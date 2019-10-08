@@ -1,4 +1,4 @@
-/*	$OpenBSD: bytestringtest.c,v 1.10 2015/10/25 20:15:06 doug Exp $	*/
+/*	$OpenBSD: bytestringtest.c,v 1.12 2018/08/16 18:40:19 jsing Exp $	*/
 /*
  * Copyright (c) 2014, Google Inc.
  *
@@ -268,7 +268,7 @@ test_get_optional_asn1_bool(void)
 static int
 test_cbb_basic(void)
 {
-	static const uint8_t kExpected[] = {1, 2, 3, 4, 5, 6, 7, 8};
+	static const uint8_t kExpected[] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
 	uint8_t *buf = NULL;
 	size_t buf_len;
 	int ret = 0;
@@ -282,7 +282,8 @@ test_cbb_basic(void)
 	CHECK_GOTO(CBB_add_u8(&cbb, 1));
 	CHECK_GOTO(CBB_add_u16(&cbb, 0x203));
 	CHECK_GOTO(CBB_add_u24(&cbb, 0x40506));
-	CHECK_GOTO(CBB_add_bytes(&cbb, (const uint8_t*) "\x07\x08", 2));
+	CHECK_GOTO(CBB_add_u32(&cbb, 0x708090a));
+	CHECK_GOTO(CBB_add_bytes(&cbb, (const uint8_t*) "\x0b\x0c", 2));
 	CHECK_GOTO(CBB_finish(&cbb, &buf, &buf_len));
 
 	ret = (buf_len == sizeof(kExpected)
@@ -350,9 +351,9 @@ test_cbb_prefixed(void)
 {
 	static const uint8_t kExpected[] = {0, 1, 1, 0, 2, 2, 3, 0, 0, 3,
 	    4, 5, 6, 5, 4, 1, 0, 1, 2};
+	CBB cbb, contents, inner_contents, inner_inner_contents;
 	uint8_t *buf = NULL;
 	size_t buf_len;
-	CBB cbb, contents, inner_contents, inner_inner_contents;
 	int ret = 0;
 
 	CHECK(CBB_init(&cbb, 0));
@@ -369,6 +370,59 @@ test_cbb_prefixed(void)
 	CHECK_GOTO(CBB_add_u16_length_prefixed(&inner_contents,
 	    &inner_inner_contents));
 	CHECK_GOTO(CBB_add_u8(&inner_inner_contents, 2));
+	CHECK_GOTO(CBB_finish(&cbb, &buf, &buf_len));
+
+	ret = (buf_len == sizeof(kExpected)
+	    && memcmp(buf, kExpected, buf_len) == 0);
+
+	if (0) {
+err:
+		CBB_cleanup(&cbb);
+	}
+	free(buf);
+	return ret;
+}
+
+static int
+test_cbb_discard_child(void)
+{
+	static const uint8_t kExpected[] = {
+		0xaa,
+		0,
+		1, 0xbb,
+		0, 2, 0xcc, 0xcc,
+		0, 0, 3, 0xdd, 0xdd, 0xdd,
+		1, 0xff,
+	};
+	CBB cbb, contents, inner_contents, inner_inner_contents;
+	uint8_t *buf = NULL;
+	size_t buf_len;
+	int ret = 0;
+
+	CHECK(CBB_init(&cbb, 0));
+	CHECK_GOTO(CBB_add_u8(&cbb, 0xaa));
+
+	// Discarding |cbb|'s children preserves the byte written.
+	CBB_discard_child(&cbb);
+
+	CHECK_GOTO(CBB_add_u8_length_prefixed(&cbb, &contents));
+	CHECK_GOTO(CBB_add_u8_length_prefixed(&cbb, &contents));
+	CHECK_GOTO(CBB_add_u8(&contents, 0xbb));
+	CHECK_GOTO(CBB_add_u16_length_prefixed(&cbb, &contents));
+	CHECK_GOTO(CBB_add_u16(&contents, 0xcccc));
+	CHECK_GOTO(CBB_add_u24_length_prefixed(&cbb, &contents));
+	CHECK_GOTO(CBB_add_u24(&contents, 0xdddddd));
+	CHECK_GOTO(CBB_add_u8_length_prefixed(&cbb, &contents));
+	CHECK_GOTO(CBB_add_u8(&contents, 0xff));
+	CHECK_GOTO(CBB_add_u8_length_prefixed(&contents, &inner_contents));
+	CHECK_GOTO(CBB_add_u8(&inner_contents, 0x42));
+	CHECK_GOTO(CBB_add_u16_length_prefixed(&inner_contents,
+	    &inner_inner_contents));
+	CHECK_GOTO(CBB_add_u8(&inner_inner_contents, 0x99));
+
+	// Discard everything from |inner_contents| down.
+	CBB_discard_child(&contents);
+
 	CHECK_GOTO(CBB_finish(&cbb, &buf, &buf_len));
 
 	ret = (buf_len == sizeof(kExpected)
@@ -805,6 +859,7 @@ main(void)
 	failed |= !test_cbb_basic();
 	failed |= !test_cbb_fixed();
 	failed |= !test_cbb_finish_child();
+	failed |= !test_cbb_discard_child();
 	failed |= !test_cbb_misuse();
 	failed |= !test_cbb_prefixed();
 	failed |= !test_cbb_asn1();

@@ -1,9 +1,3 @@
-include_directories(
-	.
-	../../include
-	../../include/compat
-)
-
 set(
 	OPENSSL_SRC
 	apps.c
@@ -55,12 +49,12 @@ set(
 	x509.c
 )
 
-if(CMAKE_HOST_UNIX)
+if(UNIX)
 	set(OPENSSL_SRC ${OPENSSL_SRC} apps_posix.c)
 	set(OPENSSL_SRC ${OPENSSL_SRC} certhash.c)
 endif()
 
-if(CMAKE_HOST_WIN32)
+if(WIN32)
 	set(OPENSSL_SRC ${OPENSSL_SRC} apps_win.c)
 	set(OPENSSL_SRC ${OPENSSL_SRC} certhash_win.c)
 	set(OPENSSL_SRC ${OPENSSL_SRC} compat/poll_win.c)
@@ -73,7 +67,15 @@ else()
 	set(OPENSSL_SRC ${OPENSSL_SRC} compat/strtonum.c)
 endif()
 
+if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+        check_function_exists(clock_gettime HAVE_CLOCK_GETTIME)
+        if(NOT HAVE_CLOCK_GETTIME)
+                set(OPENSSL_SRC ${OPENSSL_SRC} compat/clock_gettime_osx.c)
+        endif()
+endif()
+
 add_executable(openssl ${OPENSSL_SRC})
+target_include_directories(openssl PRIVATE . ../../include/compat)
 target_link_libraries(openssl ${OPENSSL_LIBS})
 
 if(ENABLE_LIBRESSL_INSTALL)

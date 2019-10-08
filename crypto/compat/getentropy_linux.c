@@ -1,4 +1,4 @@
-/*	$OpenBSD: getentropy_linux.c,v 1.44 2017/04/29 18:43:31 beck Exp $	*/
+/*	$OpenBSD: getentropy_linux.c,v 1.46 2018/11/20 08:04:28 deraadt Exp $	*/
 
 /*
  * Copyright (c) 2014 Theo de Raadt <deraadt@openbsd.org>
@@ -73,8 +73,7 @@
 
 int	getentropy(void *buf, size_t len);
 
-static int gotdata(char *buf, size_t len);
-#ifdef SYS_getrandom
+#if defined(SYS_getrandom) && defined(GRND_NONBLOCK)
 static int getentropy_getrandom(void *buf, size_t len);
 #endif
 static int getentropy_urandom(void *buf, size_t len);
@@ -94,7 +93,7 @@ getentropy(void *buf, size_t len)
 		return (-1);
 	}
 
-#ifdef SYS_getrandom
+#if defined(SYS_getrandom) && defined(GRND_NONBLOCK)
 	/*
 	 * Try descriptor-less getrandom(), in non-blocking mode.
 	 *
@@ -177,23 +176,7 @@ getentropy(void *buf, size_t len)
 	return (ret);
 }
 
-/*
- * Basic sanity checking; wish we could do better.
- */
-static int
-gotdata(char *buf, size_t len)
-{
-	char	any_set = 0;
-	size_t	i;
-
-	for (i = 0; i < len; ++i)
-		any_set |= buf[i];
-	if (any_set == 0)
-		return (-1);
-	return (0);
-}
-
-#ifdef SYS_getrandom
+#if defined(SYS_getrandom) && defined(GRND_NONBLOCK)
 static int
 getentropy_getrandom(void *buf, size_t len)
 {
@@ -261,10 +244,8 @@ start:
 		i += ret;
 	}
 	close(fd);
-	if (gotdata(buf, len) == 0) {
-		errno = save_errno;
-		return (0);		/* satisfied */
-	}
+	errno = save_errno;
+	return (0);		/* satisfied */
 nodevrandom:
 	errno = EIO;
 	return (-1);
@@ -292,10 +273,8 @@ getentropy_sysctl(void *buf, size_t len)
 			goto sysctlfailed;
 		i += chunk;
 	}
-	if (gotdata(buf, len) == 0) {
-		errno = save_errno;
-		return (0);			/* satisfied */
-	}
+	errno = save_errno;
+	return (0);			/* satisfied */
 sysctlfailed:
 	errno = EIO;
 	return (-1);
@@ -541,10 +520,6 @@ getentropy_fallback(void *buf, size_t len)
 	}
 	explicit_bzero(&ctx, sizeof ctx);
 	explicit_bzero(results, sizeof results);
-	if (gotdata(buf, len) == 0) {
-		errno = save_errno;
-		return (0);		/* satisfied */
-	}
-	errno = EIO;
-	return (-1);
+	errno = save_errno;
+	return (0);		/* satisfied */
 }

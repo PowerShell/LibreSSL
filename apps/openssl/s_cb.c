@@ -1,4 +1,4 @@
-/* $OpenBSD: s_cb.c,v 1.8 2017/08/12 21:04:33 jsing Exp $ */
+/* $OpenBSD: s_cb.c,v 1.11 2018/11/06 05:45:50 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -700,8 +700,8 @@ tlsext_cb(SSL * s, int client_server, int type, unsigned char *data, int len,
 		extname = "cert type";
 		break;
 
-	case TLSEXT_TYPE_elliptic_curves:
-		extname = "elliptic curves";
+	case TLSEXT_TYPE_supported_groups:
+		extname = "supported groups";
 		break;
 
 	case TLSEXT_TYPE_ec_point_formats:
@@ -730,6 +730,14 @@ tlsext_cb(SSL * s, int client_server, int type, unsigned char *data, int len,
 
 	case TLSEXT_TYPE_renegotiate:
 		extname = "renegotiation info";
+		break;
+
+	case TLSEXT_TYPE_application_layer_protocol_negotiation:
+		extname = "application layer protocol negotiation";
+		break;
+
+	case TLSEXT_TYPE_padding:
+		extname = "TLS padding";
 		break;
 
 	default:
@@ -813,7 +821,8 @@ generate_cookie_callback(SSL * ssl, unsigned char *cookie,
 }
 
 int
-verify_cookie_callback(SSL * ssl, unsigned char *cookie, unsigned int cookie_len)
+verify_cookie_callback(SSL * ssl, const unsigned char *cookie,
+    unsigned int cookie_len)
 {
 	unsigned char *buffer, result[EVP_MAX_MD_SIZE];
 	unsigned int length, resultlength;

@@ -1,4 +1,4 @@
-/* $OpenBSD: s_client.c,v 1.33 2017/08/12 21:04:33 jsing Exp $ */
+/* $OpenBSD: s_client.c,v 1.37 2018/11/14 06:24:21 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -592,7 +592,7 @@ s_client_main(int argc, char **argv)
 			goto bad;
 	}
 	if (badop) {
-bad:
+ bad:
 		if (errstr)
 			BIO_printf(bio_err, "invalid argument %s: %s\n",
 			    *argv, errstr);
@@ -859,7 +859,7 @@ re_start:
 		BIO_free(fbio);
 		if (!foundit)
 			BIO_printf(bio_err,
-			    "didn't found starttls in server response,"
+			    "didn't find starttls in server response,"
 			    " try anyway...\n");
 		BIO_printf(sbio, "STARTTLS\r\n");
 		BIO_read(sbio, sbuf, BUFSIZZ);
@@ -891,7 +891,7 @@ re_start:
 		BIO_free(fbio);
 		if (!foundit)
 			BIO_printf(bio_err,
-			    "didn't found STARTTLS in server response,"
+			    "didn't find STARTTLS in server response,"
 			    " try anyway...\n");
 		BIO_printf(sbio, ". STARTTLS\r\n");
 		BIO_read(sbio, sbuf, BUFSIZZ);
@@ -1200,27 +1200,23 @@ re_start:
 	}
 
 	ret = 0;
-shut:
+ shut:
 	if (in_init)
 		print_stuff(bio_c_out, con, full_log);
 	SSL_shutdown(con);
 	shutdown(SSL_get_fd(con), SHUT_RD);
 	close(SSL_get_fd(con));
-end:
+ end:
 	if (con != NULL) {
 		if (prexit != 0)
 			print_stuff(bio_c_out, con, 1);
 		SSL_free(con);
 	}
-	if (ctx != NULL)
-		SSL_CTX_free(ctx);
-	if (cert)
-		X509_free(cert);
-	if (key)
-		EVP_PKEY_free(key);
+	SSL_CTX_free(ctx);
+	X509_free(cert);
+	EVP_PKEY_free(key);
 	free(pass);
-	if (vpm)
-		X509_VERIFY_PARAM_free(vpm);
+	X509_VERIFY_PARAM_free(vpm);
 	freezero(cbuf, BUFSIZZ);
 	freezero(sbuf, BUFSIZZ);
 	freezero(mbuf, BUFSIZZ);
@@ -1405,8 +1401,7 @@ print_stuff(BIO * bio, SSL * s, int full)
 		}
 	}
 	BIO_printf(bio, "---\n");
-	if (peer != NULL)
-		X509_free(peer);
+	X509_free(peer);
 	/* flush, or debugging output gets mixed with http response */
 	(void) BIO_flush(bio);
 }

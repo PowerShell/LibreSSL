@@ -26,7 +26,7 @@ m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 # This must be saved before AC_PROG_CC
 USER_CFLAGS="$CFLAGS"
 
-AC_PROG_CC
+AC_PROG_CC([cc gcc])
 AC_PROG_CC_STDC
 AM_PROG_CC_C_O
 AC_PROG_LIBTOOL
@@ -80,18 +80,18 @@ CFLAGS="$old_cflags"
 
 AS_CASE([$host_cpu],
 	[*sparc*], [CPPFLAGS="$CPPFLAGS -D__STRICT_ALIGNMENT"],
-	[*arm*], AS_IF([test "x$BSWAP4" = "xyes"],,
-		    CPPFLAGS="$CPPFLAGS -D__STRICT_ALIGNMENT"),
-	[*amd64*], [host_cpu=x86_64, HOSTARCH=intel],
+	[*arm*], [host_cpu=arm],
+	[*amd64*], [host_cpu=x86_64 HOSTARCH=intel],
 	[i?86], [HOSTARCH=intel],
 	[x86_64], [HOSTARCH=intel]
 )
+AS_IF([test "x$BSWAP4" = "xyes" -a "$host_cpu" = "arm" ],,CPPFLAGS="$CPPFLAGS -D__STRICT_ALIGNMENT")
 AM_CONDITIONAL([HOST_CPU_IS_INTEL], [test "x$HOSTARCH" = "xintel"])
 
 AC_MSG_CHECKING([if .gnu.warning accepts long strings])
 AC_LINK_IFELSE([AC_LANG_SOURCE([[
 extern void SSLv3_method();
-__asm__(".section .gnu.warning.SSLv3_method; .ascii \"SSLv3_method is insecure\" ; .text");
+__asm__(".section .gnu.warning.SSLv3_method\n\t.ascii \"SSLv3_method is insecure\"\n\t.text");
 int main() {return 0;}
 ]])], [
     AC_DEFINE(HAS_GNU_WARNING_LONG, 1, [Define if .gnu.warning accepts long strings.])
@@ -105,10 +105,16 @@ AC_ARG_ENABLE([asm],
 AM_CONDITIONAL([OPENSSL_NO_ASM], [test "x$enable_asm" = "xno"])
 
 # Conditionally enable assembly by default
+AM_CONDITIONAL([HOST_ASM_ELF_ARM],
+    [test "x$HOST_ABI" = "xelf" -a "$host_cpu" = "arm" -a "x$enable_asm" != "xno"])
 AM_CONDITIONAL([HOST_ASM_ELF_X86_64],
     [test "x$HOST_ABI" = "xelf" -a "$host_cpu" = "x86_64" -a "x$enable_asm" != "xno"])
 AM_CONDITIONAL([HOST_ASM_MACOSX_X86_64],
     [test "x$HOST_ABI" = "xmacosx" -a "$host_cpu" = "x86_64" -a "x$enable_asm" != "xno"])
+AM_CONDITIONAL([HOST_ASM_MASM_X86_64],
+    [test "x$HOST_ABI" = "xmasm" -a "$host_cpu" = "x86_64" -a "x$enable_asm" != "xno"])
+AM_CONDITIONAL([HOST_ASM_MINGW64_X86_64],
+    [test "x$HOST_ABI" = "xmingw64" -a "$host_cpu" = "x86_64" -a "x$enable_asm" != "xno"])
 
 # Check if time_t is sized correctly
 AC_CHECK_SIZEOF([time_t], [time.h])

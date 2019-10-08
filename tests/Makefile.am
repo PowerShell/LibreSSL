@@ -3,6 +3,7 @@ include $(top_srcdir)/Makefile.am.common
 AM_CPPFLAGS += -I $(top_srcdir)/crypto/modes
 AM_CPPFLAGS += -I $(top_srcdir)/crypto/asn1
 AM_CPPFLAGS += -I $(top_srcdir)/ssl
+AM_CPPFLAGS += -I $(top_srcdir)/tls
 AM_CPPFLAGS += -I $(top_srcdir)/apps/openssl
 AM_CPPFLAGS += -I $(top_srcdir)/apps/openssl/compat
 AM_CPPFLAGS += -D_PATH_SSL_CA_FILE=\"$(top_srcdir)/apps/openssl/cert.pem\"
@@ -43,6 +44,11 @@ arc4randomforktest_SOURCES = arc4randomforktest.c
 endif
 EXTRA_DIST += arc4randomforktest.sh
 
+# asn1evp
+TESTS += asn1evp
+check_PROGRAMS += asn1evp
+asn1evp_SOURCES = asn1evp.c
+
 # asn1test
 TESTS += asn1test
 check_PROGRAMS += asn1test
@@ -71,11 +77,27 @@ check_PROGRAMS += biotest
 biotest_SOURCES = biotest.c
 endif
 
+# bnaddsub
+TESTS += bnaddsub
+check_PROGRAMS += bnaddsub
+bnaddsub_SOURCES = bnaddsub.c
+
+# bn_rand_interval
+TESTS += bn_rand_interval
+check_PROGRAMS += bn_rand_interval
+bn_rand_interval_SOURCES = bn_rand_interval.c
+
 # bntest
 TESTS += bntest
 bntest_CPPFLAGS = $(AM_CPPFLAGS) -ULIBRESSL_INTERNAL
 check_PROGRAMS += bntest
 bntest_SOURCES = bntest.c
+
+# buffertest
+TESTS += buffertest
+buffertest_CPPFLAGS = $(AM_CPPFLAGS)
+check_PROGRAMS += buffertest
+buffertest_SOURCES = buffertest.c
 
 # bytestringtest
 TESTS += bytestringtest
@@ -107,6 +129,11 @@ cipherstest_SOURCES = cipherstest.c
 TESTS += clienttest
 check_PROGRAMS += clienttest
 clienttest_SOURCES = clienttest.c
+
+# configtest
+TESTS += configtest
+check_PROGRAMS += configtest
+configtest_SOURCES = configtest.c
 
 # cts128test
 TESTS += cts128test
@@ -189,6 +216,10 @@ TESTS += gost2814789t
 check_PROGRAMS += gost2814789t
 gost2814789t_SOURCES = gost2814789t.c
 
+# handshake_table
+noinst_PROGRAMS = handshake_table
+handshake_table_SOURCES = handshake_table.c
+
 # hkdf_test
 TESTS += hkdftest
 check_PROGRAMS += hkdftest
@@ -208,6 +239,17 @@ ideatest_SOURCES = ideatest.c
 TESTS += igetest
 check_PROGRAMS += igetest
 igetest_SOURCES = igetest.c
+
+# keypairtest
+TESTS += keypairtest.sh
+check_PROGRAMS += keypairtest
+keypairtest_SOURCES = keypairtest.c
+EXTRA_DIST += keypairtest.sh
+
+# key_schedule
+TESTS += key_schedule
+check_PROGRAMS += key_schedule
+key_schedule_SOURCES = key_schedule.c
 
 # md4test
 TESTS += md4test
@@ -284,6 +326,11 @@ TESTS += rc4test
 check_PROGRAMS += rc4test
 rc4test_SOURCES = rc4test.c
 
+# recordtest
+TESTS += recordtest
+check_PROGRAMS += recordtest
+recordtest_SOURCES = recordtest.c
+
 # rfc5280time
 check_PROGRAMS += rfc5280time
 rfc5280time_SOURCES = rfc5280time.c
@@ -324,6 +371,16 @@ sha256test_SOURCES = sha256test.c
 TESTS += sha512test
 check_PROGRAMS += sha512test
 sha512test_SOURCES = sha512test.c
+
+# sm3test
+TESTS += sm3test
+check_PROGRAMS += sm3test
+sm3test_SOURCES = sm3test.c
+
+# sm4test
+TESTS += sm4test
+check_PROGRAMS += sm4test
+sm4test_SOURCES = sm4test.c
 
 # ssl_versions
 TESTS += ssl_versions
@@ -384,6 +441,11 @@ TESTS += utf8test
 check_PROGRAMS += utf8test
 utf8test_SOURCES = utf8test.c
 
+# valid_handshakes_terminate
+TESTS += valid_handshakes_terminate
+check_PROGRAMS += valid_handshakes_terminate
+valid_handshakes_terminate_SOURCES = valid_handshakes_terminate.c
+
 # verifytest
 TESTS += verifytest
 check_PROGRAMS += verifytest
@@ -393,3 +455,8 @@ verifytest_SOURCES = verifytest.c
 TESTS += x25519test
 check_PROGRAMS += x25519test
 x25519test_SOURCES = x25519test.c
+
+# x509name
+TESTS += x509name
+check_PROGRAMS += x509name
+x509name_SOURCES = x509name.c

@@ -1,4 +1,4 @@
-/*	$Id: http.c,v 1.9 2017/03/26 18:41:02 deraadt Exp $ */
+/*	$Id: http.c,v 1.11 2018/11/29 14:25:07 tedu Exp $ */
 /*
  * Copyright (c) 2016 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -34,10 +34,6 @@
 
 #include "http.h"
 #include <tls.h>
-
-#ifndef DEFAULT_CA_FILE
-#define DEFAULT_CA_FILE "/etc/ssl/cert.pem"
-#endif
 
 /*
  * A buffer for transferring HTTP/S data.
@@ -139,7 +135,7 @@ http_init()
 		goto err;
 	}
 
-	if (tls_config_set_ca_file(tlscfg, DEFAULT_CA_FILE) == -1) {
+	if (tls_config_set_ca_file(tlscfg, tls_default_ca_cert_file()) == -1) {
 		warn("tls_config_set_ca_file: %s", tls_config_error(tlscfg));
 		goto err;
 	}

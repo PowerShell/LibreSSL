@@ -1,4 +1,4 @@
-/* $OpenBSD: ocsp_cl.c,v 1.14 2017/01/29 17:49:23 beck Exp $ */
+/* $OpenBSD: ocsp_cl.c,v 1.16 2018/11/25 19:48:43 jmc Exp $ */
 /* Written by Tom Titchener <Tom_Titchener@groove.net> for the OpenSSL
  * project. */
 
@@ -139,7 +139,7 @@ OCSP_request_add1_cert(OCSP_REQUEST *req, X509 *cert)
 	return 1;
 }
 
-/* Sign an OCSP request set the requestorName to the subjec
+/* Sign an OCSP request set the requestorName to the subject
  * name of an optional signers certificate and include one
  * or more optional certificates in the request. Behaves
  * like PKCS7_sign().
@@ -389,4 +389,10 @@ OCSP_check_validity(ASN1_GENERALIZEDTIME *thisupd,
 	}
 
 	return 1;
+}
+
+const OCSP_CERTID *
+OCSP_SINGLERESP_get0_id(const OCSP_SINGLERESP *single)
+{
+	return single->certId;
 }

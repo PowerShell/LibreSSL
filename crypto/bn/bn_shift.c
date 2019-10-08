@@ -167,9 +167,7 @@ BN_lshift(BIGNUM *r, const BIGNUM *a, int n)
 	bn_check_top(r);
 	return (1);
 }
-#ifdef _M_ARM64
-#pragma optimize("", off)
-#endif
+
 int
 BN_rshift(BIGNUM *r, const BIGNUM *a, int n)
 {
@@ -218,6 +216,3 @@ BN_rshift(BIGNUM *r, const BIGNUM *a, int n)
 	bn_check_top(r);
 	return (1);
 }
-#ifdef _M_ARM64
-#pragma optimize("", on)
-#endif

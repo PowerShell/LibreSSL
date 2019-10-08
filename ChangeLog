@@ -28,7 +28,213 @@ history is also available from Git.
 
 LibreSSL Portable Release Notes:
 
-2.6.5 - Security fixes
+2.9.2 - Bug fixes
+
+	* Fixed portable builds with older versions of MacOS,
+	  Android targets < API 21, and Solaris 10
+
+	* Fixed SRTP profile advertisement for DTLS servers.
+
+2.9.1 - Stable release
+
+	* Added support for XChaCha20 and XChaCha20-Poly1305.
+
+	* Added support for AES key wrap constructions via the EVP interface.
+
+	* Partial port of the OpenSSL EC_KEY_METHOD API for use by OpenSSH.
+
+	* Added pbkdf2 key derivation support to openssl(1)
+
+	* Removed SHA224 based handshake signatures from consideration for use in a TLS 1.2 handshake.
+
+	* Changed the default digest type of openssl(1) enc to to sha256.
+
+	* Changed the default digest type of openssl(1) dgst to sha256.
+
+	* Changed the default digest type of openssl(1) x509 -fingerprint to sha256.
+
+	* Changed the default digest type of openssl(1) crl -fingerprint to sha256.
+
+	* Improved Windows, Android, and ARM compatibility, including assembly
+	  optimizations on Mingw-w64 targets.
+
+2.9.0 - Development release
+
+	* Added the SM4 block cipher from the Chinese standard GB/T 32907-2016.
+
+	* Fixed warnings about clock_gettime on Windows Visual Studio builds.
+
+	* Fixed CMake builds on systems where getpagesize is defined as an
+	  inline function.
+
+	* CRYPTO_LOCK is now automatically initialized, with the legacy
+	  callbacks stubbed for compatibility.
+
+	* Added the SM3 hash function from the Chinese standard GB/T 32905-2016.
+
+	* Added more OPENSSL_NO_* macros for compatibility with OpenSSL.
+
+	* Added extensive interoperability tests between LibreSSL and OpenSSL
+	  1.0 and 1.1.
+
+	* Added additional Wycheproof tests and related bug fixes.
+
+	* Simplified sigalgs option processing and handshake signing algorithm
+
+	* Added the ability to use the RSA PSS algorithm for handshake
+	  signatures.
+
+	* Added bn_rand_interval() and use it in code needing ranges of random
+	  bn values.
+
+	* Added functionality to derive early, handshake, and application
+	  secrets as per RFC8446.
+
+	* Added handshake state machine from RFC8446.
+
+	* Removed some ASN.1 related code from libcrypto that had not been used
+	  since around 2000.
+
+	* Unexported internal symbols and internalized more record layer structs.
+
+	* Added support for assembly optimizations on 32-bit ARM ELF targets.
+
+	* Improved protection against timing side channels in ECDSA signature
+	  generation.
+
+	* Coordinate blinding was added to some elliptic curves. This is the
+	  last bit of the work by Brumley et al. to protect against the
+	  Portsmash vulnerability.
+
+	* Ensure transcript handshake is always freed with TLS 1.2.
+
+2.8.2 - Stable release
+
+	* Added Wycheproof support for ECDH and ECDSA Web Crypto test vectors,
+	  along with test harness fixes.
+
+	* Fixed memory leak in nc(1)
+
+2.8.1 - Test and compatibility improvements
+
+	* Added Wycheproof support for ECDH, RSASSA-PSS, AES-GCM,
+	  AES-CMAC, AES-CCM, AES-CBC-PKCS5, DSA, ChaCha20-Poly1305, ECDSA, and
+	  X25519 test vectors. Applied appropriate fixes for errors uncovered
+	  by tests.
+
+	* Simplified key exchange signature generation and verification.
+
+	* Fixed a one-byte buffer overrun in callers of EVP_read_pw_string
+
+	* Converted more code paths to use CBB/CBS. All handshake messages are
+	  now created by CBB.
+
+	* Fixed various memory leaks found by Coverity.
+
+	* Simplified session ticket parsing and handling, inspired by
+	  BoringSSL.
+
+	* Modified signature of CRYPTO_mem_leaks_* to return -1. This function
+	  is a no-op in LibreSSL, so this function returns an error to not
+	  indicate the (non-)existence of memory leaks.
+
+	* SSL_copy_session_id, PEM_Sign, EVP_EncodeUpdate, BIO_set_cipher,
+	  X509_OBJECT_up_ref_count now return an int for error handling,
+	  matching OpenSSL.
+
+	* Converted a number of #defines into proper functions, matching
+	  OpenSSL's ABI.
+
+	* Added X509_get0_serialNumber from OpenSSL.
+
+	* Removed EVP_PKEY2PKCS8_broken and PKCS8_set_broken, while adding
+	  PKCS8_pkey_add1_attr_by_NID and PKCS8_pkey_get0_attrs, matching
+	  OpenSSL.
+
+	* Removed broken pkcs8 formats from openssl(1).
+
+	* Converted more functions in public API to use const arguments.
+
+	* Stopped handing AES-GCM in ssl_cipher_get_evp, since they use the
+	  EVP_AEAD interface.
+
+	* Stopped using composite EVP_CIPHER AEADs.
+
+	* Added timing-safe compares for checking results of signature
+	  verification. There are no known attacks, this is just inexpensive
+	  prudence.
+
+	* Correctly clear the current cipher state, when changing cipher state.
+	  This fixed an issue where renegotiation of cipher suites would fail
+	  when switched from AEAD to non-AEAD or vice-versa.
+	  Issue reported by Bernard Spil.
+
+	* Added more cipher tests to appstest.sh, including all TLSv1.2
+	  ciphers.
+
+	* Added RSA_meth_get_finish() RSA_meth_set1_name() from OpenSSL.
+
+	* Added new EVP_CIPHER_CTX_(get|set)_iv() API that allows the IV to be
+	  retrieved and set with appropriate validation.
+
+2.8.0 - Bug fixes, security, and compatibility improvements
+
+	* Extensive documentation updates and additional API history.
+
+	* Fixed a pair of 20+ year-old bugs in X509_NAME_add_entry
+
+	* Tighten up checks for various X509_VERIFY_PARAM functions,
+	  'poisoning' parameters so that an unverified certificate cannot be
+	  used if it fails verification.
+
+	* Fixed a potential memory leak on failure in ASN1_item_digest
+
+	* Fixed a potential memory alignment crash in asn1_item_combine_free
+
+	* Removed unused SSL3_FLAGS_DELAY_CLIENT_FINISHED and
+	  SSL3_FLAGS_POP_BUFFER flags in write path, simplifying IO paths.
+
+	* Removed SSL_OP_TLS_ROLLBACK_BUG buggy client workarounds.
+
+	* Made ENGINE_finish and ENGINE_free succeed on NULL and simplify callers
+	  and matching OpenSSL behavior, rewrote ENGINE_* documentation.
+
+	* Added const annotations to many existing APIs from OpenSSL, making
+	  interoperability easier for downstream applications.
+
+	* Fixed small timing side-channels in ecdsa_sign_setup and
+	  dsa_sign_setup.
+
+	* Documented security pitfalls with BN_FLG_CONSTTIME and constant-time
+	  operation of BN_* functions.
+
+	* Updated BN_clear to use explicit_bzero.
+
+	* Added a missing bounds check in c2i_ASN1_BIT_STRING.
+
+	* More CBS conversions, including simplifications to RSA key exchange,
+	  and converted code to use dedicated buffers for secrets.
+
+	* Removed three remaining single DES cipher suites.
+
+	* Fixed a potential leak/incorrect return value in DSA signature
+	  generation.
+
+	* Added a blinding value when generating DSA and ECDSA signatures, in
+	  order to reduce the possibility of a side-channel attack leaking the
+	  private key.
+
+	* Added ECC constant time scalar multiplication support.
+	  From Billy Brumley and his team at Tampere University of Technology.
+
+	* Revised the implementation of RSASSA-PKCS1-v1_5 to match the
+	  specification in RFC 8017. Based on an OpenSSL commit by David
+	  Benjamin.
+
+	* Cleaned up BN_* implementations following changes made in OpenSSL by
+	  Davide Galassi and others.
+
+2.7.4 - Security fixes
 
 	* Avoid a timing side-channel leak when generating DSA and ECDSA
 	  signatures. This is caused by an attempt to do fast modular
@@ -40,6 +246,80 @@ LibreSSL Portable Release Notes:
 	  reported by Guido Vranken to OpenSSL
 	  (https://github.com/openssl/openssl/pull/6457) and based on his
 	  diff.
+
+2.7.3 - Bug fixes
+
+	* Removed incorrect NULL checks in DH_set0_key(). Reported by Ondrej
+	  Sury
+
+	* Fixed an issue normalizing CPU architecture in the configure script,
+	  which disabled assembly optimizations on platforms that get detected
+	  as 'amd64', opposed to 'x86_64'
+
+	* Limited tls_config_clear_keys() to only clear private keys.
+	  This was inadvertently clearing the keypair, which includes the OCSP
+	  staple and pubkey hash - if an application called tls_configure()
+	  followed by tls_config_clear_keys(), this would prevent OCSP staples
+	  from working.
+
+2.7.2 - Stable release
+
+	* Updated and added extensive new HISTORY sections to API manuals.
+
+	* Added support for shared library builds with CMake on all supported
+	  platforms. Note that some of the CMake options have changed, consult
+	  the README for details.
+
+2.7.1 - Bug fixes
+
+	* Fixed a bug in int_x509_param_set_hosts, calling strlen() if name
+	  length provided is 0 to match the OpenSSL behaviour. Issue noticed
+	  by Christian Heimes <christian@python.org>.
+
+	* Fixed builds macOS 10.11 and older.
+
+2.7.0 - Bug fixes and improvements
+
+	* Added support for many OpenSSL 1.0.2 and 1.1 APIs, based on
+	  observations of real-world usage in applications. These are
+	  implemented in parallel with existing OpenSSL 1.0.1 APIs - visibility
+	  changes have not been made to existing structs, allowing code written
+	  for older OpenSSL APIs to continue working.
+
+	* Extensive corrections, improvements, and additions to the
+	  API documentation, including new public APIs from OpenSSL that had
+	  no pre-existing documentation.
+
+	* Added support for automatic library initialization in libcrypto,
+	  libssl, and libtls. Support for pthread_once or a compatible
+	  equivalent is now required of the target operating system. As a
+	  side-effect, minimum Windows support is Vista or higher.
+
+	* Converted more packet handling methods to CBB, which improves
+	  resiliency when generating TLS messages.
+
+	* Completed TLS extension handling rewrite, improving consistency of
+	  checks for malformed and duplicate extensions.
+
+	* Rewrote ASN1_TYPE_{get,set}_octetstring() using templated ASN.1.
+	  This removes the last remaining use of the old M_ASN1_* macros
+	  (asn1_mac.h) from API that needs to continue to exist.
+
+	* Added support for client-side session resumption in libtls.
+	  A libtls client can specify a session file descriptor (a regular
+	  file with appropriate ownership and permissions) and libtls will
+	  manage reading and writing of session data across TLS handshakes.
+
+	* Improved support for strict alignment on ARMv7 architectures,
+	  conditionally enabling assembly in those cases.
+
+	* Fixed a memory leak in libtls when reusing a tls_config.
+
+	* Merged more DTLS support into the regular TLS code path, removing
+	  duplicated code.
+
+	* Many improvements to Windows Cmake-based builds and tests,
+	  especially when targeting Visual Studio.
 
 2.6.4 - Bug fixes
 
@@ -858,7 +1138,7 @@ LibreSSL Portable Release Notes:
 
 	* Removed nonfunctional Netscape browser-hang workaround code.
 
-	* Simplfied and refactored SSL/DTLS handshake code.
+	* Simplified and refactored SSL/DTLS handshake code.
 
 	* Added SHA256 Camellia cipher suites for TLS 1.2 from RFC 5932.
 

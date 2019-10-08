@@ -1,4 +1,4 @@
-/* $OpenBSD: tls_config.c,v 1.44.4.1 2017/12/09 16:49:17 jsing Exp $ */
+/* $OpenBSD: tls_config.c,v 1.56 2019/04/04 15:09:09 jsing Exp $ */
 /*
  * Copyright (c) 2014 Joel Sing <jsing@openbsd.org>
  *
@@ -15,135 +15,29 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#ifdef _MSC_VER
+#define NO_REDEF_POSIX_FUNCTIONS
+#endif
+
 #include <sys/stat.h>
 
 #include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <pthread.h>
 #include <stdlib.h>
 #include <unistd.h>
 
 #include <tls.h>
+
 #include "tls_internal.h"
 
-static int
-set_string(const char **dest, const char *src)
+static const char default_ca_file[] = "/etc/ssl/cert.pem";
+
+const char *
+tls_default_ca_cert_file(void)
 {
-	free((char *)*dest);
-	*dest = NULL;
-	if (src != NULL)
-		if ((*dest = strdup(src)) == NULL)
-			return -1;
-	return 0;
-}
-
-static void *
-memdup(const void *in, size_t len)
-{
-	void *out;
-
-	if ((out = malloc(len)) == NULL)
-		return NULL;
-	memcpy(out, in, len);
-	return out;
-}
-
-static int
-set_mem(char **dest, size_t *destlen, const void *src, size_t srclen)
-{
-	free(*dest);
-	*dest = NULL;
-	*destlen = 0;
-	if (src != NULL)
-		if ((*dest = memdup(src, srclen)) == NULL)
-			return -1;
-	*destlen = srclen;
-	return 0;
-}
-
-static struct tls_keypair *
-tls_keypair_new(void)
-{
-	return calloc(1, sizeof(struct tls_keypair));
-}
-
-static void
-tls_keypair_clear_key(struct tls_keypair *keypair)
-{
-	freezero(keypair->key_mem, keypair->key_len);
-	keypair->key_mem = NULL;
-	keypair->key_len = 0;
-}
-
-static int
-tls_keypair_set_cert_file(struct tls_keypair *keypair, struct tls_error *error,
-    const char *cert_file)
-{
-	return tls_config_load_file(error, "certificate", cert_file,
-	    &keypair->cert_mem, &keypair->cert_len);
-}
-
-static int
-tls_keypair_set_cert_mem(struct tls_keypair *keypair, const uint8_t *cert,
-    size_t len)
-{
-	return set_mem(&keypair->cert_mem, &keypair->cert_len, cert, len);
-}
-
-static int
-tls_keypair_set_key_file(struct tls_keypair *keypair, struct tls_error *error,
-    const char *key_file)
-{
-	tls_keypair_clear_key(keypair);
-	return tls_config_load_file(error, "key", key_file,
-	    &keypair->key_mem, &keypair->key_len);
-}
-
-static int
-tls_keypair_set_key_mem(struct tls_keypair *keypair, const uint8_t *key,
-    size_t len)
-{
-	tls_keypair_clear_key(keypair);
-	return set_mem(&keypair->key_mem, &keypair->key_len, key, len);
-}
-
-static int
-tls_keypair_set_ocsp_staple_file(struct tls_keypair *keypair,
-    struct tls_error *error, const char *ocsp_file)
-{
-	return tls_config_load_file(error, "ocsp", ocsp_file,
-	    &keypair->ocsp_staple, &keypair->ocsp_staple_len);
-}
-
-static int
-tls_keypair_set_ocsp_staple_mem(struct tls_keypair *keypair,
-    const uint8_t *staple, size_t len)
-{
-	return set_mem(&keypair->ocsp_staple, &keypair->ocsp_staple_len, staple,
-	    len);
-}
-
-static void
-tls_keypair_clear(struct tls_keypair *keypair)
-{
-	tls_keypair_set_cert_mem(keypair, NULL, 0);
-	tls_keypair_set_key_mem(keypair, NULL, 0);
-}
-
-static void
-tls_keypair_free(struct tls_keypair *keypair)
-{
-	if (keypair == NULL)
-		return;
-
-	tls_keypair_clear(keypair);
-
-	free(keypair->cert_mem);
-	free(keypair->key_mem);
-	free(keypair->ocsp_staple);
-	free(keypair->pubkey_hash);
-
-	free(keypair);
+	return default_ca_file;
 }
 
 int
@@ -161,31 +55,31 @@ tls_config_load_file(struct tls_error *error, const char *filetype,
 	if ((fd = open(filename, O_RDONLY)) == -1) {
 		tls_error_set(error, "failed to open %s file '%s'",
 		    filetype, filename);
-		goto fail;
+		goto err;
 	}
 	if (fstat(fd, &st) != 0) {
 		tls_error_set(error, "failed to stat %s file '%s'",
 		    filetype, filename);
-		goto fail;
+		goto err;
 	}
 	if (st.st_size < 0)
-		goto fail;
+		goto err;
 	*len = (size_t)st.st_size;
 	if ((*buf = malloc(*len)) == NULL) {
 		tls_error_set(error, "failed to allocate buffer for "
 		    "%s file", filetype);
-		goto fail;
+		goto err;
 	}
 	n = read(fd, *buf, *len);
 	if (n < 0 || (size_t)n != *len) {
 		tls_error_set(error, "failed to read %s file '%s'",
 		    filetype, filename);
-		goto fail;
+		goto err;
 	}
 	close(fd);
 	return 0;
 
- fail:
+ err:
 	if (fd != -1)
 		close(fd);
 	freezero(*buf, *len);
@@ -196,7 +90,7 @@ tls_config_load_file(struct tls_error *error, const char *filetype,
 }
 
 struct tls_config *
-tls_config_new(void)
+tls_config_new_internal(void)
 {
 	struct tls_config *config;
 	unsigned char sid[TLS_MAX_SESSION_ID_LENGTH];
@@ -204,10 +98,14 @@ tls_config_new(void)
 	if ((config = calloc(1, sizeof(*config))) == NULL)
 		return (NULL);
 
-	if ((config->keypair = tls_keypair_new()) == NULL)
+	if (pthread_mutex_init(&config->mutex, NULL) != 0)
 		goto err;
 
 	config->refcount = 1;
+	config->session_fd = -1;
+
+	if ((config->keypair = tls_keypair_new()) == NULL)
+		goto err;
 
 	/*
 	 * Default configuration.
@@ -246,15 +144,29 @@ tls_config_new(void)
 	return (NULL);
 }
 
+struct tls_config *
+tls_config_new(void)
+{
+	if (tls_init() == -1)
+		return (NULL);
+
+	return tls_config_new_internal();
+}
+
 void
 tls_config_free(struct tls_config *config)
 {
 	struct tls_keypair *kp, *nkp;
+	int refcount;
 
 	if (config == NULL)
 		return;
 
-	if (--config->refcount > 0)
+	pthread_mutex_lock(&config->mutex);
+	refcount = --config->refcount;
+	pthread_mutex_unlock(&config->mutex);
+
+	if (refcount > 0)
 		return;
 
 	for (kp = config->keypair; kp != NULL; kp = nkp) {
@@ -298,10 +210,7 @@ tls_config_clear_keys(struct tls_config *config)
 	struct tls_keypair *kp;
 
 	for (kp = config->keypair; kp != NULL; kp = kp->next)
-		tls_keypair_clear(kp);
-
-	tls_config_set_ca_mem(config, NULL, 0);
-	tls_config_set_crl_mem(config, NULL, 0);
+		tls_keypair_clear_key(kp);
 }
 
 int
@@ -469,12 +378,13 @@ tls_config_add_keypair_mem_internal(struct tls_config *config, const uint8_t *ce
 
 	if ((keypair = tls_keypair_new()) == NULL)
 		return (-1);
-	if (tls_keypair_set_cert_mem(keypair, cert, cert_len) != 0)
+	if (tls_keypair_set_cert_mem(keypair, &config->error, cert, cert_len) != 0)
 		goto err;
-	if (tls_keypair_set_key_mem(keypair, key, key_len) != 0)
+	if (tls_keypair_set_key_mem(keypair, &config->error, key, key_len) != 0)
 		goto err;
 	if (staple != NULL &&
-	    tls_keypair_set_ocsp_staple_mem(keypair, staple, staple_len) != 0)
+	    tls_keypair_set_ocsp_staple_mem(keypair, &config->error, staple,
+		staple_len) != 0)
 		goto err;
 
 	tls_config_keypair_add(config, keypair);
@@ -529,13 +439,13 @@ tls_config_set_ca_file(struct tls_config *config, const char *ca_file)
 int
 tls_config_set_ca_path(struct tls_config *config, const char *ca_path)
 {
-	return set_string(&config->ca_path, ca_path);
+	return tls_set_string(&config->ca_path, ca_path);
 }
 
 int
 tls_config_set_ca_mem(struct tls_config *config, const uint8_t *ca, size_t len)
 {
-	return set_mem(&config->ca_mem, &config->ca_len, ca, len);
+	return tls_set_mem(&config->ca_mem, &config->ca_len, ca, len);
 }
 
 int
@@ -549,7 +459,8 @@ int
 tls_config_set_cert_mem(struct tls_config *config, const uint8_t *cert,
     size_t len)
 {
-	return tls_keypair_set_cert_mem(config->keypair, cert, len);
+	return tls_keypair_set_cert_mem(config->keypair, &config->error,
+	    cert, len);
 }
 
 int
@@ -571,17 +482,17 @@ tls_config_set_ciphers(struct tls_config *config, const char *ciphers)
 
 	if ((ssl_ctx = SSL_CTX_new(SSLv23_method())) == NULL) {
 		tls_config_set_errorx(config, "out of memory");
-		goto fail;
+		goto err;
 	}
 	if (SSL_CTX_set_cipher_list(ssl_ctx, ciphers) != 1) {
 		tls_config_set_errorx(config, "no ciphers for '%s'", ciphers);
-		goto fail;
+		goto err;
 	}
 
 	SSL_CTX_free(ssl_ctx);
-	return set_string(&config->ciphers, ciphers);
+	return tls_set_string(&config->ciphers, ciphers);
 
- fail:
+ err:
 	SSL_CTX_free(ssl_ctx);
 	return -1;
 }
@@ -597,7 +508,7 @@ int
 tls_config_set_crl_mem(struct tls_config *config, const uint8_t *crl,
     size_t len)
 {
-	return set_mem(&config->crl_mem, &config->crl_len, crl, len);
+	return tls_set_mem(&config->crl_mem, &config->crl_len, crl, len);
 }
 
 int
@@ -624,17 +535,16 @@ tls_config_set_dheparams(struct tls_config *config, const char *params)
 int
 tls_config_set_ecdhecurve(struct tls_config *config, const char *curve)
 {
-	if (strchr(curve, ',') != NULL || strchr(curve, ':') != NULL) {
+	if (curve == NULL ||
+	    strcasecmp(curve, "none") == 0 ||
+	    strcasecmp(curve, "auto") == 0) {
+		curve = TLS_ECDHE_CURVES;
+	} else if (strchr(curve, ',') != NULL || strchr(curve, ':') != NULL) {
 		tls_config_set_errorx(config, "invalid ecdhe curve '%s'",
 		    curve);
 		return (-1);
 	}
 
-	if (curve == NULL ||
-	    strcasecmp(curve, "none") == 0 ||
-	    strcasecmp(curve, "auto") == 0)
-		curve = TLS_ECDHE_CURVES;
-		
 	return tls_config_set_ecdhecurves(config, curve);
 }
 
@@ -710,7 +620,8 @@ int
 tls_config_set_key_mem(struct tls_config *config, const uint8_t *key,
     size_t len)
 {
-	return tls_keypair_set_key_mem(config->keypair, key, len);
+	return tls_keypair_set_key_mem(config->keypair, &config->error,
+	    key, len);
 }
 
 static int
@@ -718,8 +629,6 @@ tls_config_set_keypair_file_internal(struct tls_config *config,
     const char *cert_file, const char *key_file, const char *ocsp_file)
 {
 	if (tls_config_set_cert_file(config, cert_file) != 0)
-		return (-1);
-	if (tls_config_set_key_file(config, key_file) != 0)
 		return (-1);
 	if (tls_config_set_key_file(config, key_file) != 0)
 		return (-1);
@@ -784,6 +693,44 @@ int
 tls_config_set_protocols(struct tls_config *config, uint32_t protocols)
 {
 	config->protocols = protocols;
+
+	return (0);
+}
+
+int
+tls_config_set_session_fd(struct tls_config *config, int session_fd)
+{
+	struct stat sb;
+	mode_t mugo;
+
+	if (session_fd == -1) {
+		config->session_fd = session_fd;
+		return (0);
+	}
+
+	if (fstat(session_fd, &sb) == -1) {
+		tls_config_set_error(config, "failed to stat session file");
+		return (-1);
+	}
+	if (!S_ISREG(sb.st_mode)) {
+		tls_config_set_errorx(config,
+		    "session file is not a regular file");
+		return (-1);
+	}
+
+	if (sb.st_uid != getuid()) {
+		tls_config_set_errorx(config, "session file has incorrect "
+		    "owner (uid %i != %i)", sb.st_uid, getuid());
+		return (-1);
+	}
+	mugo = sb.st_mode & (S_IRWXU|S_IRWXG|S_IRWXO);
+	if (mugo != (S_IRUSR|S_IWUSR)) {
+		tls_config_set_errorx(config, "session file has incorrect "
+		    "permissions (%o != 600)", mugo);
+		return (-1);
+	}
+
+	config->session_fd = session_fd;
 
 	return (0);
 }
@@ -869,7 +816,8 @@ int
 tls_config_set_ocsp_staple_mem(struct tls_config *config, const uint8_t *staple,
     size_t len)
 {
-	return tls_keypair_set_ocsp_staple_mem(config->keypair, staple, len);
+	return tls_keypair_set_ocsp_staple_mem(config->keypair, &config->error,
+	    staple, len);
 }
 
 int

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cipher_list.c,v 1.6 2017/08/28 17:32:04 jsing Exp $	*/
+/*	$OpenBSD: cipher_list.c,v 1.9 2018/06/02 16:35:02 jsing Exp $	*/
 /*
  * Copyright (c) 2015 Doug Hogan <doug@openbsd.org>
  * Copyright (c) 2015 Joel Sing <jsing@openbsd.org>
@@ -49,7 +49,6 @@ static uint8_t cipher_bytes[] = {
 	0xcc, 0xaa,	/* DHE-RSA-CHACHA20-POLY1305 */
 	0x00, 0x9c,	/* AES128-GCM-SHA256 */
 	0x00, 0x3d,	/* AES256-SHA256 */
-	0x00, 0x09,	/* DES-CBC-SHA */
 };
 
 static uint16_t cipher_values[] = {
@@ -58,25 +57,21 @@ static uint16_t cipher_values[] = {
 	0xccaa,		/* DHE-RSA-CHACHA20-POLY1305 */
 	0x009c,		/* AES128-GCM-SHA256 */
 	0x003d,		/* AES256-SHA256 */
-	0x0009,		/* DES-CBC-SHA */
 };
 
 #define N_CIPHERS (sizeof(cipher_bytes) / 2)
-
-extern STACK_OF(SSL_CIPHER) *ssl_bytes_to_cipher_list(SSL *s,
-    const unsigned char *p, int num);
-extern int ssl_cipher_list_to_bytes(SSL *s, STACK_OF(SSL_CIPHER) *sk,
-    unsigned char *p, size_t len, size_t *outlen);
 
 static int
 ssl_bytes_to_list_alloc(SSL *s, STACK_OF(SSL_CIPHER) **ciphers)
 {
 	SSL_CIPHER *cipher;
 	uint16_t value;
+	CBS cbs;
 	int i;
 
-	*ciphers = ssl_bytes_to_cipher_list(s, cipher_bytes,
-	    sizeof(cipher_bytes));
+	CBS_init(&cbs, cipher_bytes, sizeof(cipher_bytes));
+
+	*ciphers = ssl_bytes_to_cipher_list(s, &cbs);
 	CHECK(*ciphers != NULL);
 	CHECK(sk_SSL_CIPHER_num(*ciphers) == N_CIPHERS);
 	for (i = 0; i < sk_SSL_CIPHER_num(*ciphers); i++) {
@@ -92,6 +87,7 @@ ssl_bytes_to_list_alloc(SSL *s, STACK_OF(SSL_CIPHER) **ciphers)
 static int
 ssl_list_to_bytes_scsv(SSL *s, STACK_OF(SSL_CIPHER) **ciphers)
 {
+	CBB cbb;
 	unsigned char *buf = NULL;
 	size_t buflen, outlen;
 	int ret = 0;
@@ -101,7 +97,9 @@ ssl_list_to_bytes_scsv(SSL *s, STACK_OF(SSL_CIPHER) **ciphers)
 	buflen = sizeof(cipher_bytes) + 2 + 2;
 	CHECK((buf = calloc(1, buflen)) != NULL);
 
-	CHECK(ssl_cipher_list_to_bytes(s, *ciphers, buf, buflen, &outlen));
+	CHECK(CBB_init_fixed(&cbb, buf, buflen));
+	CHECK(ssl_cipher_list_to_bytes(s, *ciphers, &cbb));
+	CHECK(CBB_finish(&cbb, NULL, &outlen));
 
 	CHECK_GOTO(outlen > 0 && outlen == buflen - 2);
 	CHECK_GOTO(memcmp(buf, cipher_bytes, sizeof(cipher_bytes)) == 0);
@@ -118,6 +116,7 @@ err:
 static int
 ssl_list_to_bytes_no_scsv(SSL *s, STACK_OF(SSL_CIPHER) **ciphers)
 {
+	CBB cbb;
 	unsigned char *buf = NULL;
 	size_t buflen, outlen;
 	int ret = 0;
@@ -132,7 +131,9 @@ ssl_list_to_bytes_no_scsv(SSL *s, STACK_OF(SSL_CIPHER) **ciphers)
 	/* Set renegotiate so it doesn't add SCSV */
 	s->internal->renegotiate = 1;
 
-	CHECK(ssl_cipher_list_to_bytes(s, *ciphers, buf, buflen, &outlen));
+	CHECK(CBB_init_fixed(&cbb, buf, buflen));
+	CHECK(ssl_cipher_list_to_bytes(s, *ciphers, &cbb));
+	CHECK(CBB_finish(&cbb, NULL, &outlen));
 
 	CHECK_GOTO(outlen > 0 && outlen == buflen - 2);
 	CHECK_GOTO(memcmp(buf, cipher_bytes, sizeof(cipher_bytes)) == 0);
@@ -149,25 +150,18 @@ static int
 ssl_bytes_to_list_invalid(SSL *s, STACK_OF(SSL_CIPHER) **ciphers)
 {
 	uint8_t empty_cipher_bytes[] = {0};
+	CBS cbs;
 
 	sk_SSL_CIPHER_free(*ciphers);
 
 	/* Invalid length: CipherSuite is 2 bytes so it must be even */
-	*ciphers = ssl_bytes_to_cipher_list(s, cipher_bytes,
-	    sizeof(cipher_bytes) - 1);
+	CBS_init(&cbs, cipher_bytes, sizeof(cipher_bytes) - 1);
+	*ciphers = ssl_bytes_to_cipher_list(s, &cbs);
 	CHECK(*ciphers == NULL);
 
 	/* Invalid length: cipher_suites must be at least 2 */
-	*ciphers = ssl_bytes_to_cipher_list(s, empty_cipher_bytes,
-	    sizeof(empty_cipher_bytes));
-	CHECK(*ciphers == NULL);
-
-	/* Invalid length: cipher_suites must be at most 2^16-2 */
-	*ciphers = ssl_bytes_to_cipher_list(s, cipher_bytes, 0x10000);
-	CHECK(*ciphers == NULL);
-
-	/* Invalid len: prototype is signed, but it shouldn't accept len < 0 */
-	*ciphers = ssl_bytes_to_cipher_list(s, cipher_bytes, -2);
+	CBS_init(&cbs, empty_cipher_bytes, sizeof(empty_cipher_bytes));
+	*ciphers = ssl_bytes_to_cipher_list(s, &cbs);
 	CHECK(*ciphers == NULL);
 
 	return 1;

@@ -1,4 +1,4 @@
-.\"	$OpenBSD: BIO_f_cipher.3,v 1.6 2016/12/06 14:45:08 schwarze Exp $
+.\"	$OpenBSD: BIO_f_cipher.3,v 1.11 2018/08/24 19:32:26 tb Exp $
 .\"	OpenSSL 186bb907 Apr 13 11:05:13 2015 -0700
 .\"
 .\" This file was written by Dr. Stephen Henson <steve@openssl.org>.
@@ -49,7 +49,7 @@
 .\" ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 .\" OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.Dd $Mdocdate: December 6 2016 $
+.Dd $Mdocdate: August 24 2018 $
 .Dt BIO_F_CIPHER 3
 .Os
 .Sh NAME
@@ -61,11 +61,11 @@
 .Sh SYNOPSIS
 .In openssl/bio.h
 .In openssl/evp.h
-.Ft BIO_METHOD *
+.Ft const BIO_METHOD *
 .Fo BIO_f_cipher
 .Fa void
 .Fc
-.Ft void
+.Ft int
 .Fo BIO_set_cipher
 .Fa "BIO *b"
 .Fa "const EVP_CIPHER *cipher"
@@ -154,6 +154,8 @@ by preceding the cipher BIO with a buffering BIO.
 .Sh RETURN VALUES
 .Fn BIO_f_cipher
 returns the cipher BIO method.
+.Fn BIO_set_cipher
+returns 1 on success and 0 on error.
 .Pp
 .Fn BIO_get_cipher_status
 returns 1 for a successful decrypt and 0 for failure.
@@ -162,3 +164,14 @@ returns 1 for a successful decrypt and 0 for failure.
 currently always returns 1.
 .Sh SEE ALSO
 .Xr BIO_new 3
+.Sh HISTORY
+.Fn BIO_f_cipher ,
+.Fn BIO_set_cipher ,
+and
+.Fn BIO_get_cipher_status
+first appeared in SSLeay 0.6.5 and have been available since
+.Ox 2.4 .
+.Pp
+.Fn BIO_get_cipher_ctx
+first appeared in SSLeay 0.9.1 and has been available since
+.Ox 2.6 .
