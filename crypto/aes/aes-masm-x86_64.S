@@ -1,5 +1,72 @@
+; 1 "crypto/aes/aes-masm-x86_64.S.tmp"
+; 1 "<built-in>" 1
+; 1 "<built-in>" 3
+; 349 "<built-in>" 3
+; 1 "<command line>" 1
+; 1 "<built-in>" 2
+; 1 "crypto/aes/aes-masm-x86_64.S.tmp" 2
 OPTION	DOTNAME
-#include "x86_arch.h"
+
+; 1 "./crypto/x86_arch.h" 1
+
+
+; 16 "./crypto/x86_arch.h"
+
+
+
+
+
+
+
+
+
+; 40 "./crypto/x86_arch.h"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+; 3 "crypto/aes/aes-masm-x86_64.S.tmp" 2
 
 .text$	SEGMENT ALIGN(64) 'CODE'
 
@@ -1393,7 +1460,7 @@ $L$cbc_picked_te::
 	jb	$L$cbc_slow_prologue
 	test	rdx,15
 	jnz	$L$cbc_slow_prologue
-	bt	r10d,IA32CAP_BIT0_HT
+	bt	r10d,28
 	jc	$L$cbc_slow_prologue
 
 
@@ -2878,3 +2945,4 @@ DB	9,0,0,0
 
 .xdata	ENDS
 END
+

@@ -14,6 +14,7 @@ opensslinclude_HEADERS += camellia.h
 opensslinclude_HEADERS += cast.h
 opensslinclude_HEADERS += chacha.h
 opensslinclude_HEADERS += cmac.h
+opensslinclude_HEADERS += cms.h
 opensslinclude_HEADERS += comp.h
 opensslinclude_HEADERS += conf.h
 opensslinclude_HEADERS += conf_api.h

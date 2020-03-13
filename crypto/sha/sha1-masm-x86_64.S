@@ -1,5 +1,72 @@
+; 1 "crypto/sha/sha1-masm-x86_64.S.tmp"
+; 1 "<built-in>" 1
+; 1 "<built-in>" 3
+; 349 "<built-in>" 3
+; 1 "<command line>" 1
+; 1 "<built-in>" 2
+; 1 "crypto/sha/sha1-masm-x86_64.S.tmp" 2
 OPTION	DOTNAME
-#include "x86_arch.h"
+
+; 1 "./crypto/x86_arch.h" 1
+
+
+; 16 "./crypto/x86_arch.h"
+
+
+
+
+
+
+
+
+
+; 40 "./crypto/x86_arch.h"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+; 3 "crypto/sha/sha1-masm-x86_64.S.tmp" 2
 .text$	SEGMENT ALIGN(64) 'CODE'
 EXTERN	OPENSSL_ia32cap_P:NEAR
 
@@ -19,7 +86,7 @@ $L$SEH_begin_sha1_block_data_order::
 
 	mov	r9d,DWORD PTR[((OPENSSL_ia32cap_P+0))]
 	mov	r8d,DWORD PTR[((OPENSSL_ia32cap_P+4))]
-	test	r8d,IA32CAP_MASK1_SSSE3
+	test	r8d,(1 SHL 9)
 	jz	$L$ialu
 	jmp	_ssse3_shortcut
 
@@ -2676,3 +2743,4 @@ DB	9,0,0,0
 
 .xdata	ENDS
 END
+

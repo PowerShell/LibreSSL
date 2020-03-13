@@ -1,5 +1,72 @@
+; 1 "crypto/rc4/rc4-masm-x86_64.S.tmp"
+; 1 "<built-in>" 1
+; 1 "<built-in>" 3
+; 349 "<built-in>" 3
+; 1 "<command line>" 1
+; 1 "<built-in>" 2
+; 1 "crypto/rc4/rc4-masm-x86_64.S.tmp" 2
 OPTION	DOTNAME
-#include "x86_arch.h"
+
+; 1 "./crypto/x86_arch.h" 1
+
+
+; 16 "./crypto/x86_arch.h"
+
+
+
+
+
+
+
+
+
+; 40 "./crypto/x86_arch.h"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+; 3 "crypto/rc4/rc4-masm-x86_64.S.tmp" 2
 .text$	SEGMENT ALIGN(64) 'CODE'
 EXTERN	OPENSSL_ia32cap_P:NEAR
 
@@ -46,7 +113,7 @@ $L$prologue::
 	mov	eax,DWORD PTR[r10*4+rdi]
 	test	r11,-16
 	jz	$L$loop1
-	bt	r8d,IA32CAP_BIT0_INTEL
+	bt	r8d,30
 	jc	$L$intel
 	and	rbx,7
 	lea	rsi,QWORD PTR[1+r10]
@@ -558,7 +625,7 @@ $L$SEH_begin_RC4_set_key::
 	xor	r11,r11
 
 	mov	r8d,DWORD PTR[OPENSSL_ia32cap_P]
-	bt	r8d,IA32CAP_BIT0_INTELP4
+	bt	r8d,20
 	jc	$L$c1stloop
 	jmp	$L$w1stloop
 
@@ -625,9 +692,9 @@ ALIGN	16
 RC4_options	PROC PUBLIC
 	lea	rax,QWORD PTR[$L$opts]
 	mov	edx,DWORD PTR[OPENSSL_ia32cap_P]
-	bt	edx,IA32CAP_BIT0_INTELP4
+	bt	edx,20
 	jc	$L$8xchar
-	bt	edx,IA32CAP_BIT0_INTEL
+	bt	edx,30
 	jnc	$L$done
 	add	rax,25
 	DB	0F3h,0C3h		;repret
@@ -649,3 +716,4 @@ RC4_options	ENDP
 
 .text$	ENDS
 END
+

@@ -410,21 +410,21 @@ am__libcrypto_la_SOURCES_DIST = aes/aes-elf-armv4.S \
 	ec/ec_check.c ec/ec_curve.c ec/ec_cvt.c ec/ec_err.c \
 	ec/ec_key.c ec/ec_kmeth.c ec/ec_lib.c ec/ec_mult.c ec/ec_oct.c \
 	ec/ec_pmeth.c ec/ec_print.c ec/eck_prn.c ec/ecp_mont.c \
-	ec/ecp_nist.c ec/ecp_oct.c ec/ecp_smpl.c ecdh/ech_err.c \
-	ecdh/ech_key.c ecdh/ech_lib.c ecdsa/ecs_asn1.c ecdsa/ecs_err.c \
-	ecdsa/ecs_lib.c ecdsa/ecs_ossl.c ecdsa/ecs_sign.c \
-	ecdsa/ecs_vrf.c engine/eng_all.c engine/eng_cnf.c \
-	engine/eng_ctrl.c engine/eng_dyn.c engine/eng_err.c \
-	engine/eng_fat.c engine/eng_init.c engine/eng_lib.c \
-	engine/eng_list.c engine/eng_openssl.c engine/eng_pkey.c \
-	engine/eng_table.c engine/tb_asnmth.c engine/tb_cipher.c \
-	engine/tb_dh.c engine/tb_digest.c engine/tb_dsa.c \
-	engine/tb_ecdh.c engine/tb_ecdsa.c engine/tb_eckey.c \
-	engine/tb_pkmeth.c engine/tb_rand.c engine/tb_rsa.c \
-	engine/tb_store.c err/err.c err/err_all.c err/err_prn.c \
-	evp/bio_b64.c evp/bio_enc.c evp/bio_md.c evp/c_all.c \
-	evp/digest.c evp/e_aes.c evp/e_aes_cbc_hmac_sha1.c evp/e_bf.c \
-	evp/e_camellia.c evp/e_cast.c evp/e_chacha.c \
+	ec/ecp_nist.c ec/ecp_oct.c ec/ecp_smpl.c ecdh/ecdh_kdf.c \
+	ecdh/ech_err.c ecdh/ech_key.c ecdh/ech_lib.c ecdsa/ecs_asn1.c \
+	ecdsa/ecs_err.c ecdsa/ecs_lib.c ecdsa/ecs_ossl.c \
+	ecdsa/ecs_sign.c ecdsa/ecs_vrf.c engine/eng_all.c \
+	engine/eng_cnf.c engine/eng_ctrl.c engine/eng_dyn.c \
+	engine/eng_err.c engine/eng_fat.c engine/eng_init.c \
+	engine/eng_lib.c engine/eng_list.c engine/eng_openssl.c \
+	engine/eng_pkey.c engine/eng_table.c engine/tb_asnmth.c \
+	engine/tb_cipher.c engine/tb_dh.c engine/tb_digest.c \
+	engine/tb_dsa.c engine/tb_ecdh.c engine/tb_ecdsa.c \
+	engine/tb_eckey.c engine/tb_pkmeth.c engine/tb_rand.c \
+	engine/tb_rsa.c engine/tb_store.c err/err.c err/err_all.c \
+	err/err_prn.c evp/bio_b64.c evp/bio_enc.c evp/bio_md.c \
+	evp/c_all.c evp/digest.c evp/e_aes.c evp/e_aes_cbc_hmac_sha1.c \
+	evp/e_bf.c evp/e_camellia.c evp/e_cast.c evp/e_chacha.c \
 	evp/e_chacha20poly1305.c evp/e_des.c evp/e_des3.c \
 	evp/e_gost2814789.c evp/e_idea.c evp/e_null.c evp/e_old.c \
 	evp/e_rc2.c evp/e_rc4.c evp/e_rc4_hmac_md5.c evp/e_sm4.c \
@@ -729,16 +729,16 @@ am_libcrypto_la_OBJECTS = $(am__objects_31) $(am__objects_33) \
 	ec/libcrypto_la-ec_pmeth.lo ec/libcrypto_la-ec_print.lo \
 	ec/libcrypto_la-eck_prn.lo ec/libcrypto_la-ecp_mont.lo \
 	ec/libcrypto_la-ecp_nist.lo ec/libcrypto_la-ecp_oct.lo \
-	ec/libcrypto_la-ecp_smpl.lo ecdh/libcrypto_la-ech_err.lo \
-	ecdh/libcrypto_la-ech_key.lo ecdh/libcrypto_la-ech_lib.lo \
-	ecdsa/libcrypto_la-ecs_asn1.lo ecdsa/libcrypto_la-ecs_err.lo \
-	ecdsa/libcrypto_la-ecs_lib.lo ecdsa/libcrypto_la-ecs_ossl.lo \
-	ecdsa/libcrypto_la-ecs_sign.lo ecdsa/libcrypto_la-ecs_vrf.lo \
-	engine/libcrypto_la-eng_all.lo engine/libcrypto_la-eng_cnf.lo \
-	engine/libcrypto_la-eng_ctrl.lo engine/libcrypto_la-eng_dyn.lo \
-	engine/libcrypto_la-eng_err.lo engine/libcrypto_la-eng_fat.lo \
-	engine/libcrypto_la-eng_init.lo engine/libcrypto_la-eng_lib.lo \
-	engine/libcrypto_la-eng_list.lo \
+	ec/libcrypto_la-ecp_smpl.lo ecdh/libcrypto_la-ecdh_kdf.lo \
+	ecdh/libcrypto_la-ech_err.lo ecdh/libcrypto_la-ech_key.lo \
+	ecdh/libcrypto_la-ech_lib.lo ecdsa/libcrypto_la-ecs_asn1.lo \
+	ecdsa/libcrypto_la-ecs_err.lo ecdsa/libcrypto_la-ecs_lib.lo \
+	ecdsa/libcrypto_la-ecs_ossl.lo ecdsa/libcrypto_la-ecs_sign.lo \
+	ecdsa/libcrypto_la-ecs_vrf.lo engine/libcrypto_la-eng_all.lo \
+	engine/libcrypto_la-eng_cnf.lo engine/libcrypto_la-eng_ctrl.lo \
+	engine/libcrypto_la-eng_dyn.lo engine/libcrypto_la-eng_err.lo \
+	engine/libcrypto_la-eng_fat.lo engine/libcrypto_la-eng_init.lo \
+	engine/libcrypto_la-eng_lib.lo engine/libcrypto_la-eng_list.lo \
 	engine/libcrypto_la-eng_openssl.lo \
 	engine/libcrypto_la-eng_pkey.lo \
 	engine/libcrypto_la-eng_table.lo \
@@ -1241,6 +1241,7 @@ am__depfiles_remade = ./$(DEPDIR)/libcrypto_la-armcap.Plo \
 	ec/$(DEPDIR)/libcrypto_la-ecp_nist.Plo \
 	ec/$(DEPDIR)/libcrypto_la-ecp_oct.Plo \
 	ec/$(DEPDIR)/libcrypto_la-ecp_smpl.Plo \
+	ecdh/$(DEPDIR)/libcrypto_la-ecdh_kdf.Plo \
 	ecdh/$(DEPDIR)/libcrypto_la-ech_err.Plo \
 	ecdh/$(DEPDIR)/libcrypto_la-ech_key.Plo \
 	ecdh/$(DEPDIR)/libcrypto_la-ech_lib.Plo \
@@ -1770,8 +1771,9 @@ AM_CPPFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/include/compat \
 	-DLIBRESSL_INTERNAL -D__BEGIN_HIDDEN_DECLS= \
 	-D__END_HIDDEN_DECLS= -I$(top_srcdir)/crypto/asn1 \
 	-I$(top_srcdir)/crypto/bn -I$(top_srcdir)/crypto/ec \
-	-I$(top_srcdir)/crypto/ecdsa -I$(top_srcdir)/crypto/evp \
-	-I$(top_srcdir)/crypto/modes -I$(top_srcdir)/crypto
+	-I$(top_srcdir)/crypto/ecdh -I$(top_srcdir)/crypto/ecdsa \
+	-I$(top_srcdir)/crypto/evp -I$(top_srcdir)/crypto/modes \
+	-I$(top_srcdir)/crypto
 lib_LTLIBRARIES = libcrypto.la
 
 # needed for a CMake target
@@ -1988,62 +1990,62 @@ libcrypto_la_SOURCES = $(am__append_36) $(am__append_38) \
 	ec/ec_cvt.c ec/ec_err.c ec/ec_key.c ec/ec_kmeth.c ec/ec_lib.c \
 	ec/ec_mult.c ec/ec_oct.c ec/ec_pmeth.c ec/ec_print.c \
 	ec/eck_prn.c ec/ecp_mont.c ec/ecp_nist.c ec/ecp_oct.c \
-	ec/ecp_smpl.c ecdh/ech_err.c ecdh/ech_key.c ecdh/ech_lib.c \
-	ecdsa/ecs_asn1.c ecdsa/ecs_err.c ecdsa/ecs_lib.c \
-	ecdsa/ecs_ossl.c ecdsa/ecs_sign.c ecdsa/ecs_vrf.c \
-	engine/eng_all.c engine/eng_cnf.c engine/eng_ctrl.c \
-	engine/eng_dyn.c engine/eng_err.c engine/eng_fat.c \
-	engine/eng_init.c engine/eng_lib.c engine/eng_list.c \
-	engine/eng_openssl.c engine/eng_pkey.c engine/eng_table.c \
-	engine/tb_asnmth.c engine/tb_cipher.c engine/tb_dh.c \
-	engine/tb_digest.c engine/tb_dsa.c engine/tb_ecdh.c \
-	engine/tb_ecdsa.c engine/tb_eckey.c engine/tb_pkmeth.c \
-	engine/tb_rand.c engine/tb_rsa.c engine/tb_store.c err/err.c \
-	err/err_all.c err/err_prn.c evp/bio_b64.c evp/bio_enc.c \
-	evp/bio_md.c evp/c_all.c evp/digest.c evp/e_aes.c \
-	evp/e_aes_cbc_hmac_sha1.c evp/e_bf.c evp/e_camellia.c \
-	evp/e_cast.c evp/e_chacha.c evp/e_chacha20poly1305.c \
-	evp/e_des.c evp/e_des3.c evp/e_gost2814789.c evp/e_idea.c \
-	evp/e_null.c evp/e_old.c evp/e_rc2.c evp/e_rc4.c \
-	evp/e_rc4_hmac_md5.c evp/e_sm4.c evp/e_xcbc_d.c evp/encode.c \
-	evp/evp_aead.c evp/evp_enc.c evp/evp_err.c evp/evp_key.c \
-	evp/evp_lib.c evp/evp_pbe.c evp/evp_pkey.c evp/m_dss.c \
-	evp/m_dss1.c evp/m_ecdsa.c evp/m_gost2814789.c \
-	evp/m_gostr341194.c evp/m_md4.c evp/m_md5.c evp/m_md5_sha1.c \
-	evp/m_null.c evp/m_ripemd.c evp/m_sha1.c evp/m_sigver.c \
-	evp/m_streebog.c evp/m_sm3.c evp/m_wp.c evp/names.c \
-	evp/p5_crpt.c evp/p5_crpt2.c evp/p_dec.c evp/p_enc.c \
-	evp/p_lib.c evp/p_open.c evp/p_seal.c evp/p_sign.c \
-	evp/p_verify.c evp/pmeth_fn.c evp/pmeth_gn.c evp/pmeth_lib.c \
-	gost/gost2814789.c gost/gost89_keywrap.c gost/gost89_params.c \
-	gost/gost89imit_ameth.c gost/gost89imit_pmeth.c \
-	gost/gost_asn1.c gost/gost_err.c gost/gostr341001.c \
-	gost/gostr341001_ameth.c gost/gostr341001_key.c \
-	gost/gostr341001_params.c gost/gostr341001_pmeth.c \
-	gost/gostr341194.c gost/streebog.c hkdf/hkdf.c hmac/hm_ameth.c \
-	hmac/hm_pmeth.c hmac/hmac.c idea/i_cbc.c idea/i_cfb64.c \
-	idea/i_ecb.c idea/i_ofb64.c idea/i_skey.c lhash/lh_stats.c \
-	lhash/lhash.c md4/md4_dgst.c md4/md4_one.c md5/md5_dgst.c \
-	md5/md5_one.c modes/cbc128.c modes/ccm128.c modes/cfb128.c \
-	modes/ctr128.c modes/cts128.c modes/gcm128.c modes/ofb128.c \
-	modes/xts128.c objects/o_names.c objects/obj_dat.c \
-	objects/obj_err.c objects/obj_lib.c objects/obj_xref.c \
-	ocsp/ocsp_asn.c ocsp/ocsp_cl.c ocsp/ocsp_err.c ocsp/ocsp_ext.c \
-	ocsp/ocsp_ht.c ocsp/ocsp_lib.c ocsp/ocsp_prn.c ocsp/ocsp_srv.c \
-	ocsp/ocsp_vfy.c pem/pem_all.c pem/pem_err.c pem/pem_info.c \
-	pem/pem_lib.c pem/pem_oth.c pem/pem_pk8.c pem/pem_pkey.c \
-	pem/pem_seal.c pem/pem_sign.c pem/pem_x509.c pem/pem_xaux.c \
-	pem/pvkfmt.c pkcs12/p12_add.c pkcs12/p12_asn.c \
-	pkcs12/p12_attr.c pkcs12/p12_crpt.c pkcs12/p12_crt.c \
-	pkcs12/p12_decr.c pkcs12/p12_init.c pkcs12/p12_key.c \
-	pkcs12/p12_kiss.c pkcs12/p12_mutl.c pkcs12/p12_npas.c \
-	pkcs12/p12_p8d.c pkcs12/p12_p8e.c pkcs12/p12_utl.c \
-	pkcs12/pk12err.c pkcs7/bio_pk7.c pkcs7/pk7_asn1.c \
-	pkcs7/pk7_attr.c pkcs7/pk7_doit.c pkcs7/pk7_lib.c \
-	pkcs7/pk7_mime.c pkcs7/pk7_smime.c pkcs7/pkcs7err.c \
-	poly1305/poly1305.c rand/rand_err.c rand/rand_lib.c \
-	rand/randfile.c rc2/rc2_cbc.c rc2/rc2_ecb.c rc2/rc2_skey.c \
-	rc2/rc2cfb64.c rc2/rc2ofb64.c ripemd/rmd_dgst.c \
+	ec/ecp_smpl.c ecdh/ecdh_kdf.c ecdh/ech_err.c ecdh/ech_key.c \
+	ecdh/ech_lib.c ecdsa/ecs_asn1.c ecdsa/ecs_err.c \
+	ecdsa/ecs_lib.c ecdsa/ecs_ossl.c ecdsa/ecs_sign.c \
+	ecdsa/ecs_vrf.c engine/eng_all.c engine/eng_cnf.c \
+	engine/eng_ctrl.c engine/eng_dyn.c engine/eng_err.c \
+	engine/eng_fat.c engine/eng_init.c engine/eng_lib.c \
+	engine/eng_list.c engine/eng_openssl.c engine/eng_pkey.c \
+	engine/eng_table.c engine/tb_asnmth.c engine/tb_cipher.c \
+	engine/tb_dh.c engine/tb_digest.c engine/tb_dsa.c \
+	engine/tb_ecdh.c engine/tb_ecdsa.c engine/tb_eckey.c \
+	engine/tb_pkmeth.c engine/tb_rand.c engine/tb_rsa.c \
+	engine/tb_store.c err/err.c err/err_all.c err/err_prn.c \
+	evp/bio_b64.c evp/bio_enc.c evp/bio_md.c evp/c_all.c \
+	evp/digest.c evp/e_aes.c evp/e_aes_cbc_hmac_sha1.c evp/e_bf.c \
+	evp/e_camellia.c evp/e_cast.c evp/e_chacha.c \
+	evp/e_chacha20poly1305.c evp/e_des.c evp/e_des3.c \
+	evp/e_gost2814789.c evp/e_idea.c evp/e_null.c evp/e_old.c \
+	evp/e_rc2.c evp/e_rc4.c evp/e_rc4_hmac_md5.c evp/e_sm4.c \
+	evp/e_xcbc_d.c evp/encode.c evp/evp_aead.c evp/evp_enc.c \
+	evp/evp_err.c evp/evp_key.c evp/evp_lib.c evp/evp_pbe.c \
+	evp/evp_pkey.c evp/m_dss.c evp/m_dss1.c evp/m_ecdsa.c \
+	evp/m_gost2814789.c evp/m_gostr341194.c evp/m_md4.c \
+	evp/m_md5.c evp/m_md5_sha1.c evp/m_null.c evp/m_ripemd.c \
+	evp/m_sha1.c evp/m_sigver.c evp/m_streebog.c evp/m_sm3.c \
+	evp/m_wp.c evp/names.c evp/p5_crpt.c evp/p5_crpt2.c \
+	evp/p_dec.c evp/p_enc.c evp/p_lib.c evp/p_open.c evp/p_seal.c \
+	evp/p_sign.c evp/p_verify.c evp/pmeth_fn.c evp/pmeth_gn.c \
+	evp/pmeth_lib.c gost/gost2814789.c gost/gost89_keywrap.c \
+	gost/gost89_params.c gost/gost89imit_ameth.c \
+	gost/gost89imit_pmeth.c gost/gost_asn1.c gost/gost_err.c \
+	gost/gostr341001.c gost/gostr341001_ameth.c \
+	gost/gostr341001_key.c gost/gostr341001_params.c \
+	gost/gostr341001_pmeth.c gost/gostr341194.c gost/streebog.c \
+	hkdf/hkdf.c hmac/hm_ameth.c hmac/hm_pmeth.c hmac/hmac.c \
+	idea/i_cbc.c idea/i_cfb64.c idea/i_ecb.c idea/i_ofb64.c \
+	idea/i_skey.c lhash/lh_stats.c lhash/lhash.c md4/md4_dgst.c \
+	md4/md4_one.c md5/md5_dgst.c md5/md5_one.c modes/cbc128.c \
+	modes/ccm128.c modes/cfb128.c modes/ctr128.c modes/cts128.c \
+	modes/gcm128.c modes/ofb128.c modes/xts128.c objects/o_names.c \
+	objects/obj_dat.c objects/obj_err.c objects/obj_lib.c \
+	objects/obj_xref.c ocsp/ocsp_asn.c ocsp/ocsp_cl.c \
+	ocsp/ocsp_err.c ocsp/ocsp_ext.c ocsp/ocsp_ht.c ocsp/ocsp_lib.c \
+	ocsp/ocsp_prn.c ocsp/ocsp_srv.c ocsp/ocsp_vfy.c pem/pem_all.c \
+	pem/pem_err.c pem/pem_info.c pem/pem_lib.c pem/pem_oth.c \
+	pem/pem_pk8.c pem/pem_pkey.c pem/pem_seal.c pem/pem_sign.c \
+	pem/pem_x509.c pem/pem_xaux.c pem/pvkfmt.c pkcs12/p12_add.c \
+	pkcs12/p12_asn.c pkcs12/p12_attr.c pkcs12/p12_crpt.c \
+	pkcs12/p12_crt.c pkcs12/p12_decr.c pkcs12/p12_init.c \
+	pkcs12/p12_key.c pkcs12/p12_kiss.c pkcs12/p12_mutl.c \
+	pkcs12/p12_npas.c pkcs12/p12_p8d.c pkcs12/p12_p8e.c \
+	pkcs12/p12_utl.c pkcs12/pk12err.c pkcs7/bio_pk7.c \
+	pkcs7/pk7_asn1.c pkcs7/pk7_attr.c pkcs7/pk7_doit.c \
+	pkcs7/pk7_lib.c pkcs7/pk7_mime.c pkcs7/pk7_smime.c \
+	pkcs7/pkcs7err.c poly1305/poly1305.c rand/rand_err.c \
+	rand/rand_lib.c rand/randfile.c rc2/rc2_cbc.c rc2/rc2_ecb.c \
+	rc2/rc2_skey.c rc2/rc2cfb64.c rc2/rc2ofb64.c ripemd/rmd_dgst.c \
 	ripemd/rmd_one.c rsa/rsa_ameth.c rsa/rsa_asn1.c rsa/rsa_chk.c \
 	rsa/rsa_crpt.c rsa/rsa_depr.c rsa/rsa_eay.c rsa/rsa_err.c \
 	rsa/rsa_gen.c rsa/rsa_lib.c rsa/rsa_meth.c rsa/rsa_none.c \
@@ -3066,6 +3068,8 @@ ecdh/$(am__dirstamp):
 ecdh/$(DEPDIR)/$(am__dirstamp):
 	@$(MKDIR_P) ecdh/$(DEPDIR)
 	@: > ecdh/$(DEPDIR)/$(am__dirstamp)
+ecdh/libcrypto_la-ecdh_kdf.lo: ecdh/$(am__dirstamp) \
+	ecdh/$(DEPDIR)/$(am__dirstamp)
 ecdh/libcrypto_la-ech_err.lo: ecdh/$(am__dirstamp) \
 	ecdh/$(DEPDIR)/$(am__dirstamp)
 ecdh/libcrypto_la-ech_key.lo: ecdh/$(am__dirstamp) \
@@ -4277,6 +4281,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@ec/$(DEPDIR)/libcrypto_la-ecp_nist.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@ec/$(DEPDIR)/libcrypto_la-ecp_oct.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@ec/$(DEPDIR)/libcrypto_la-ecp_smpl.Plo@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@ecdh/$(DEPDIR)/libcrypto_la-ecdh_kdf.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@ecdh/$(DEPDIR)/libcrypto_la-ech_err.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@ecdh/$(DEPDIR)/libcrypto_la-ech_key.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@ecdh/$(DEPDIR)/libcrypto_la-ech_lib.Plo@am__quote@ # am--include-marker
@@ -7047,6 +7052,13 @@ ec/libcrypto_la-ecp_smpl.lo: ec/ecp_smpl.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcrypto_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ec/libcrypto_la-ecp_smpl.lo `test -f 'ec/ecp_smpl.c' || echo '$(srcdir)/'`ec/ecp_smpl.c
 
+ecdh/libcrypto_la-ecdh_kdf.lo: ecdh/ecdh_kdf.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcrypto_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ecdh/libcrypto_la-ecdh_kdf.lo -MD -MP -MF ecdh/$(DEPDIR)/libcrypto_la-ecdh_kdf.Tpo -c -o ecdh/libcrypto_la-ecdh_kdf.lo `test -f 'ecdh/ecdh_kdf.c' || echo '$(srcdir)/'`ecdh/ecdh_kdf.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ecdh/$(DEPDIR)/libcrypto_la-ecdh_kdf.Tpo ecdh/$(DEPDIR)/libcrypto_la-ecdh_kdf.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='ecdh/ecdh_kdf.c' object='ecdh/libcrypto_la-ecdh_kdf.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcrypto_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o ecdh/libcrypto_la-ecdh_kdf.lo `test -f 'ecdh/ecdh_kdf.c' || echo '$(srcdir)/'`ecdh/ecdh_kdf.c
+
 ecdh/libcrypto_la-ech_err.lo: ecdh/ech_err.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcrypto_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT ecdh/libcrypto_la-ech_err.lo -MD -MP -MF ecdh/$(DEPDIR)/libcrypto_la-ech_err.Tpo -c -o ecdh/libcrypto_la-ech_err.lo `test -f 'ecdh/ech_err.c' || echo '$(srcdir)/'`ecdh/ech_err.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) ecdh/$(DEPDIR)/libcrypto_la-ech_err.Tpo ecdh/$(DEPDIR)/libcrypto_la-ech_err.Plo
@@ -9761,6 +9773,7 @@ distclean: distclean-am
 	-rm -f ec/$(DEPDIR)/libcrypto_la-ecp_nist.Plo
 	-rm -f ec/$(DEPDIR)/libcrypto_la-ecp_oct.Plo
 	-rm -f ec/$(DEPDIR)/libcrypto_la-ecp_smpl.Plo
+	-rm -f ecdh/$(DEPDIR)/libcrypto_la-ecdh_kdf.Plo
 	-rm -f ecdh/$(DEPDIR)/libcrypto_la-ech_err.Plo
 	-rm -f ecdh/$(DEPDIR)/libcrypto_la-ech_key.Plo
 	-rm -f ecdh/$(DEPDIR)/libcrypto_la-ech_lib.Plo
@@ -10472,6 +10485,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ec/$(DEPDIR)/libcrypto_la-ecp_nist.Plo
 	-rm -f ec/$(DEPDIR)/libcrypto_la-ecp_oct.Plo
 	-rm -f ec/$(DEPDIR)/libcrypto_la-ecp_smpl.Plo
+	-rm -f ecdh/$(DEPDIR)/libcrypto_la-ecdh_kdf.Plo
 	-rm -f ecdh/$(DEPDIR)/libcrypto_la-ech_err.Plo
 	-rm -f ecdh/$(DEPDIR)/libcrypto_la-ech_key.Plo
 	-rm -f ecdh/$(DEPDIR)/libcrypto_la-ech_lib.Plo

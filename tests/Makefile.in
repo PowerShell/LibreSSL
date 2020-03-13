@@ -93,7 +93,8 @@ host_triplet = @host@
 TESTS = aeadtest.sh aes_wrap$(EXEEXT) $(am__append_2) asn1evp$(EXEEXT) \
 	asn1test$(EXEEXT) asn1time$(EXEEXT) base64test$(EXEEXT) \
 	bftest$(EXEEXT) $(am__EXEEXT_2) bnaddsub$(EXEEXT) \
-	bn_rand_interval$(EXEEXT) bntest$(EXEEXT) buffertest$(EXEEXT) \
+	bn_rand_interval$(EXEEXT) bntest$(EXEEXT) \
+	bn_to_string$(EXEEXT) buffertest$(EXEEXT) \
 	bytestringtest$(EXEEXT) casttest$(EXEEXT) chachatest$(EXEEXT) \
 	cipher_list$(EXEEXT) cipherstest$(EXEEXT) clienttest$(EXEEXT) \
 	configtest$(EXEEXT) cts128test$(EXEEXT) destest$(EXEEXT) \
@@ -120,28 +121,28 @@ check_PROGRAMS = aeadtest$(EXEEXT) aes_wrap$(EXEEXT) $(am__EXEEXT_1) \
 	asn1evp$(EXEEXT) asn1test$(EXEEXT) asn1time$(EXEEXT) \
 	base64test$(EXEEXT) bftest$(EXEEXT) $(am__EXEEXT_2) \
 	bnaddsub$(EXEEXT) bn_rand_interval$(EXEEXT) bntest$(EXEEXT) \
-	buffertest$(EXEEXT) bytestringtest$(EXEEXT) casttest$(EXEEXT) \
-	chachatest$(EXEEXT) cipher_list$(EXEEXT) cipherstest$(EXEEXT) \
-	clienttest$(EXEEXT) configtest$(EXEEXT) cts128test$(EXEEXT) \
-	destest$(EXEEXT) dhtest$(EXEEXT) dsatest$(EXEEXT) \
-	ecdhtest$(EXEEXT) ecdsatest$(EXEEXT) ectest$(EXEEXT) \
-	enginetest$(EXEEXT) evptest$(EXEEXT) $(am__EXEEXT_3) \
-	exptest$(EXEEXT) freenull$(EXEEXT) gcm128test$(EXEEXT) \
-	gost2814789t$(EXEEXT) hkdftest$(EXEEXT) hmactest$(EXEEXT) \
-	ideatest$(EXEEXT) igetest$(EXEEXT) keypairtest$(EXEEXT) \
-	key_schedule$(EXEEXT) md4test$(EXEEXT) md5test$(EXEEXT) \
-	mont$(EXEEXT) $(am__EXEEXT_4) optionstest$(EXEEXT) \
-	pbkdf2$(EXEEXT) $(am__EXEEXT_5) pkcs7test$(EXEEXT) \
-	poly1305test$(EXEEXT) pq_test$(EXEEXT) randtest$(EXEEXT) \
-	rc2test$(EXEEXT) rc4test$(EXEEXT) recordtest$(EXEEXT) \
-	rfc5280time$(EXEEXT) rmdtest$(EXEEXT) rsa_test$(EXEEXT) \
-	servertest$(EXEEXT) sha1test$(EXEEXT) sha256test$(EXEEXT) \
-	sha512test$(EXEEXT) sm3test$(EXEEXT) sm4test$(EXEEXT) \
-	ssl_versions$(EXEEXT) ssltest$(EXEEXT) timingsafe$(EXEEXT) \
-	tlsexttest$(EXEEXT) tlstest$(EXEEXT) tls_ext_alpn$(EXEEXT) \
-	tls_prf$(EXEEXT) utf8test$(EXEEXT) \
-	valid_handshakes_terminate$(EXEEXT) verifytest$(EXEEXT) \
-	x25519test$(EXEEXT) x509name$(EXEEXT)
+	bn_to_string$(EXEEXT) buffertest$(EXEEXT) \
+	bytestringtest$(EXEEXT) casttest$(EXEEXT) chachatest$(EXEEXT) \
+	cipher_list$(EXEEXT) cipherstest$(EXEEXT) clienttest$(EXEEXT) \
+	configtest$(EXEEXT) cts128test$(EXEEXT) destest$(EXEEXT) \
+	dhtest$(EXEEXT) dsatest$(EXEEXT) ecdhtest$(EXEEXT) \
+	ecdsatest$(EXEEXT) ectest$(EXEEXT) enginetest$(EXEEXT) \
+	evptest$(EXEEXT) $(am__EXEEXT_3) exptest$(EXEEXT) \
+	freenull$(EXEEXT) gcm128test$(EXEEXT) gost2814789t$(EXEEXT) \
+	hkdftest$(EXEEXT) hmactest$(EXEEXT) ideatest$(EXEEXT) \
+	igetest$(EXEEXT) keypairtest$(EXEEXT) key_schedule$(EXEEXT) \
+	md4test$(EXEEXT) md5test$(EXEEXT) mont$(EXEEXT) \
+	$(am__EXEEXT_4) optionstest$(EXEEXT) pbkdf2$(EXEEXT) \
+	$(am__EXEEXT_5) pkcs7test$(EXEEXT) poly1305test$(EXEEXT) \
+	pq_test$(EXEEXT) randtest$(EXEEXT) rc2test$(EXEEXT) \
+	rc4test$(EXEEXT) recordtest$(EXEEXT) rfc5280time$(EXEEXT) \
+	rmdtest$(EXEEXT) rsa_test$(EXEEXT) servertest$(EXEEXT) \
+	sha1test$(EXEEXT) sha256test$(EXEEXT) sha512test$(EXEEXT) \
+	sm3test$(EXEEXT) sm4test$(EXEEXT) ssl_versions$(EXEEXT) \
+	ssltest$(EXEEXT) timingsafe$(EXEEXT) tlsexttest$(EXEEXT) \
+	tlstest$(EXEEXT) tls_ext_alpn$(EXEEXT) tls_prf$(EXEEXT) \
+	utf8test$(EXEEXT) valid_handshakes_terminate$(EXEEXT) \
+	verifytest$(EXEEXT) x25519test$(EXEEXT) x509name$(EXEEXT)
 
 # arc4randomforktest
 # Windows/mingw does not have fork, but Cygwin does.
@@ -272,6 +273,13 @@ bn_rand_interval_OBJECTS = $(am_bn_rand_interval_OBJECTS)
 bn_rand_interval_LDADD = $(LDADD)
 bn_rand_interval_DEPENDENCIES =  \
 	$(abs_top_builddir)/tls/.libs/libtls.a \
+	$(abs_top_builddir)/ssl/.libs/libssl.a \
+	$(abs_top_builddir)/crypto/.libs/libcrypto.a \
+	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) $(am__append_1)
+am_bn_to_string_OBJECTS = bn_to_string.$(OBJEXT)
+bn_to_string_OBJECTS = $(am_bn_to_string_OBJECTS)
+bn_to_string_LDADD = $(LDADD)
+bn_to_string_DEPENDENCIES = $(abs_top_builddir)/tls/.libs/libtls.a \
 	$(abs_top_builddir)/ssl/.libs/libssl.a \
 	$(abs_top_builddir)/crypto/.libs/libcrypto.a \
 	$(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) $(am__append_1)
@@ -770,7 +778,8 @@ am__depfiles_remade = ./$(DEPDIR)/aeadtest.Po ./$(DEPDIR)/aes_wrap.Po \
 	./$(DEPDIR)/asn1test.Po ./$(DEPDIR)/asn1time.Po \
 	./$(DEPDIR)/base64test.Po ./$(DEPDIR)/bftest.Po \
 	./$(DEPDIR)/biotest.Po ./$(DEPDIR)/bn_rand_interval.Po \
-	./$(DEPDIR)/bnaddsub.Po ./$(DEPDIR)/bntest-bntest.Po \
+	./$(DEPDIR)/bn_to_string.Po ./$(DEPDIR)/bnaddsub.Po \
+	./$(DEPDIR)/bntest-bntest.Po \
 	./$(DEPDIR)/buffertest-buffertest.Po \
 	./$(DEPDIR)/bytestringtest.Po ./$(DEPDIR)/casttest.Po \
 	./$(DEPDIR)/chachatest.Po ./$(DEPDIR)/cipher_list.Po \
@@ -829,8 +838,8 @@ SOURCES = $(aeadtest_SOURCES) $(aes_wrap_SOURCES) \
 	$(arc4randomforktest_SOURCES) $(asn1evp_SOURCES) \
 	$(asn1test_SOURCES) $(asn1time_SOURCES) $(base64test_SOURCES) \
 	$(bftest_SOURCES) $(biotest_SOURCES) \
-	$(bn_rand_interval_SOURCES) $(bnaddsub_SOURCES) \
-	$(bntest_SOURCES) $(buffertest_SOURCES) \
+	$(bn_rand_interval_SOURCES) $(bn_to_string_SOURCES) \
+	$(bnaddsub_SOURCES) $(bntest_SOURCES) $(buffertest_SOURCES) \
 	$(bytestringtest_SOURCES) $(casttest_SOURCES) \
 	$(chachatest_SOURCES) $(cipher_list_SOURCES) \
 	$(cipherstest_SOURCES) $(clienttest_SOURCES) \
@@ -860,8 +869,8 @@ DIST_SOURCES = $(aeadtest_SOURCES) $(aes_wrap_SOURCES) \
 	$(am__arc4randomforktest_SOURCES_DIST) $(asn1evp_SOURCES) \
 	$(asn1test_SOURCES) $(asn1time_SOURCES) $(base64test_SOURCES) \
 	$(bftest_SOURCES) $(am__biotest_SOURCES_DIST) \
-	$(bn_rand_interval_SOURCES) $(bnaddsub_SOURCES) \
-	$(bntest_SOURCES) $(buffertest_SOURCES) \
+	$(bn_rand_interval_SOURCES) $(bn_to_string_SOURCES) \
+	$(bnaddsub_SOURCES) $(bntest_SOURCES) $(buffertest_SOURCES) \
 	$(bytestringtest_SOURCES) $(casttest_SOURCES) \
 	$(chachatest_SOURCES) $(cipher_list_SOURCES) \
 	$(cipherstest_SOURCES) $(clienttest_SOURCES) \
@@ -1279,6 +1288,7 @@ bnaddsub_SOURCES = bnaddsub.c
 bn_rand_interval_SOURCES = bn_rand_interval.c
 bntest_CPPFLAGS = $(AM_CPPFLAGS) -ULIBRESSL_INTERNAL
 bntest_SOURCES = bntest.c
+bn_to_string_SOURCES = bn_to_string.c
 buffertest_CPPFLAGS = $(AM_CPPFLAGS)
 buffertest_SOURCES = buffertest.c
 bytestringtest_SOURCES = bytestringtest.c
@@ -1440,6 +1450,10 @@ biotest$(EXEEXT): $(biotest_OBJECTS) $(biotest_DEPENDENCIES) $(EXTRA_biotest_DEP
 bn_rand_interval$(EXEEXT): $(bn_rand_interval_OBJECTS) $(bn_rand_interval_DEPENDENCIES) $(EXTRA_bn_rand_interval_DEPENDENCIES) 
 	@rm -f bn_rand_interval$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(bn_rand_interval_OBJECTS) $(bn_rand_interval_LDADD) $(LIBS)
+
+bn_to_string$(EXEEXT): $(bn_to_string_OBJECTS) $(bn_to_string_DEPENDENCIES) $(EXTRA_bn_to_string_DEPENDENCIES) 
+	@rm -f bn_to_string$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(bn_to_string_OBJECTS) $(bn_to_string_LDADD) $(LIBS)
 
 bnaddsub$(EXEEXT): $(bnaddsub_OBJECTS) $(bnaddsub_DEPENDENCIES) $(EXTRA_bnaddsub_DEPENDENCIES) 
 	@rm -f bnaddsub$(EXEEXT)
@@ -1732,6 +1746,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bftest.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/biotest.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bn_rand_interval.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bn_to_string.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bnaddsub.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bntest-bntest.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/buffertest-buffertest.Po@am__quote@ # am--include-marker
@@ -2152,6 +2167,13 @@ bn_rand_interval.log: bn_rand_interval$(EXEEXT)
 bntest.log: bntest$(EXEEXT)
 	@p='bntest$(EXEEXT)'; \
 	b='bntest'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+bn_to_string.log: bn_to_string$(EXEEXT)
+	@p='bn_to_string$(EXEEXT)'; \
+	b='bn_to_string'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
@@ -2724,6 +2746,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/bftest.Po
 	-rm -f ./$(DEPDIR)/biotest.Po
 	-rm -f ./$(DEPDIR)/bn_rand_interval.Po
+	-rm -f ./$(DEPDIR)/bn_to_string.Po
 	-rm -f ./$(DEPDIR)/bnaddsub.Po
 	-rm -f ./$(DEPDIR)/bntest-bntest.Po
 	-rm -f ./$(DEPDIR)/buffertest-buffertest.Po
@@ -2847,6 +2870,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/bftest.Po
 	-rm -f ./$(DEPDIR)/biotest.Po
 	-rm -f ./$(DEPDIR)/bn_rand_interval.Po
+	-rm -f ./$(DEPDIR)/bn_to_string.Po
 	-rm -f ./$(DEPDIR)/bnaddsub.Po
 	-rm -f ./$(DEPDIR)/bntest-bntest.Po
 	-rm -f ./$(DEPDIR)/buffertest-buffertest.Po

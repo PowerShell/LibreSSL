@@ -1,5 +1,72 @@
+; 1 "crypto/modes/ghash-masm-x86_64.S.tmp"
+; 1 "<built-in>" 1
+; 1 "<built-in>" 3
+; 349 "<built-in>" 3
+; 1 "<command line>" 1
+; 1 "<built-in>" 2
+; 1 "crypto/modes/ghash-masm-x86_64.S.tmp" 2
 OPTION	DOTNAME
-#include "x86_arch.h"
+
+; 1 "./crypto/x86_arch.h" 1
+
+
+; 16 "./crypto/x86_arch.h"
+
+
+
+
+
+
+
+
+
+; 40 "./crypto/x86_arch.h"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+; 3 "crypto/modes/ghash-masm-x86_64.S.tmp" 2
 .text$	SEGMENT ALIGN(64) 'CODE'
 
 PUBLIC	gcm_gmult_4bit
@@ -1186,3 +1253,4 @@ DB	004h,0a2h,000h,000h
 
 .xdata	ENDS
 END
+

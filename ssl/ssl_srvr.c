@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_srvr.c,v 1.66 2019/03/25 17:21:18 jsing Exp $ */
+/* $OpenBSD: ssl_srvr.c,v 1.68 2019/04/22 15:12:20 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -913,8 +913,7 @@ ssl3_get_client_hello(SSL *s)
 
 		CBS_dup(&cbs, &ext_block);
 
-		i = ssl_get_prev_session(s, CBS_data(&session_id),
-		    CBS_len(&session_id), &ext_block);
+		i = ssl_get_prev_session(s, &session_id, &ext_block);
 		if (i == 1) { /* previous session */
 			s->internal->hit = 1;
 		} else if (i == -1)
@@ -2553,7 +2552,7 @@ ssl3_send_newsession_ticket(SSL *s)
 			EVP_EncryptInit_ex(&ctx, EVP_aes_128_cbc(), NULL,
 			    tctx->internal->tlsext_tick_aes_key, iv);
 			HMAC_Init_ex(&hctx, tctx->internal->tlsext_tick_hmac_key,
-			    16, tlsext_tick_md(), NULL);
+			    16, EVP_sha256(), NULL);
 			memcpy(key_name, tctx->internal->tlsext_tick_key_name, 16);
 		}
 

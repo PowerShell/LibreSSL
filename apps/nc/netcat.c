@@ -1,4 +1,4 @@
-/* $OpenBSD: netcat.c,v 1.203 2019/02/26 17:32:47 jsing Exp $ */
+/* $OpenBSD: netcat.c,v 1.206 2019/08/08 16:49:35 mestre Exp $ */
 /*
  * Copyright (c) 2001 Eric Jackson <ericj@monkey.org>
  * Copyright (c) 2015 Bob Beck.  All rights reserved.
@@ -393,6 +393,7 @@ main(int argc, char *argv[])
 					err(1, "unveil");
 			}
 		} else {
+			/* no filesystem visibility */
 			if (unveil("/", "") == -1)
 				err(1, "unveil");
 		}
@@ -578,7 +579,7 @@ main(int argc, char *argv[])
 					close(s);
 				s = local_listen(host, uport, hints);
 			}
-			if (s < 0)
+			if (s == -1)
 				err(1, NULL);
 			if (uflag && kflag) {
 				/*
@@ -600,11 +601,11 @@ main(int argc, char *argv[])
 				len = sizeof(z);
 				rv = recvfrom(s, buf, sizeof(buf), MSG_PEEK,
 				    (struct sockaddr *)&z, &len);
-				if (rv < 0)
+				if (rv == -1)
 					err(1, "recvfrom");
 
 				rv = connect(s, (struct sockaddr *)&z, len);
-				if (rv < 0)
+				if (rv == -1)
 					err(1, "connect");
 
 				if (vflag)
@@ -638,7 +639,7 @@ main(int argc, char *argv[])
 				tls_free(tls_cctx);
 			}
 			if (family == AF_UNIX && uflag) {
-				if (connect(s, NULL, 0) < 0)
+				if (connect(s, NULL, 0) == -1)
 					err(1, "connect");
 			}
 
@@ -749,7 +750,7 @@ unix_bind(char *path, int flags)
 
 	/* Create unix domain socket. */
 	if ((s = socket(AF_UNIX, flags | (uflag ? SOCK_DGRAM : SOCK_STREAM),
-	    0)) < 0)
+	    0)) == -1)
 		return -1;
 
 	memset(&s_un, 0, sizeof(struct sockaddr_un));
@@ -762,7 +763,7 @@ unix_bind(char *path, int flags)
 		return -1;
 	}
 
-	if (bind(s, (struct sockaddr *)&s_un, sizeof(s_un)) < 0) {
+	if (bind(s, (struct sockaddr *)&s_un, sizeof(s_un)) == -1) {
 		save_errno = errno;
 		close(s);
 		errno = save_errno;
@@ -872,10 +873,10 @@ unix_connect(char *path)
 	int s, save_errno;
 
 	if (uflag) {
-		if ((s = unix_bind(unix_dg_tmp_socket, SOCK_CLOEXEC)) < 0)
+		if ((s = unix_bind(unix_dg_tmp_socket, SOCK_CLOEXEC)) == -1)
 			return -1;
 	} else {
-		if ((s = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0)) < 0)
+		if ((s = socket(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0)) == -1)
 			return -1;
 	}
 
@@ -888,7 +889,7 @@ unix_connect(char *path)
 		errno = ENAMETOOLONG;
 		return -1;
 	}
-	if (connect(s, (struct sockaddr *)&s_un, sizeof(s_un)) < 0) {
+	if (connect(s, (struct sockaddr *)&s_un, sizeof(s_un)) == -1) {
 		save_errno = errno;
 		close(s);
 		errno = save_errno;
@@ -907,9 +908,9 @@ unix_listen(char *path)
 {
 	int s;
 
-	if ((s = unix_bind(path, 0)) < 0)
+	if ((s = unix_bind(path, 0)) == -1)
 		return -1;
-	if (listen(s, 5) < 0) {
+	if (listen(s, 5) == -1) {
 		close(s);
 		return -1;
 	}
@@ -939,7 +940,7 @@ remote_connect(const char *host, const char *port, struct addrinfo hints)
 
 	for (res = res0; res; res = res->ai_next) {
 		if ((s = socket(res->ai_family, res->ai_socktype |
-		    SOCK_NONBLOCK, res->ai_protocol)) < 0)
+		    SOCK_NONBLOCK, res->ai_protocol)) == -1)
 			continue;
 
 		/* Bind to a local port or source address if specified. */
@@ -959,7 +960,7 @@ remote_connect(const char *host, const char *port, struct addrinfo hints)
 				errx(1, "getaddrinfo: %s", gai_strerror(error));
 
 			if (bind(s, (struct sockaddr *)ares->ai_addr,
-			    ares->ai_addrlen) < 0)
+			    ares->ai_addrlen) == -1)
 				err(1, "bind failed");
 			freeaddrinfo(ares);
 		}
@@ -1041,7 +1042,7 @@ local_listen(const char *host, const char *port, struct addrinfo hints)
 
 	for (res = res0; res; res = res->ai_next) {
 		if ((s = socket(res->ai_family, res->ai_socktype,
-		    res->ai_protocol)) < 0)
+		    res->ai_protocol)) == -1)
 			continue;
 
 #ifdef SO_REUSEPORT
@@ -1063,7 +1064,7 @@ local_listen(const char *host, const char *port, struct addrinfo hints)
 	}
 
 	if (!uflag && s != -1) {
-		if (listen(s, 1) < 0)
+		if (listen(s, 1) == -1)
 			err(1, "listen");
 	}
 	if (vflag && s != -1) {
@@ -1473,12 +1474,12 @@ build_ports(char *p)
 			for (x = 0; x <= hi - lo; x++) {
 				cp = arc4random_uniform(x + 1);
 				portlist[x] = portlist[cp];
-				if (asprintf(&portlist[cp], "%d", x + lo) < 0)
+				if (asprintf(&portlist[cp], "%d", x + lo) == -1)
 					err(1, "asprintf");
 			}
 		} else { /* Load ports sequentially. */
 			for (cp = lo; cp <= hi; cp++) {
-				if (asprintf(&portlist[x], "%d", cp) < 0)
+				if (asprintf(&portlist[x], "%d", cp) == -1)
 					err(1, "asprintf");
 				x++;
 			}

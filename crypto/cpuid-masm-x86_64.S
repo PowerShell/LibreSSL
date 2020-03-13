@@ -1,5 +1,72 @@
+; 1 "crypto/cpuid-masm-x86_64.S.tmp"
+; 1 "<built-in>" 1
+; 1 "<built-in>" 3
+; 349 "<built-in>" 3
+; 1 "<command line>" 1
+; 1 "<built-in>" 2
+; 1 "crypto/cpuid-masm-x86_64.S.tmp" 2
 OPTION	DOTNAME
-#include "x86_arch.h"
+
+; 1 "./crypto/x86_arch.h" 1
+
+
+; 16 "./crypto/x86_arch.h"
+
+
+
+
+
+
+
+
+
+; 40 "./crypto/x86_arch.h"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+; 3 "crypto/cpuid-masm-x86_64.S.tmp" 2
 EXTERN	OPENSSL_cpuid_setup:NEAR
 
 .CRT$XCU	SEGMENT READONLY ALIGN(8)
@@ -66,7 +133,7 @@ OPENSSL_ia32_cpuid	PROC PUBLIC
 	mov	r10d,eax
 	mov	eax,080000001h
 	cpuid
-	and	r9d,IA32CAP_MASK1_AMD_XOP
+	and	r9d,(1 SHL 11)
 	or	r9d,1
 
 	cmp	r10d,080000008h
@@ -79,12 +146,12 @@ OPENSSL_ia32_cpuid	PROC PUBLIC
 
 	mov	eax,1
 	cpuid
-	bt	edx,IA32CAP_BIT0_HT
+	bt	edx,28
 	jnc	$L$generic
 	shr	ebx,16
 	cmp	bl,r10b
 	ja	$L$generic
-	xor	edx,IA32CAP_MASK0_HT
+	xor	edx,(1 SHL 28)
 	jmp	$L$generic
 
 $L$intel::
@@ -103,36 +170,36 @@ $L$nocacheinfo::
 	mov	eax,1
 	cpuid
 
-	and	edx,(~(IA32CAP_MASK0_INTELP4 | IA32CAP_MASK0_INTEL))
+	and	edx,(NOT((1 SHL 20) OR (1 SHL 30)))
 	cmp	r9d,0
 	jne	$L$notintel
 
-	or	edx,IA32CAP_MASK0_INTEL
+	or	edx,(1 SHL 30)
 	and	ah,15
 	cmp	ah,15
 	jne	$L$notintel
 
-	or	edx,IA32CAP_MASK0_INTELP4
+	or	edx,(1 SHL 20)
 $L$notintel::
-	bt	edx,IA32CAP_BIT0_HT
+	bt	edx,28
 	jnc	$L$generic
-	xor	edx,IA32CAP_MASK0_HT
+	xor	edx,(1 SHL 28)
 	cmp	r10d,0
 	je	$L$generic
 
-	or	edx,IA32CAP_MASK0_HT
+	or	edx,(1 SHL 28)
 	shr	ebx,16
 	cmp	bl,1
 	ja	$L$generic
-	xor	edx,IA32CAP_MASK0_HT
+	xor	edx,(1 SHL 28)
 
 $L$generic::
-	and	r9d,IA32CAP_MASK1_AMD_XOP
-	and	ecx,(~IA32CAP_MASK1_AMD_XOP)
+	and	r9d,(1 SHL 11)
+	and	ecx,(NOT(1 SHL 11))
 	or	r9d,ecx
 
 	mov	r10d,edx
-	bt	r9d,IA32CAP_BIT1_OSXSAVE
+	bt	r9d,27
 	jnc	$L$clear_avx
 	xor	ecx,ecx
 DB	00fh,001h,0d0h		
@@ -140,7 +207,7 @@ DB	00fh,001h,0d0h
 	cmp	eax,6
 	je	$L$done
 $L$clear_avx::
-	mov	eax,(~(IA32CAP_MASK1_AVX | IA32CAP_MASK1_FMA3 | IA32CAP_MASK1_AMD_XOP))
+	mov	eax,(NOT((1 SHL 28) OR (1 SHL 12) OR (1 SHL 11)))
 	and	r9d,eax
 $L$done::
 	shl	r9,32
@@ -183,3 +250,4 @@ OPENSSL_wipe_cpu	ENDP
 
 .text$	ENDS
 END
+
