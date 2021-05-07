@@ -1,6 +1,6 @@
-.\" $OpenBSD: ssl.3,v 1.17 2019/06/14 13:41:31 schwarze Exp $
+.\" $OpenBSD: ssl.3,v 1.20 2020/09/21 08:53:56 schwarze Exp $
 .\" full merge up to: OpenSSL e330f55d Nov 11 00:51:04 2016 +0100
-.\" selective merge up to: OpenSSL cbade361 Dec 12 13:14:45 2017 +0100
+.\" selective merge up to: OpenSSL 322755cc Sep 1 08:40:51 2018 +0800
 .\"
 .\" This file was written by Ralf S. Engelschall <rse@openssl.org>,
 .\" Ben Laurie <ben@openssl.org>, and Ulf Moeller <ulf@openssl.org>.
@@ -51,7 +51,7 @@
 .\" ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 .\" OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.Dd $Mdocdate: June 14 2019 $
+.Dd $Mdocdate: September 21 2020 $
 .Dt SSL 3
 .Os
 .Sh NAME
@@ -295,11 +295,13 @@ Constructors and destructors:
 .Pp
 To change the configuration:
 .Xr SSL_clear 3 ,
+.Xr SSL_set_SSL_CTX 3 ,
 .Xr SSL_copy_session_id 3 ,
 .Xr SSL_set_bio 3 ,
 .Xr SSL_set_connect_state 3 ,
 .Xr SSL_set_fd 3 ,
 .Xr SSL_set_session 3 ,
+.Xr SSL_set1_host 3 ,
 .Xr SSL_set_verify_result 3
 .Pp
 To inspect the configuration:
@@ -316,6 +318,7 @@ To transmit data:
 .Xr SSL_connect 3 ,
 .Xr SSL_do_handshake 3 ,
 .Xr SSL_read 3 ,
+.\" XXX enable after the 6.8 release: Xr SSL_read_early_data 3 ,
 .Xr SSL_renegotiate 3 ,
 .Xr SSL_shutdown 3 ,
 .Xr SSL_write 3

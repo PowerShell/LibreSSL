@@ -1,5 +1,6 @@
 include $(top_srcdir)/Makefile.am.common
 
+if !ENABLE_LIBTLS_ONLY
 opensslincludedir=$(includedir)/openssl
 
 opensslinclude_HEADERS =
@@ -73,5 +74,7 @@ opensslinclude_HEADERS += ui.h
 opensslinclude_HEADERS += ui_compat.h
 opensslinclude_HEADERS += whrlpool.h
 opensslinclude_HEADERS += x509.h
+opensslinclude_HEADERS += x509_verify.h
 opensslinclude_HEADERS += x509_vfy.h
 opensslinclude_HEADERS += x509v3.h
+endif

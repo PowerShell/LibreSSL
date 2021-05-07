@@ -10,6 +10,9 @@ DTLS_server_method
 DTLSv1_client_method
 DTLSv1_method
 DTLSv1_server_method
+DTLSv1_2_client_method
+DTLSv1_2_method
+DTLSv1_2_server_method
 SSLv23_client_method
 SSLv23_method
 SSLv23_server_method
@@ -187,6 +190,7 @@ SSL_get0_alpn_selected
 SSL_get0_chain_certs
 SSL_get0_next_proto_negotiated
 SSL_get0_param
+SSL_get0_peername
 SSL_get1_session
 SSL_get1_supported_ciphers
 SSL_get_SSL_CTX
@@ -234,6 +238,7 @@ SSL_get_version
 SSL_get_wbio
 SSL_get_wfd
 SSL_has_matching_session_id
+SSL_is_dtls
 SSL_is_server
 SSL_library_init
 SSL_load_client_CA_file
@@ -265,6 +270,7 @@ SSL_set_debug
 SSL_set_ex_data
 SSL_set_fd
 SSL_set_generate_session_id
+SSL_set_hostflags
 SSL_set_info_callback
 SSL_set_max_proto_version
 SSL_set_min_proto_version
@@ -303,6 +309,7 @@ SSL_use_RSAPrivateKey_ASN1
 SSL_use_RSAPrivateKey_file
 SSL_use_certificate
 SSL_use_certificate_ASN1
+SSL_use_certificate_chain_file
 SSL_use_certificate_file
 SSL_version
 SSL_version_str

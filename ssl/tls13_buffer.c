@@ -1,4 +1,4 @@
-/* $OpenBSD: tls13_buffer.c,v 1.1 2019/01/17 06:32:12 jsing Exp $ */
+/* $OpenBSD: tls13_buffer.c,v 1.3 2020/03/10 17:11:25 jsing Exp $ */
 /*
  * Copyright (c) 2018, 2019 Joel Sing <jsing@openbsd.org>
  *
@@ -75,6 +75,15 @@ tls13_buffer_resize(struct tls13_buffer *buf, size_t capacity)
 	return 1;
 }
 
+int
+tls13_buffer_set_data(struct tls13_buffer *buf, CBS *data)
+{
+	if (!tls13_buffer_resize(buf, CBS_len(data)))
+		return 0;
+	memcpy(buf->data, CBS_data(data), CBS_len(data));
+	return 1;
+}
+
 ssize_t
 tls13_buffer_extend(struct tls13_buffer *buf, size_t len,
     tls13_read_cb read_cb, void *cb_arg)
@@ -94,6 +103,9 @@ tls13_buffer_extend(struct tls13_buffer *buf, size_t len,
 		if ((ret = read_cb(&buf->data[buf->len],
 		    buf->capacity - buf->len, cb_arg)) <= 0)
 			return ret;
+
+		if (ret > buf->capacity - buf->len)
+			return TLS13_IO_FAILURE;
 
 		buf->len += ret;
 

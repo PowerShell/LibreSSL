@@ -82,13 +82,13 @@ elif [ "x$ARCH" = "xarm32" -o "x$ARCH" = "xarm64" ]; then
 	if [ "x$ARCH" = "xarm32" ]; then
 		sudo apt-get install -y g++-arm-linux-gnueabihf
 		sudo ln -s /usr/arm-linux-gnueabihf/lib /lib/arm-linux-gnueabihf
-		sudo ln -s /lib/arm-linux-gnueabihf/ld-2.19.so /lib/ld-linux-armhf.so.3
+		sudo ln -s /lib/arm-linux-gnueabihf/ld-2.27.so /lib/ld-linux-armhf.so.3
 		export CC=arm-linux-gnueabihf-gcc
 		./configure --host=arm-linux
 	else
 		sudo apt-get install -y g++-aarch64-linux-gnu
 		sudo ln -s /usr/aarch64-linux-gnu/lib/ /lib/aarch64-linux-gnu
-		sudo ln -s /lib/aarch64-linux-gnu/ld-2.19.so /lib/ld-linux-aarch64.so.1
+		sudo ln -s /lib/aarch64-linux-gnu/ld-2.27.so /lib/ld-linux-aarch64.so.1
 		export CC=aarch64-linux-gnu-gcc
 		./configure --host=aarch64-linux
 	fi
@@ -97,11 +97,10 @@ elif [ "x$ARCH" = "xarm32" -o "x$ARCH" = "xarm64" ]; then
 	file apps/openssl/.libs/openssl
 
 elif [ "x$ARCH" = "xandroid" ]; then
+	touch $HOME/.android/repositories.cfg
 	echo y | sdkmanager 'ndk-bundle'
+	echo y | sdkmanager 'ndk;20.1.5948944'
 	echo y | sdkmanager 'cmake;3.6.4111459'
-	echo y | sdkmanager 'lldb;3.0'
-	echo y | sdkmanager --update
-	echo y | sdkmanager --licenses
 
 	export CMAKE=$ANDROID_HOME/cmake/3.6.4111459/bin/cmake
 	export NINJA=$ANDROID_HOME/cmake/3.6.4111459/bin/ninja

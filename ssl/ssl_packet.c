@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_packet.c,v 1.8 2018/11/08 22:28:52 jsing Exp $ */
+/* $OpenBSD: ssl_packet.c,v 1.10 2021/02/25 17:06:05 jsing Exp $ */
 /*
  * Copyright (c) 2016, 2017 Joel Sing <jsing@openbsd.org>
  *
@@ -238,7 +238,7 @@ ssl_server_legacy_first_packet(SSL *s)
 	const char *data;
 	CBS header;
 
-	if (SSL_IS_DTLS(s))
+	if (SSL_is_dtls(s))
 		return 1;
 
 	CBS_init(&header, s->internal->packet, SSL3_RT_HEADER_LENGTH);
@@ -247,12 +247,13 @@ ssl_server_legacy_first_packet(SSL *s)
 		return 1;
 
 	/* Only continue if this is not a version locked method. */
-	if (s->method->internal->min_version == s->method->internal->max_version)
+	if (s->method->internal->min_tls_version ==
+	    s->method->internal->max_tls_version)
 		return 1;
 
 	if (ssl_is_sslv2_client_hello(&header) == 1) {
 		/* Only permit SSLv2 client hellos if TLSv1.0 is enabled. */
-		if (ssl_enabled_version_range(s, &min_version, NULL) != 1) {
+		if (ssl_enabled_tls_version_range(s, &min_version, NULL) != 1) {
 			SSLerror(s, SSL_R_NO_PROTOCOLS_AVAILABLE);
 			return -1;
 		}

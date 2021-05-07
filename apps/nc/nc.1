@@ -1,4 +1,4 @@
-.\"     $OpenBSD: nc.1,v 1.93 2018/12/27 17:45:36 jmc Exp $
+.\"     $OpenBSD: nc.1,v 1.96 2021/03/31 20:41:35 jmc Exp $
 .\"
 .\" Copyright (c) 1996 David Sacerdote
 .\" All rights reserved.
@@ -25,7 +25,7 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.Dd $Mdocdate: December 27 2018 $
+.Dd $Mdocdate: March 31 2021 $
 .Dt NC 1
 .Os
 .Sh NAME
@@ -47,7 +47,7 @@
 .Op Fl P Ar proxy_username
 .Op Fl p Ar source_port
 .Op Fl R Ar CAfile
-.Op Fl s Ar source
+.Op Fl s Ar sourceaddr
 .Op Fl T Ar keyword
 .Op Fl V Ar rtable
 .Op Fl W Ar recvlimit
@@ -192,8 +192,8 @@ Ask the kernel to drop incoming packets whose TTL / hop limit is under
 the network socket after EOF on the input.
 Some servers require this to finish their work.
 .It Fl n
-Do not do any DNS or service lookups on any specified addresses,
-hostnames or ports.
+Do not perform domain name resolution.
+If a name cannot be resolved without DNS, an error will be reported.
 .It Fl O Ar length
 Specify the size of the TCP send buffer.
 .It Fl o Ar staplefile
@@ -228,10 +228,9 @@ instead of sequentially within a range or in the order that the system
 assigns them.
 .It Fl S
 Enable the RFC 2385 TCP MD5 signature option.
-.It Fl s Ar source
-Send packets from the interface with the
-.Ar source
-IP address.
+.It Fl s Ar sourceaddr
+Set the source address to send packets from,
+which is useful on machines with multiple interfaces.
 For
 .Ux Ns -domain
 datagram sockets, specifies the local temporary socket file
@@ -415,7 +414,7 @@ On a second console
 .Pq or a second machine ,
 connect to the machine and port being listened on:
 .Pp
-.Dl $ nc 127.0.0.1 1234
+.Dl $ nc -N 127.0.0.1 1234
 .Pp
 There should now be a connection between the ports.
 Anything typed at the second console will be concatenated to the first,
@@ -428,7 +427,10 @@ and which side is being used as a
 .Sq client .
 The connection may be terminated using an
 .Dv EOF
-.Pq Sq ^D .
+.Pq Sq ^D ,
+as the
+.Fl N
+flag was given.
 .Sh DATA TRANSFER
 The example in the previous section can be expanded to build a
 basic data transfer model.

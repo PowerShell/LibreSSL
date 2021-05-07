@@ -1,3 +1,4 @@
+/* $OpenBSD: recordtest.c,v 1.4 2020/05/11 18:08:37 jsing Exp $ */
 /*
  * Copyright (c) 2019 Joel Sing <jsing@openbsd.org>
  *
@@ -240,7 +241,7 @@ struct record_recv_test record_recv_tests[] = {
 		.rt = {
 			{
 				.rw_len = sizeof(test_record_3),
-				.want_ret = TLS13_IO_FAILURE,
+				.want_ret = TLS13_IO_RECORD_OVERFLOW,
 			},
 		},
 	},

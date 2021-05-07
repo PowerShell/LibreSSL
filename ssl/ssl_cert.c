@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_cert.c,v 1.76 2019/05/15 09:13:16 bcook Exp $ */
+/* $OpenBSD: ssl_cert.c,v 1.81 2021/03/27 17:56:28 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -168,7 +168,7 @@ ssl_cert_new(void)
 		SSLerrorx(ERR_R_MALLOC_FAILURE);
 		return (NULL);
 	}
-	ret->key = &(ret->pkeys[SSL_PKEY_RSA_ENC]);
+	ret->key = &(ret->pkeys[SSL_PKEY_RSA]);
 	ret->references = 1;
 	return (ret);
 }
@@ -240,17 +240,16 @@ ssl_cert_dup(CERT *cert)
 				 * (Nothing at the moment, I think.)
 				 */
 
-			case SSL_PKEY_RSA_ENC:
-			case SSL_PKEY_RSA_SIGN:
+			case SSL_PKEY_RSA:
 				/* We have an RSA key. */
-				break;
-
-			case SSL_PKEY_DH_RSA:
-				/* We have a DH key. */
 				break;
 
 			case SSL_PKEY_ECC:
 				/* We have an ECC key */
+				break;
+
+			case SSL_PKEY_GOST01:
+				/* We have a GOST key */
 				break;
 
 			default:
@@ -377,7 +376,7 @@ ssl_sess_cert_new(void)
 		SSLerrorx(ERR_R_MALLOC_FAILURE);
 		return NULL;
 	}
-	ret->peer_key = &(ret->peer_pkeys[SSL_PKEY_RSA_ENC]);
+	ret->peer_key = &(ret->peer_pkeys[SSL_PKEY_RSA]);
 	ret->references = 1;
 
 	return ret;
@@ -506,7 +505,7 @@ SSL_CTX_get_client_CA_list(const SSL_CTX *ctx)
 STACK_OF(X509_NAME) *
 SSL_get_client_CA_list(const SSL *s)
 {
-	if (s->internal->type == SSL_ST_CONNECT) {
+	if (!s->server) {
 		/* We are in the client. */
 		if ((s->version >> 8) == SSL3_VERSION_MAJOR)
 			return (S3I(s)->tmp.ca_names);
@@ -596,8 +595,9 @@ SSL_load_client_CA_file(const char *file)
 				goto err;
 			}
 		}
-		if ((xn = X509_get_subject_name(x)) == NULL) goto err;
-			/* check for duplicates */
+		if ((xn = X509_get_subject_name(x)) == NULL)
+			goto err;
+		/* check for duplicates */
 		xn = X509_NAME_dup(xn);
 		if (xn == NULL)
 			goto err;
@@ -657,8 +657,9 @@ SSL_add_file_cert_subjects_to_stack(STACK_OF(X509_NAME) *stack,
 	for (;;) {
 		if (PEM_read_bio_X509(in, &x, NULL, NULL) == NULL)
 			break;
-		if ((xn = X509_get_subject_name(x)) == NULL) goto err;
-			xn = X509_NAME_dup(xn);
+		if ((xn = X509_get_subject_name(x)) == NULL)
+			goto err;
+		xn = X509_NAME_dup(xn);
 		if (xn == NULL)
 			goto err;
 		if (sk_X509_NAME_find(stack, xn) >= 0)

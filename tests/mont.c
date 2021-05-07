@@ -1,4 +1,4 @@
-/*	$OpenBSD: mont.c,v 1.2 2014/10/22 13:23:05 jsing Exp $	*/
+/*	$OpenBSD: mont.c,v 1.4 2021/04/04 19:36:09 tb Exp $	*/
 
 /*
  * Copyright (c) 2014 Miodrag Vallat.
@@ -34,8 +34,9 @@
 int
 main(int argc, char *argv[])
 {
-	DH *dh;
-	unsigned char *key, r[32 + 16 * 8];
+	DH *dh = NULL;
+	unsigned char *key = NULL;
+	unsigned char r[32 + 16 * 8];
 	size_t privsz;
 
 	arc4random_buf(r, sizeof(r));
@@ -62,12 +63,16 @@ main(int argc, char *argv[])
 			goto err;
 
 		free(key);
+		key = NULL;
 		DH_free(dh);
+		dh = NULL;
 	}
 
 	return 0;
 
-err:
+ err:
 	ERR_print_errors_fp(stderr);
+	free(key);
+	DH_free(dh);
 	return 1;
 }

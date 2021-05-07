@@ -1,4 +1,4 @@
-/* $OpenBSD: apps.c,v 1.54 2019/07/14 03:30:45 guenther Exp $ */
+/* $OpenBSD: apps.c,v 1.60 2021/03/31 17:13:54 tb Exp $ */
 /*
  * Copyright (c) 2014 Joel Sing <jsing@openbsd.org>
  *
@@ -141,11 +141,11 @@
 #include <openssl/err.h>
 #include <openssl/pem.h>
 #include <openssl/pkcs12.h>
+#include <openssl/rsa.h>
 #include <openssl/safestack.h>
+#include <openssl/ssl.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
-
-#include <openssl/rsa.h>
 
 typedef struct {
 	const char *name;
@@ -216,7 +216,6 @@ chopup_args(ARGS *arg, char *buf, int *argc, char **argv[])
 	*argc = 0;
 	*argv = NULL;
 
-	i = 0;
 	if (arg->count == 0) {
 		arg->count = 20;
 		arg->data = reallocarray(NULL, arg->count, sizeof(char *));
@@ -1917,6 +1916,8 @@ args_verify(char ***pargs, int *pargc, int *badarg, BIO *err,
 		flags |= X509_V_FLAG_POLICY_CHECK;
 	else if (!strcmp(arg, "-explicit_policy"))
 		flags |= X509_V_FLAG_EXPLICIT_POLICY;
+	else if (!strcmp(arg, "-legacy_verify"))
+		flags |= X509_V_FLAG_LEGACY_VERIFY;
 	else if (!strcmp(arg, "-inhibit_any"))
 		flags |= X509_V_FLAG_INHIBIT_ANY;
 	else if (!strcmp(arg, "-inhibit_map"))
@@ -2299,6 +2300,14 @@ options_parse(int argc, char **argv, const struct option *opts, char **unnamed,
 			*opt->opt.value |= opt->value;
 			break;
 
+		case OPTION_UL_VALUE_OR:
+			*opt->opt.ulvalue |= opt->ulvalue;
+			break;
+
+		case OPTION_ORDER:
+			*opt->opt.order = ++(*opt->order);
+			break;
+
 		default:
 			fprintf(stderr, "option %s - unknown type %i\n",
 			    opt->name, opt->type);
@@ -2331,4 +2340,3 @@ show_cipher(const OBJ_NAME *name, void *arg)
 
 	fprintf(stderr, " -%-24s%s", name->name, (++*n % 3 != 0 ? "" : "\n"));
 }
-

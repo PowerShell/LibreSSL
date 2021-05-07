@@ -6,6 +6,7 @@ set(
 	ciphers.c
 	crl.c
 	crl2p7.c
+	cms.c
 	dgst.c
 	dh.c
 	dhparam.c
@@ -81,14 +82,4 @@ target_link_libraries(openssl ${OPENSSL_LIBS})
 if(ENABLE_LIBRESSL_INSTALL)
 	install(TARGETS openssl DESTINATION ${CMAKE_INSTALL_BINDIR})
 	install(FILES openssl.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
-endif(ENABLE_LIBRESSL_INSTALL)
-
-if(NOT "${OPENSSLDIR}" STREQUAL "")
-	set(CONF_DIR "${OPENSSLDIR}")
-else()
-	set(CONF_DIR "${CMAKE_INSTALL_PREFIX}/etc/ssl")
-endif()
-if(ENABLE_LIBRESSL_INSTALL)
-	install(FILES cert.pem openssl.cnf x509v3.cnf DESTINATION ${CONF_DIR})
-	install(DIRECTORY DESTINATION ${CONF_DIR}/certs)
 endif(ENABLE_LIBRESSL_INSTALL)

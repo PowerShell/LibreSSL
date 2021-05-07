@@ -1,4 +1,4 @@
-/* $OpenBSD: tls_config.c,v 1.56 2019/04/04 15:09:09 jsing Exp $ */
+/* $OpenBSD: tls_config.c,v 1.63 2021/01/21 22:03:25 eric Exp $ */
 /*
  * Copyright (c) 2014 Joel Sing <jsing@openbsd.org>
  *
@@ -28,7 +28,7 @@
 
 #include "tls_internal.h"
 
-static const char default_ca_file[] = "/etc/ssl/cert.pem";
+static const char default_ca_file[] = TLS_DEFAULT_CA_FILE;
 
 const char *
 tls_default_ca_cert_file(void)
@@ -179,6 +179,8 @@ tls_config_free(struct tls_config *config)
 	free((char *)config->crl_mem);
 	free(config->ecdhecurves);
 
+	pthread_mutex_destroy(&config->mutex);
+
 	free(config);
 }
 
@@ -253,6 +255,8 @@ tls_config_parse_protocols(uint32_t *protocols, const char *protostr)
 			proto = TLS_PROTOCOL_TLSv1_1;
 		else if (strcasecmp(p, "tlsv1.2") == 0)
 			proto = TLS_PROTOCOL_TLSv1_2;
+		else if (strcasecmp(p, "tlsv1.3") == 0)
+			proto = TLS_PROTOCOL_TLSv1_3;
 
 		if (proto == 0) {
 			free(s);
@@ -349,7 +353,8 @@ tls_config_add_keypair_file_internal(struct tls_config *config,
 		return (-1);
 	if (tls_keypair_set_cert_file(keypair, &config->error, cert_file) != 0)
 		goto err;
-	if (tls_keypair_set_key_file(keypair, &config->error, key_file) != 0)
+	if (key_file != NULL &&
+	    tls_keypair_set_key_file(keypair, &config->error, key_file) != 0)
 		goto err;
 	if (ocsp_file != NULL &&
 	    tls_keypair_set_ocsp_staple_file(keypair, &config->error,
@@ -376,7 +381,8 @@ tls_config_add_keypair_mem_internal(struct tls_config *config, const uint8_t *ce
 		return (-1);
 	if (tls_keypair_set_cert_mem(keypair, &config->error, cert, cert_len) != 0)
 		goto err;
-	if (tls_keypair_set_key_mem(keypair, &config->error, key, key_len) != 0)
+	if (key != NULL &&
+	    tls_keypair_set_key_mem(keypair, &config->error, key, key_len) != 0)
 		goto err;
 	if (staple != NULL &&
 	    tls_keypair_set_ocsp_staple_mem(keypair, &config->error, staple,
@@ -798,6 +804,13 @@ tls_config_verify_client_optional(struct tls_config *config)
 void
 tls_config_skip_private_key_check(struct tls_config *config)
 {
+	config->skip_private_key_check = 1;
+}
+
+void
+tls_config_use_fake_private_key(struct tls_config *config)
+{
+	config->use_fake_private_key = 1;
 	config->skip_private_key_check = 1;
 }
 

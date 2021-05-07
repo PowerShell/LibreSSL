@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_vpm.c,v 1.18 2018/04/06 07:08:20 beck Exp $ */
+/* $OpenBSD: x509_vpm.c,v 1.25 2021/04/15 14:15:03 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2004.
  */
@@ -172,12 +172,13 @@ x509_verify_param_zero(X509_VERIFY_PARAM *param)
 	X509_VERIFY_PARAM_ID *paramid;
 	if (!param)
 		return;
+	free(param->name);
 	param->name = NULL;
 	param->purpose = 0;
 	param->trust = 0;
 	/*param->inh_flags = X509_VP_FLAG_DEFAULT;*/
 	param->inh_flags = 0;
-	param->flags = 0;
+	param->flags = X509_V_FLAG_LEGACY_VERIFY;
 	param->depth = -1;
 	if (param->policies) {
 		sk_ASN1_OBJECT_pop_free(param->policies, ASN1_OBJECT_free);
@@ -207,7 +208,7 @@ X509_VERIFY_PARAM_new(void)
 	param = calloc(1, sizeof(X509_VERIFY_PARAM));
 	if (param == NULL)
 		return NULL;
-	paramid = calloc (1, sizeof(X509_VERIFY_PARAM_ID));
+	paramid = calloc(1, sizeof(X509_VERIFY_PARAM_ID));
 	if (paramid == NULL) {
 		free(param);
 		return NULL;
@@ -227,7 +228,8 @@ X509_VERIFY_PARAM_free(X509_VERIFY_PARAM *param)
 	free(param);
 }
 
-/* This function determines how parameters are "inherited" from one structure
+/*
+ * This function determines how parameters are "inherited" from one structure
  * to another. There are several different ways this can happen.
  *
  * 1. If a child structure needs to have its values initialized from a parent
@@ -673,8 +675,8 @@ X509_VERIFY_PARAM_get_count(void)
 	return num;
 }
 
-const
-X509_VERIFY_PARAM *X509_VERIFY_PARAM_get0(int id)
+const X509_VERIFY_PARAM *
+X509_VERIFY_PARAM_get0(int id)
 {
 	int num = sizeof(default_table) / sizeof(X509_VERIFY_PARAM);
 	if (id < num)
@@ -682,8 +684,8 @@ X509_VERIFY_PARAM *X509_VERIFY_PARAM_get0(int id)
 	return sk_X509_VERIFY_PARAM_value(param_table, id - num);
 }
 
-const
-X509_VERIFY_PARAM *X509_VERIFY_PARAM_lookup(const char *name)
+const X509_VERIFY_PARAM *
+X509_VERIFY_PARAM_lookup(const char *name)
 {
 	X509_VERIFY_PARAM pm;
 	unsigned int i, limit;

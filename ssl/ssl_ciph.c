@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_ciph.c,v 1.108 2019/04/04 16:44:24 jsing Exp $ */
+/* $OpenBSD: ssl_ciph.c,v 1.121 2021/03/24 18:44:00 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -396,6 +396,28 @@ static const SSL_CIPHER cipher_aliases[] = {
 		.algorithm_ssl = SSL_TLSV1_3,
 	},
 
+	/* cipher suite aliases */
+#ifdef LIBRESSL_HAS_TLS1_3
+	{
+		.valid = 1,
+		.name = "TLS_AES_128_GCM_SHA256",
+		.id = TLS1_3_CK_AES_128_GCM_SHA256,
+		.algorithm_ssl = SSL_TLSV1_3,
+	},
+	{
+		.valid = 1,
+		.name = "TLS_AES_256_GCM_SHA384",
+		.id = TLS1_3_CK_AES_256_GCM_SHA384,
+		.algorithm_ssl = SSL_TLSV1_3,
+	},
+	{
+		.valid = 1,
+		.name = "TLS_CHACHA20_POLY1305_SHA256",
+		.id = TLS1_3_CK_CHACHA20_POLY1305_SHA256,
+		.algorithm_ssl = SSL_TLSV1_3,
+	},
+#endif
+
 	/* strength classes */
 	{
 		.name = SSL_TXT_LOW,
@@ -537,9 +559,21 @@ ssl_cipher_get_evp_aead(const SSL_SESSION *ss, const EVP_AEAD **aead)
 int
 ssl_get_handshake_evp_md(SSL *s, const EVP_MD **md)
 {
+	unsigned long handshake_mac;
+
 	*md = NULL;
 
-	switch (ssl_get_algorithm2(s) & SSL_HANDSHAKE_MAC_MASK) {
+	if (S3I(s)->hs.cipher == NULL)
+		return 0;
+
+	handshake_mac = S3I(s)->hs.cipher->algorithm2 &
+	    SSL_HANDSHAKE_MAC_MASK;
+
+	/* For TLSv1.2 we upgrade the default MD5+SHA1 MAC to SHA256. */
+	if (SSL_USE_SHA256_PRF(s) && handshake_mac == SSL_HANDSHAKE_MAC_DEFAULT)
+		handshake_mac = SSL_HANDSHAKE_MAC_SHA256;
+
+	switch (handshake_mac) {
 	case SSL_HANDSHAKE_MAC_DEFAULT:
 		*md = EVP_md5_sha1();
 		return 1;
@@ -758,13 +792,12 @@ ssl_cipher_collect_aliases(const SSL_CIPHER **ca_list, int num_of_group_aliases,
 static void
 ssl_cipher_apply_rule(unsigned long cipher_id, unsigned long alg_mkey,
     unsigned long alg_auth, unsigned long alg_enc, unsigned long alg_mac,
-    unsigned long alg_ssl, unsigned long algo_strength,
-    int rule, int strength_bits, CIPHER_ORDER **head_p, CIPHER_ORDER **tail_p)
+    unsigned long alg_ssl, unsigned long algo_strength, int rule,
+    int strength_bits, CIPHER_ORDER **head_p, CIPHER_ORDER **tail_p)
 {
 	CIPHER_ORDER *head, *tail, *curr, *next, *last;
 	const SSL_CIPHER *cp;
 	int reverse = 0;
-
 
 	if (rule == CIPHER_DEL)
 		reverse = 1; /* needed to maintain sorting between currently deleted ciphers */
@@ -908,7 +941,7 @@ ssl_cipher_strength_sort(CIPHER_ORDER **head_p, CIPHER_ORDER **tail_p)
 
 static int
 ssl_cipher_process_rulestr(const char *rule_str, CIPHER_ORDER **head_p,
-    CIPHER_ORDER **tail_p, const SSL_CIPHER **ca_list)
+    CIPHER_ORDER **tail_p, const SSL_CIPHER **ca_list, int *tls13_seen)
 {
 	unsigned long alg_mkey, alg_auth, alg_enc, alg_mac, alg_ssl;
 	unsigned long algo_strength;
@@ -916,6 +949,8 @@ ssl_cipher_process_rulestr(const char *rule_str, CIPHER_ORDER **head_p,
 	unsigned long cipher_id = 0;
 	const char *l, *buf;
 	char ch;
+
+	*tls13_seen = 0;
 
 	retval = 1;
 	l = rule_str;
@@ -960,7 +995,8 @@ ssl_cipher_process_rulestr(const char *rule_str, CIPHER_ORDER **head_p,
 			while (((ch >= 'A') && (ch <= 'Z')) ||
 			    ((ch >= '0') && (ch <= '9')) ||
 			    ((ch >= 'a') && (ch <= 'z')) ||
-			    (ch == '-') || (ch == '.')) {
+			    (ch == '-') || (ch == '.') ||
+			    (ch == '_')) {
 				ch = *(++l);
 				buflen++;
 			}
@@ -1084,6 +1120,8 @@ ssl_cipher_process_rulestr(const char *rule_str, CIPHER_ORDER **head_p,
 				 * pattern!
 				 */
 				cipher_id = ca_list[j]->id;
+				if (ca_list[j]->algorithm_ssl == SSL_TLSV1_3)
+					*tls13_seen = 1;
 			} else {
 				/*
 				 * not an explicit ciphersuite; only in this
@@ -1129,6 +1167,8 @@ ssl_cipher_process_rulestr(const char *rule_str, CIPHER_ORDER **head_p,
 			while ((*l != '\0') && !ITEM_SEP(*l))
 				l++;
 		} else if (found) {
+			if (alg_ssl == SSL_TLSV1_3)
+				*tls13_seen = 1;
 			ssl_cipher_apply_rule(cipher_id, alg_mkey, alg_auth,
 			    alg_enc, alg_mac, alg_ssl, algo_strength, rule,
 			    -1, head_p, tail_p);
@@ -1156,20 +1196,24 @@ ssl_aes_is_accelerated(void)
 STACK_OF(SSL_CIPHER) *
 ssl_create_cipher_list(const SSL_METHOD *ssl_method,
     STACK_OF(SSL_CIPHER) **cipher_list,
-    STACK_OF(SSL_CIPHER) **cipher_list_by_id,
+    STACK_OF(SSL_CIPHER) *cipher_list_tls13,
     const char *rule_str)
 {
 	int ok, num_of_ciphers, num_of_alias_max, num_of_group_aliases;
 	unsigned long disabled_mkey, disabled_auth, disabled_enc, disabled_mac, disabled_ssl;
-	STACK_OF(SSL_CIPHER) *cipherstack, *tmp_cipher_list;
+	STACK_OF(SSL_CIPHER) *cipherstack;
 	const char *rule_p;
 	CIPHER_ORDER *co_list = NULL, *head = NULL, *tail = NULL, *curr;
 	const SSL_CIPHER **ca_list = NULL;
+	const SSL_CIPHER *cipher;
+	int tls13_seen = 0;
+	int any_active;
+	int i;
 
 	/*
 	 * Return with error if nothing to do.
 	 */
-	if (rule_str == NULL || cipher_list == NULL || cipher_list_by_id == NULL)
+	if (rule_str == NULL || cipher_list == NULL)
 		return NULL;
 
 	/*
@@ -1201,7 +1245,7 @@ ssl_create_cipher_list(const SSL_METHOD *ssl_method,
 	ssl_cipher_apply_rule(0, SSL_kECDHE, 0, 0, 0, 0, 0, CIPHER_ADD, -1, &head, &tail);
 	ssl_cipher_apply_rule(0, SSL_kECDHE, 0, 0, 0, 0, 0, CIPHER_DEL, -1, &head, &tail);
 
-	if (ssl_aes_is_accelerated() == 1) {
+	if (ssl_aes_is_accelerated()) {
 		/*
 		 * We have hardware assisted AES - prefer AES as a symmetric
 		 * cipher, with CHACHA20 second.
@@ -1268,9 +1312,8 @@ ssl_create_cipher_list(const SSL_METHOD *ssl_method,
 		SSLerrorx(ERR_R_MALLOC_FAILURE);
 		return(NULL);	/* Failure */
 	}
-	ssl_cipher_collect_aliases(ca_list, num_of_group_aliases,
-	disabled_mkey, disabled_auth, disabled_enc,
-	disabled_mac, disabled_ssl, head);
+	ssl_cipher_collect_aliases(ca_list, num_of_group_aliases, disabled_mkey,
+	    disabled_auth, disabled_enc, disabled_mac, disabled_ssl, head);
 
 	/*
 	 * If the rule_string begins with DEFAULT, apply the default rule
@@ -1280,14 +1323,15 @@ ssl_create_cipher_list(const SSL_METHOD *ssl_method,
 	rule_p = rule_str;
 	if (strncmp(rule_str, "DEFAULT", 7) == 0) {
 		ok = ssl_cipher_process_rulestr(SSL_DEFAULT_CIPHER_LIST,
-		&head, &tail, ca_list);
+		    &head, &tail, ca_list, &tls13_seen);
 		rule_p += 7;
 		if (*rule_p == ':')
 			rule_p++;
 	}
 
 	if (ok && (strlen(rule_p) > 0))
-		ok = ssl_cipher_process_rulestr(rule_p, &head, &tail, ca_list);
+		ok = ssl_cipher_process_rulestr(rule_p, &head, &tail, ca_list,
+		    &tls13_seen);
 
 	free((void *)ca_list);	/* Not needed anymore */
 
@@ -1306,30 +1350,41 @@ ssl_create_cipher_list(const SSL_METHOD *ssl_method,
 		return (NULL);
 	}
 
+	/* Prefer TLSv1.3 cipher suites. */
+	if (cipher_list_tls13 != NULL) {
+		for (i = 0; i < sk_SSL_CIPHER_num(cipher_list_tls13); i++) {
+			cipher = sk_SSL_CIPHER_value(cipher_list_tls13, i);
+			sk_SSL_CIPHER_push(cipherstack, cipher);
+		}
+		tls13_seen = 1;
+	}
+
 	/*
 	 * The cipher selection for the list is done. The ciphers are added
 	 * to the resulting precedence to the STACK_OF(SSL_CIPHER).
+	 *
+	 * If the rule string did not contain any references to TLSv1.3 and
+	 * TLSv1.3 cipher suites have not been configured separately,
+	 * include inactive TLSv1.3 cipher suites. This avoids attempts to
+	 * use TLSv1.3 with an older rule string that does not include
+	 * TLSv1.3 cipher suites. If the rule string resulted in no active
+	 * cipher suites then we return an empty stack.
 	 */
+	any_active = 0;
 	for (curr = head; curr != NULL; curr = curr->next) {
-		if (curr->active) {
+		if (curr->active ||
+		    (!tls13_seen && curr->cipher->algorithm_ssl == SSL_TLSV1_3))
 			sk_SSL_CIPHER_push(cipherstack, curr->cipher);
-		}
+		any_active |= curr->active;
 	}
+	if (!any_active)
+		sk_SSL_CIPHER_zero(cipherstack);
+
 	free(co_list);	/* Not needed any longer */
 
-	tmp_cipher_list = sk_SSL_CIPHER_dup(cipherstack);
-	if (tmp_cipher_list == NULL) {
-		sk_SSL_CIPHER_free(cipherstack);
-		return NULL;
-	}
 	sk_SSL_CIPHER_free(*cipher_list);
 	*cipher_list = cipherstack;
-	sk_SSL_CIPHER_free(*cipher_list_by_id);
-	*cipher_list_by_id = tmp_cipher_list;
-	(void)sk_SSL_CIPHER_set_cmp_func(*cipher_list_by_id,
-	    ssl_cipher_ptr_id_cmp);
 
-	sk_SSL_CIPHER_sort(*cipher_list_by_id);
 	return (cipherstack);
 }
 
@@ -1383,6 +1438,9 @@ SSL_CIPHER_description(const SSL_CIPHER *cipher, char *buf, int len)
 	case SSL_kGOST:
 		kx = "GOST";
 		break;
+	case SSL_kTLS1_3:
+		kx = "TLSv1.3";
+		break;
 	default:
 		kx = "unknown";
 	}
@@ -1402,6 +1460,9 @@ SSL_CIPHER_description(const SSL_CIPHER *cipher, char *buf, int len)
 		break;
 	case SSL_aGOST01:
 		au = "GOST01";
+		break;
+	case SSL_aTLS1_3:
+		au = "TLSv1.3";
 		break;
 	default:
 		au = "unknown";
