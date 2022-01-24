@@ -1,4 +1,4 @@
-/* $OpenBSD: tls13_record.c,v 1.6 2020/05/11 18:08:11 jsing Exp $ */
+/* $OpenBSD: tls13_record.c,v 1.8 2021/05/16 14:19:04 jsing Exp $ */
 /*
  * Copyright (c) 2018, 2019 Joel Sing <jsing@openbsd.org>
  *
@@ -14,8 +14,6 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-
-#include "ssl_locl.h"
 
 #include "tls13_internal.h"
 #include "tls13_record.h"

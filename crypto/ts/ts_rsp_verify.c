@@ -1,4 +1,4 @@
-/* $OpenBSD: ts_rsp_verify.c,v 1.18 2017/01/29 17:49:23 beck Exp $ */
+/* $OpenBSD: ts_rsp_verify.c,v 1.21 2021/07/02 11:15:08 schwarze Exp $ */
 /* Written by Zoltan Glozik (zglozik@stones.com) for the OpenSSL
  * project 2002.
  */
@@ -593,35 +593,40 @@ TS_check_policy(ASN1_OBJECT *req_oid, TS_TST_INFO *tst_info)
 }
 
 static int
-TS_compute_imprint(BIO *data, TS_TST_INFO *tst_info, X509_ALGOR **md_alg,
-    unsigned char **imprint, unsigned *imprint_len)
+TS_compute_imprint(BIO *data, TS_TST_INFO *tst_info, X509_ALGOR **out_md_alg,
+    unsigned char **out_imprint, unsigned int *out_imprint_len)
 {
-	TS_MSG_IMPRINT *msg_imprint = TS_TST_INFO_get_msg_imprint(tst_info);
-	X509_ALGOR *md_alg_resp = TS_MSG_IMPRINT_get_algo(msg_imprint);
+	TS_MSG_IMPRINT *msg_imprint;
+	X509_ALGOR *md_alg_resp;
+	X509_ALGOR *md_alg = NULL;
+	unsigned char *imprint = NULL;
+	unsigned int imprint_len = 0;
 	const EVP_MD *md;
 	EVP_MD_CTX md_ctx;
 	unsigned char buffer[4096];
 	int length;
 
-	*md_alg = NULL;
-	*imprint = NULL;
+	*out_md_alg = NULL;
+	*out_imprint = NULL;
+	*out_imprint_len = 0;
 
-	/* Return the MD algorithm of the response. */
-	if (!(*md_alg = X509_ALGOR_dup(md_alg_resp)))
+	/* Retrieve the MD algorithm of the response. */
+	msg_imprint = TS_TST_INFO_get_msg_imprint(tst_info);
+	md_alg_resp = TS_MSG_IMPRINT_get_algo(msg_imprint);
+	if ((md_alg = X509_ALGOR_dup(md_alg_resp)) == NULL)
 		goto err;
 
 	/* Getting the MD object. */
-	if (!(md = EVP_get_digestbyobj((*md_alg)->algorithm))) {
+	if ((md = EVP_get_digestbyobj((md_alg)->algorithm)) == NULL) {
 		TSerror(TS_R_UNSUPPORTED_MD_ALGORITHM);
 		goto err;
 	}
 
 	/* Compute message digest. */
-	length = EVP_MD_size(md);
-	if (length < 0)
+	if ((length = EVP_MD_size(md)) < 0)
 		goto err;
-	*imprint_len = length;
-	if (!(*imprint = malloc(*imprint_len))) {
+	imprint_len = length;
+	if ((imprint = malloc(imprint_len)) == NULL) {
 		TSerror(ERR_R_MALLOC_FAILURE);
 		goto err;
 	}
@@ -632,16 +637,20 @@ TS_compute_imprint(BIO *data, TS_TST_INFO *tst_info, X509_ALGOR **md_alg,
 		if (!EVP_DigestUpdate(&md_ctx, buffer, length))
 			goto err;
 	}
-	if (!EVP_DigestFinal(&md_ctx, *imprint, NULL))
+	if (!EVP_DigestFinal(&md_ctx, imprint, NULL))
 		goto err;
+
+	*out_md_alg = md_alg;
+	md_alg = NULL;
+	*out_imprint = imprint;
+	imprint = NULL;
+	*out_imprint_len = imprint_len;
 
 	return 1;
 
 err:
-	X509_ALGOR_free(*md_alg);
-	free(*imprint);
-	*imprint = NULL;
-	*imprint_len = 0;
+	X509_ALGOR_free(md_alg);
+	free(imprint);
 	return 0;
 }
 
@@ -711,7 +720,7 @@ TS_check_signer_name(GENERAL_NAME *tsa_name, X509 *signer)
 
 	/* Check the subject name first. */
 	if (tsa_name->type == GEN_DIRNAME &&
-	    X509_name_cmp(tsa_name->d.dirn, signer->cert_info->subject) == 0)
+	    X509_NAME_cmp(tsa_name->d.dirn, signer->cert_info->subject) == 0)
 		return 1;
 
 	/* Check all the alternative names. */

@@ -1,11 +1,11 @@
-.\" $OpenBSD: X509_VERIFY_PARAM_set_flags.3,v 1.15 2020/09/17 08:04:22 schwarze Exp $
+.\" $OpenBSD: X509_VERIFY_PARAM_set_flags.3,v 1.17 2021/07/23 16:43:56 schwarze Exp $
 .\" full merge up to: OpenSSL d33def66 Feb 9 14:17:13 2016 -0500
-.\" selective merge up to: OpenSSL 6328d367 Jul 4 21:58:30 2020 +0200
+.\" selective merge up to: OpenSSL 24a535ea Sep 22 13:14:20 2020 +0100
 .\"
 .\" This file is a derived work.
 .\" The changes are covered by the following Copyright and license:
 .\"
-.\" Copyright (c) 2018 Ingo Schwarze <schwarze@openbsd.org>
+.\" Copyright (c) 2018, 2021 Ingo Schwarze <schwarze@openbsd.org>
 .\"
 .\" Permission to use, copy, modify, and distribute this software for any
 .\" purpose with or without fee is hereby granted, provided that the above
@@ -68,7 +68,7 @@
 .\" ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 .\" OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.Dd $Mdocdate: September 17 2020 $
+.Dd $Mdocdate: July 23 2021 $
 .Dt X509_VERIFY_PARAM_SET_FLAGS 3
 .Os
 .Sh NAME
@@ -292,12 +292,18 @@ in
 .Fa param .
 .Pp
 .Fn X509_VERIFY_PARAM_set_purpose
-sets the verification purpose in
-.Fa param
-to
-.Fa purpose .
-This determines the acceptable purpose of the certificate chain, for
-example SSL client or SSL server.
+sets the verification
+.Fa purpose
+identifier in
+.Fa param .
+This determines the acceptable purpose of the certificate chain, for example
+.Dv X509_PURPOSE_SSL_CLIENT
+or
+.Dv X509_PURPOSE_SSL_SERVER .
+Standard purposes are listed in
+.Xr X509_check_purpose 3 ,
+and additional purposes can be defined with
+.Xr X509_PURPOSE_add 3 .
 .Pp
 .Fn X509_VERIFY_PARAM_set_trust
 sets the trust setting in
@@ -404,7 +410,7 @@ peer name may be a wildcard name or a sub-domain of the reference
 identifier respectively.
 .Pp
 .Fn X509_VERIFY_PARAM_set1_email
-sets the expected RFC822 email address to
+sets the expected RFC 822 email address to
 .Fa email .
 .Fa emaillen
 should be set to the length of

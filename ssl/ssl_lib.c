@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_lib.c,v 1.255 2021/03/29 16:57:38 jsing Exp $ */
+/* $OpenBSD: ssl_lib.c,v 1.268 2021/09/10 08:59:56 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -146,13 +146,12 @@
 
 #include <stdio.h>
 
-#include "ssl_locl.h"
-
 #include <openssl/bn.h>
 #include <openssl/dh.h>
 #include <openssl/lhash.h>
 #include <openssl/objects.h>
 #include <openssl/ocsp.h>
+#include <openssl/opensslconf.h>
 #include <openssl/x509v3.h>
 
 #ifndef OPENSSL_NO_ENGINE
@@ -160,6 +159,8 @@
 #endif
 
 #include "bytestring.h"
+#include "dtls_locl.h"
+#include "ssl_locl.h"
 #include "ssl_sigalgs.h"
 
 const char *SSL_version_str = OPENSSL_VERSION_TEXT;
@@ -186,7 +187,7 @@ SSL_clear(SSL *s)
 		return (0);
 	}
 
-	s->version = s->method->internal->version;
+	s->version = s->method->version;
 	s->client_version = s->version;
 	s->internal->rwstate = SSL_NOTHING;
 	s->internal->rstate = SSL_ST_READ_HEADER;
@@ -206,12 +207,12 @@ SSL_clear(SSL *s)
 	 */
 	if (!s->internal->in_handshake && (s->session == NULL) &&
 	    (s->method != s->ctx->method)) {
-		s->method->internal->ssl_free(s);
+		s->method->ssl_free(s);
 		s->method = s->ctx->method;
-		if (!s->method->internal->ssl_new(s))
+		if (!s->method->ssl_new(s))
 			return (0);
 	} else
-		s->method->internal->ssl_clear(s);
+		s->method->ssl_clear(s);
 
 	return (1);
 }
@@ -250,6 +251,9 @@ SSL_new(SSL_CTX *ctx)
 	if ((s = calloc(1, sizeof(*s))) == NULL)
 		goto err;
 	if ((s->internal = calloc(1, sizeof(*s->internal))) == NULL)
+		goto err;
+
+	if ((s->internal->rl = tls12_record_layer_new()) == NULL)
 		goto err;
 
 	s->internal->min_tls_version = ctx->internal->min_tls_version;
@@ -338,14 +342,11 @@ SSL_new(SSL_CTX *ctx)
 
 	s->method = ctx->method;
 
-	if (!s->method->internal->ssl_new(s))
-		goto err;
-
-	if ((s->internal->rl = tls12_record_layer_new()) == NULL)
+	if (!s->method->ssl_new(s))
 		goto err;
 
 	s->references = 1;
-	s->server = ctx->method->internal->server;
+	s->server = ctx->method->server;
 
 	SSL_clear(s);
 
@@ -565,7 +566,7 @@ SSL_free(SSL *s)
 	sk_X509_NAME_pop_free(s->internal->client_CA, X509_NAME_free);
 
 	if (s->method != NULL)
-		s->method->internal->ssl_free(s);
+		s->method->ssl_free(s);
 
 	SSL_CTX_free(s->ctx);
 
@@ -611,6 +612,13 @@ BIO *
 SSL_get_rbio(const SSL *s)
 {
 	return (s->rbio);
+}
+
+void
+SSL_set0_rbio(SSL *s, BIO *rbio)
+{
+	BIO_free_all(s->rbio);
+	s->rbio = rbio;
 }
 
 BIO *
@@ -666,7 +674,7 @@ SSL_set_fd(SSL *s, int fd)
 	BIO_set_fd(bio, fd, BIO_NOCLOSE);
 	SSL_set_bio(s, bio, bio);
 	ret = 1;
-err:
+ err:
 	return (ret);
 }
 
@@ -689,7 +697,7 @@ SSL_set_wfd(SSL *s, int fd)
 	} else
 		SSL_set_bio(s, SSL_get_rbio(s), SSL_get_rbio(s));
 	ret = 1;
-err:
+ err:
 	return (ret);
 }
 
@@ -712,7 +720,7 @@ SSL_set_rfd(SSL *s, int fd)
 	} else
 		SSL_set_bio(s, SSL_get_wbio(s), SSL_get_wbio(s));
 	ret = 1;
-err:
+ err:
 	return (ret);
 }
 
@@ -810,7 +818,7 @@ SSL_get_read_ahead(const SSL *s)
 int
 SSL_pending(const SSL *s)
 {
-	return (s->method->internal->ssl_pending(s));
+	return (s->method->ssl_pending(s));
 }
 
 X509 *
@@ -865,9 +873,9 @@ SSL_copy_session_id(SSL *t, const SSL *f)
 
 	/* What if we are set up for one protocol but want to talk another? */
 	if (t->method != f->method) {
-		t->method->internal->ssl_free(t);
+		t->method->ssl_free(t);
 		t->method = f->method;
-		if (!t->method->internal->ssl_new(t))
+		if (!t->method->ssl_new(t))
 			return 0;
 	}
 
@@ -932,7 +940,7 @@ SSL_accept(SSL *s)
 	if (s->internal->handshake_func == NULL)
 		SSL_set_accept_state(s); /* Not properly initialized yet */
 
-	return (s->method->internal->ssl_accept(s));
+	return (s->method->ssl_accept(s));
 }
 
 int
@@ -941,13 +949,13 @@ SSL_connect(SSL *s)
 	if (s->internal->handshake_func == NULL)
 		SSL_set_connect_state(s); /* Not properly initialized yet */
 
-	return (s->method->internal->ssl_connect(s));
+	return (s->method->ssl_connect(s));
 }
 
 int
 SSL_is_dtls(const SSL *s)
 {
-	return s->method->internal->dtls;
+	return s->method->dtls;
 }
 
 int
@@ -1084,7 +1092,7 @@ SSL_shutdown(SSL *s)
 	}
 
 	if (s != NULL && !SSL_in_init(s))
-		return (s->method->internal->ssl_shutdown(s));
+		return (s->method->ssl_shutdown(s));
 
 	return (1);
 }
@@ -1097,7 +1105,7 @@ SSL_renegotiate(SSL *s)
 
 	s->internal->new_session = 1;
 
-	return (s->method->internal->ssl_renegotiate(s));
+	return (s->method->ssl_renegotiate(s));
 }
 
 int
@@ -1108,7 +1116,7 @@ SSL_renegotiate_abbreviated(SSL *s)
 
 	s->internal->new_session = 0;
 
-	return (s->method->internal->ssl_renegotiate(s));
+	return (s->method->ssl_renegotiate(s));
 }
 
 int
@@ -1183,9 +1191,7 @@ SSL_callback_ctrl(SSL *s, int cmd, void (*fp)(void))
 {
 	switch (cmd) {
 	case SSL_CTRL_SET_MSG_CALLBACK:
-		s->internal->msg_callback = (void (*)(int write_p, int version,
-		    int content_type, const void *buf, size_t len,
-		    SSL *ssl, void *arg))(fp);
+		s->internal->msg_callback = (ssl_msg_callback_fn *)(fp);
 		return (1);
 
 	default:
@@ -1283,9 +1289,7 @@ SSL_CTX_callback_ctrl(SSL_CTX *ctx, int cmd, void (*fp)(void))
 {
 	switch (cmd) {
 	case SSL_CTRL_SET_MSG_CALLBACK:
-		ctx->internal->msg_callback = (void (*)(int write_p, int version,
-		    int content_type, const void *buf, size_t len, SSL *ssl,
-		    void *arg))(fp);
+		ctx->internal->msg_callback = (ssl_msg_callback_fn *)fp;
 		return (1);
 
 	default:
@@ -1720,6 +1724,12 @@ SSL_get0_alpn_selected(const SSL *ssl, const unsigned char **data,
 	*len = ssl->s3->internal->alpn_selected_len;
 }
 
+void
+SSL_set_psk_use_session_callback(SSL *s, SSL_psk_use_session_cb_func cb)
+{
+	return;
+}
+
 int
 SSL_export_keying_material(SSL *s, unsigned char *out, size_t olen,
     const char *label, size_t llen, const unsigned char *p, size_t plen,
@@ -1824,8 +1834,8 @@ SSL_CTX_new(const SSL_METHOD *meth)
 	}
 
 	ret->method = meth;
-	ret->internal->min_tls_version = meth->internal->min_tls_version;
-	ret->internal->max_tls_version = meth->internal->max_tls_version;
+	ret->internal->min_tls_version = meth->min_tls_version;
+	ret->internal->max_tls_version = meth->max_tls_version;
 	ret->internal->min_proto_version = 0;
 	ret->internal->max_proto_version = 0;
 	ret->internal->mode = SSL_MODE_AUTO_RETRY;
@@ -2245,35 +2255,119 @@ ssl_get_auto_dh(SSL *s)
 	return (dhp);
 }
 
+static int
+ssl_should_update_external_cache(SSL *s, int mode)
+{
+	int cache_mode;
+
+	cache_mode = s->session_ctx->internal->session_cache_mode;
+
+	/* Don't cache if mode says not to */
+	if ((cache_mode & mode) == 0)
+		return 0;
+
+	/* if it is not already cached, cache it */
+	if (!s->internal->hit)
+		return 1;
+
+	/* If it's TLS 1.3, do it to match OpenSSL */
+	if (S3I(s)->hs.negotiated_tls_version >= TLS1_3_VERSION)
+		return 1;
+
+	return 0;
+}
+
+static int
+ssl_should_update_internal_cache(SSL *s, int mode)
+{
+	int cache_mode;
+
+	cache_mode = s->session_ctx->internal->session_cache_mode;
+
+	/* Don't cache if mode says not to */
+	if ((cache_mode & mode) == 0)
+		return 0;
+
+	/* If it is already cached, don't cache it again */
+	if (s->internal->hit)
+		return 0;
+
+	if ((cache_mode & SSL_SESS_CACHE_NO_INTERNAL_STORE) != 0)
+		return 0;
+
+	/* If we are lesser than TLS 1.3, Cache it. */
+	if (S3I(s)->hs.negotiated_tls_version < TLS1_3_VERSION)
+		return 1;
+
+	/* Below this we consider TLS 1.3 or later */
+
+	/* If it's not a server, add it? OpenSSL does this. */
+	if (!s->server)
+		return 1;
+
+	/* XXX if we support early data / PSK need to add */
+
+	/*
+	 * If we have the remove session callback, we will want
+	 * to know about this even if it's a stateless ticket
+	 * from 1.3 so we can know when it is removed.
+	 */
+	if (s->session_ctx->internal->remove_session_cb != NULL)
+		return 1;
+
+	/* If we have set OP_NO_TICKET, cache it. */
+	if ((s->internal->options & SSL_OP_NO_TICKET) != 0)
+		return 1;
+
+	/* Otherwise do not cache */
+	return 0;
+}
+
 void
 ssl_update_cache(SSL *s, int mode)
 {
-	int	i;
+	int cache_mode, do_callback;
 
-	/*
-	 * If the session_id_length is 0, we are not supposed to cache it,
-	 * and it would be rather hard to do anyway :-)
-	 */
 	if (s->session->session_id_length == 0)
 		return;
 
-	i = s->session_ctx->internal->session_cache_mode;
-	if ((i & mode) && (!s->internal->hit) && ((i & SSL_SESS_CACHE_NO_INTERNAL_STORE)
-	    || SSL_CTX_add_session(s->session_ctx, s->session))
-	    && (s->session_ctx->internal->new_session_cb != NULL)) {
-		CRYPTO_add(&s->session->references, 1, CRYPTO_LOCK_SSL_SESSION);
-		if (!s->session_ctx->internal->new_session_cb(s, s->session))
-			SSL_SESSION_free(s->session);
+	cache_mode = s->session_ctx->internal->session_cache_mode;
+	do_callback = ssl_should_update_external_cache(s, mode);
+
+	if (ssl_should_update_internal_cache(s, mode)) {
+		/*
+		 * XXX should we fail if the add to the internal cache
+		 * fails? OpenSSL doesn't care..
+		 */
+		(void) SSL_CTX_add_session(s->session_ctx, s->session);
 	}
 
-	/* auto flush every 255 connections */
-	if ((!(i & SSL_SESS_CACHE_NO_AUTO_CLEAR)) &&
-	    ((i & mode) == mode)) {
-		if ((((mode & SSL_SESS_CACHE_CLIENT) ?
-		    s->session_ctx->internal->stats.sess_connect_good :
-		    s->session_ctx->internal->stats.sess_accept_good) & 0xff) == 0xff) {
+	/*
+	 * Update the "external cache" by calling the new session
+	 * callback if present, even with TLS 1.3 without early data
+	 * "because some application just want to know about the
+	 * creation of a session and aren't doing a full cache".
+	 * Apparently, if they are doing a full cache, they'll have
+	 * some fun, but we endeavour to give application writers the
+	 * same glorious experience they expect from OpenSSL which
+	 * does it this way.
+	 */
+	if (do_callback && s->session_ctx->internal->new_session_cb != NULL) {
+		    CRYPTO_add(&s->session->references, 1, CRYPTO_LOCK_SSL_SESSION);
+		    if (!s->session_ctx->internal->new_session_cb(s, s->session))
+			    SSL_SESSION_free(s->session);
+	}
+
+	/* Auto flush every 255 connections. */
+	if (!(cache_mode & SSL_SESS_CACHE_NO_AUTO_CLEAR) &&
+	    (cache_mode & mode) != 0) {
+		int connections;
+		if (mode & SSL_SESS_CACHE_CLIENT)
+			connections = s->session_ctx->internal->stats.sess_connect_good;
+		else
+			connections = s->session_ctx->internal->stats.sess_accept_good;
+		if ((connections & 0xff) == 0xff)
 			SSL_CTX_flush_sessions(s->session_ctx, time(NULL));
-		}
 	}
 }
 
@@ -2292,17 +2386,17 @@ SSL_set_ssl_method(SSL *s, const SSL_METHOD *method)
 	if (s->method == method)
 		return (ret);
 
-	if (s->internal->handshake_func == s->method->internal->ssl_connect)
-		handshake_func = method->internal->ssl_connect;
-	else if (s->internal->handshake_func == s->method->internal->ssl_accept)
-		handshake_func = method->internal->ssl_accept;
+	if (s->internal->handshake_func == s->method->ssl_connect)
+		handshake_func = method->ssl_connect;
+	else if (s->internal->handshake_func == s->method->ssl_accept)
+		handshake_func = method->ssl_accept;
 
-	if (s->method->internal->version == method->internal->version) {
+	if (s->method->version == method->version) {
 		s->method = method;
 	} else {
-		s->method->internal->ssl_free(s);
+		s->method->ssl_free(s);
 		s->method = method;
-		ret = s->method->internal->ssl_new(s);
+		ret = s->method->ssl_new(s);
 	}
 	s->internal->handshake_func = handshake_func;
 
@@ -2397,7 +2491,7 @@ SSL_do_handshake(SSL *s)
 		return (-1);
 	}
 
-	s->method->internal->ssl_renegotiate_check(s);
+	s->method->ssl_renegotiate_check(s);
 
 	if (SSL_in_init(s) || SSL_in_before(s)) {
 		ret = s->internal->handshake_func(s);
@@ -2415,7 +2509,7 @@ SSL_set_accept_state(SSL *s)
 	s->server = 1;
 	s->internal->shutdown = 0;
 	S3I(s)->hs.state = SSL_ST_ACCEPT|SSL_ST_BEFORE;
-	s->internal->handshake_func = s->method->internal->ssl_accept;
+	s->internal->handshake_func = s->method->ssl_accept;
 	ssl_clear_cipher_state(s);
 }
 
@@ -2425,7 +2519,7 @@ SSL_set_connect_state(SSL *s)
 	s->server = 0;
 	s->internal->shutdown = 0;
 	S3I(s)->hs.state = SSL_ST_CONNECT|SSL_ST_BEFORE;
-	s->internal->handshake_func = s->method->internal->ssl_connect;
+	s->internal->handshake_func = s->method->ssl_connect;
 	ssl_clear_cipher_state(s);
 }
 
@@ -2502,9 +2596,9 @@ SSL_dup(SSL *s)
 		 * and thus we can't use SSL_copy_session_id.
 		 */
 
-		ret->method->internal->ssl_free(ret);
+		ret->method->ssl_free(ret);
 		ret->method = s->method;
-		ret->method->internal->ssl_new(ret);
+		ret->method->ssl_new(ret);
 
 		ssl_cert_free(ret->cert);
 		if ((ret->cert = ssl_cert_dup(s->cert)) == NULL)
@@ -2619,6 +2713,26 @@ void
 ssl_clear_cipher_write_state(SSL *s)
 {
 	tls12_record_layer_clear_write_state(s->internal->rl);
+}
+
+void
+ssl_info_callback(const SSL *s, int type, int value)
+{
+	ssl_info_callback_fn *cb;
+
+	if ((cb = s->internal->info_callback) == NULL)
+		cb = s->ctx->internal->info_callback;
+	if (cb != NULL)
+		cb(s, type, value);
+}
+
+void
+ssl_msg_callback(SSL *s, int is_write, int content_type,
+    const void *msg_buf, size_t msg_len)
+{
+	if (s->internal->msg_callback != NULL)
+		s->internal->msg_callback(is_write, s->version, content_type,
+		    msg_buf, msg_len, s, s->internal->msg_callback_arg);
 }
 
 /* Fix this function so that it takes an optional type parameter */
@@ -2859,6 +2973,24 @@ SSL_get_verify_result(const SSL *ssl)
 }
 
 int
+SSL_verify_client_post_handshake(SSL *ssl)
+{
+	return 0;
+}
+
+void
+SSL_CTX_set_post_handshake_auth(SSL_CTX *ctx, int val)
+{
+	return;
+}
+
+void
+SSL_set_post_handshake_auth(SSL *ssl, int val)
+{
+	return;
+}
+
+int
 SSL_get_ex_new_index(long argl, void *argp, CRYPTO_EX_new *new_func,
     CRYPTO_EX_dup *dup_func, CRYPTO_EX_free *free_func)
 {
@@ -2924,6 +3056,15 @@ SSL_CTX_get0_certificate(const SSL_CTX *ctx)
 		return NULL;
 
 	return ctx->internal->cert->key->x509;
+}
+
+EVP_PKEY *
+SSL_CTX_get0_privatekey(const SSL_CTX *ctx)
+{
+	if (ctx->internal->cert == NULL)
+		return NULL;
+
+	return ctx->internal->cert->key->privatekey;
 }
 
 int
@@ -3056,6 +3197,12 @@ SSL_set_max_proto_version(SSL *ssl, uint16_t version)
 	return ssl_version_set_max(ssl->method, version,
 	    ssl->internal->min_tls_version, &ssl->internal->max_tls_version,
 	    &ssl->internal->max_proto_version);
+}
+
+const SSL_METHOD *
+SSL_CTX_get_ssl_method(const SSL_CTX *ctx)
+{
+	return ctx->method;
 }
 
 static int

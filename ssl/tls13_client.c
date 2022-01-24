@@ -1,4 +1,4 @@
-/* $OpenBSD: tls13_client.c,v 1.77 2021/03/29 16:46:09 jsing Exp $ */
+/* $OpenBSD: tls13_client.c,v 1.86 2021/06/29 19:20:39 jsing Exp $ */
 /*
  * Copyright (c) 2018, 2019 Joel Sing <jsing@openbsd.org>
  *
@@ -15,11 +15,11 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include "ssl_locl.h"
-
 #include <openssl/ssl3.h>
 
 #include "bytestring.h"
+#include "ssl_locl.h"
+#include "ssl_sigalgs.h"
 #include "ssl_tlsext.h"
 #include "tls13_handshake.h"
 #include "tls13_internal.h"
@@ -303,7 +303,16 @@ tls13_server_hello_process(struct tls13_ctx *ctx, CBS *cbs)
 		ctx->alert = TLS13_ALERT_ILLEGAL_PARAMETER;
 		goto err;
 	}
-	/* XXX - move this to hs.tls13? */
+	if (!(ctx->handshake_stage.hs_type & WITHOUT_HRR) && !ctx->hs->tls13.hrr) {
+		/*
+		 * A ServerHello following a HelloRetryRequest MUST use the same
+		 * cipher suite (RFC 8446 section 4.1.4).
+		 */
+		if (ctx->hs->cipher != cipher) {
+			ctx->alert = TLS13_ALERT_ILLEGAL_PARAMETER;
+			goto err;
+		}
+	}
 	ctx->hs->cipher = cipher;
 
 	if (compression_method != 0) {
@@ -404,8 +413,8 @@ tls13_server_hello_retry_request_recv(struct tls13_ctx *ctx, CBS *cbs)
 		return 0;
 
 	/*
-	 * This may have been a TLSv1.2 or earlier ServerHello that just happened
-	 * to have matching server random...
+	 * This may have been a TLSv1.2 or earlier ServerHello that just
+	 * happened to have matching server random...
 	 */
 	if (ctx->hs->tls13.use_legacy)
 		return tls13_use_legacy_client(ctx);
@@ -671,10 +680,6 @@ tls13_server_certificate_verify_recv(struct tls13_ctx *ctx, CBS *cbs)
 	if (!CBS_get_u16_length_prefixed(cbs, &signature))
 		goto err;
 
-	if ((sigalg = ssl_sigalg(signature_scheme, tls13_sigalgs,
-	    tls13_sigalgs_len)) == NULL)
-		goto err;
-
 	if (!CBB_init(&cbb, 0))
 		goto err;
 	if (!CBB_add_bytes(&cbb, tls13_cert_verify_pad,
@@ -695,8 +700,10 @@ tls13_server_certificate_verify_recv(struct tls13_ctx *ctx, CBS *cbs)
 		goto err;
 	if ((pkey = X509_get0_pubkey(cert)) == NULL)
 		goto err;
-	if (!ssl_sigalg_pkey_ok(sigalg, pkey, 1))
+	if ((sigalg = ssl_sigalg_for_peer(ctx->ssl, pkey,
+	    signature_scheme)) == NULL)
 		goto err;
+	ctx->hs->peer_sigalg = sigalg;
 
 	if (CBS_len(&signature) > EVP_PKEY_size(pkey))
 		goto err;
@@ -898,7 +905,7 @@ tls13_client_certificate_send(struct tls13_ctx *ctx, CBB *cbb)
 		goto err;
 
 	ctx->hs->tls13.cpk = cpk;
-	ctx->hs->tls13.sigalg = sigalg;
+	ctx->hs->our_sigalg = sigalg;
 
 	if (!CBB_add_u8_length_prefixed(cbb, &cert_request_context))
 		goto err;
@@ -949,7 +956,7 @@ tls13_client_certificate_verify_send(struct tls13_ctx *ctx, CBB *cbb)
 
 	if ((cpk = ctx->hs->tls13.cpk) == NULL)
 		goto err;
-	if ((sigalg = ctx->hs->tls13.sigalg) == NULL)
+	if ((sigalg = ctx->hs->our_sigalg) == NULL)
 		goto err;
 	pkey = cpk->privatekey;
 

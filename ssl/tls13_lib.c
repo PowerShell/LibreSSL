@@ -1,4 +1,4 @@
-/*	$OpenBSD: tls13_lib.c,v 1.59 2021/04/07 21:48:23 tb Exp $ */
+/*	$OpenBSD: tls13_lib.c,v 1.62 2021/09/16 19:25:30 jsing Exp $ */
 /*
  * Copyright (c) 2018, 2019 Joel Sing <jsing@openbsd.org>
  * Copyright (c) 2019 Bob Beck <beck@openbsd.org>
@@ -162,8 +162,7 @@ tls13_legacy_handshake_message_recv_cb(void *arg)
 		return;
 
 	tls13_handshake_msg_data(ctx->hs_msg, &cbs);
-	s->internal->msg_callback(0, TLS1_3_VERSION, SSL3_RT_HANDSHAKE,
-	    CBS_data(&cbs), CBS_len(&cbs), s, s->internal->msg_callback_arg);
+	ssl_msg_callback(s, 0, SSL3_RT_HANDSHAKE, CBS_data(&cbs), CBS_len(&cbs));
 }
 
 static void
@@ -177,8 +176,7 @@ tls13_legacy_handshake_message_sent_cb(void *arg)
 		return;
 
 	tls13_handshake_msg_data(ctx->hs_msg, &cbs);
-	s->internal->msg_callback(1, TLS1_3_VERSION, SSL3_RT_HANDSHAKE,
-	    CBS_data(&cbs), CBS_len(&cbs), s, s->internal->msg_callback_arg);
+	ssl_msg_callback(s, 1, SSL3_RT_HANDSHAKE, CBS_data(&cbs), CBS_len(&cbs));
 }
 
 static void
@@ -186,12 +184,8 @@ tls13_legacy_info_cb(void *arg, int state, int ret)
 {
 	struct tls13_ctx *ctx = arg;
 	SSL *s = ctx->ssl;
-	void (*cb)(const SSL *, int, int);
 
-	if ((cb = s->internal->info_callback) == NULL)
-		cb = s->ctx->internal->info_callback;
-	if (cb != NULL)
-		cb(s, state, ret);
+	ssl_info_callback(s, state, ret);
 }
 
 static int
@@ -201,8 +195,7 @@ tls13_legacy_ocsp_status_recv_cb(void *arg)
 	SSL *s = ctx->ssl;
 	int ret;
 
-	if (s->ctx->internal->tlsext_status_cb == NULL ||
-	    s->internal->tlsext_ocsp_resp == NULL)
+	if (s->ctx->internal->tlsext_status_cb == NULL)
 		return 1;
 
 	ret = s->ctx->internal->tlsext_status_cb(s,
@@ -381,6 +374,7 @@ tls13_phh_received_cb(void *cb_arg, CBS *cbs)
 static const struct tls13_record_layer_callbacks rl_callbacks = {
 	.wire_read = tls13_legacy_wire_read_cb,
 	.wire_write = tls13_legacy_wire_write_cb,
+	.wire_flush = tls13_legacy_wire_flush_cb,
 	.alert_recv = tls13_alert_received_cb,
 	.alert_sent = tls13_alert_sent_cb,
 	.phh_recv = tls13_phh_received_cb,

@@ -1,4 +1,4 @@
-/* $OpenBSD: bio_ssl.c,v 1.29 2018/08/24 20:30:21 tb Exp $ */
+/* $OpenBSD: bio_ssl.c,v 1.31 2021/07/01 17:53:39 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -294,10 +294,10 @@ ssl_ctrl(BIO *b, int cmd, long num, void *ptr)
 		SSL_shutdown(ssl);
 
 		if (ssl->internal->handshake_func ==
-		    ssl->method->internal->ssl_connect)
+		    ssl->method->ssl_connect)
 			SSL_set_connect_state(ssl);
 		else if (ssl->internal->handshake_func ==
-		    ssl->method->internal->ssl_accept)
+		    ssl->method->ssl_accept)
 			SSL_set_accept_state(ssl);
 
 		SSL_clear(ssl);
@@ -509,7 +509,7 @@ BIO_new_buffer_ssl_connect(SSL_CTX *ctx)
 		goto err;
 	return (ret);
 
-err:
+ err:
 	BIO_free(buf);
 	BIO_free(ssl);
 	return (NULL);
@@ -528,7 +528,7 @@ BIO_new_ssl_connect(SSL_CTX *ctx)
 		goto err;
 	return (ret);
 
-err:
+ err:
 	BIO_free(con);
 	BIO_free(ssl);
 	return (NULL);
@@ -553,7 +553,7 @@ BIO_new_ssl(SSL_CTX *ctx, int client)
 	BIO_set_ssl(ret, ssl, BIO_CLOSE);
 	return (ret);
 
-err:
+ err:
 	BIO_free(ret);
 	return (NULL);
 }

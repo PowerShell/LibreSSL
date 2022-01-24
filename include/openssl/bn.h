@@ -1,4 +1,4 @@
-/* $OpenBSD: bn.h,v 1.39 2019/08/25 19:23:59 schwarze Exp $ */
+/* $OpenBSD: bn.h,v 1.43 2021/09/10 14:33:44 tb Exp $ */
 /* Copyright (C) 1995-1997 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -231,6 +231,15 @@ extern "C" {
 #define BN_set_flags(b,n)	((b)->flags|=(n))
 #define BN_get_flags(b,n)	((b)->flags&(n))
 
+/* Values for |top| in BN_rand() */
+#define BN_RAND_TOP_ANY    -1
+#define BN_RAND_TOP_ONE     0
+#define BN_RAND_TOP_TWO     1
+
+/* Values for |bottom| in BN_rand() */
+#define BN_RAND_BOTTOM_ANY  0
+#define BN_RAND_BOTTOM_ODD  1
+
 /* get a clone of a BIGNUM with changed flags, for *temporary* use only
  * (the two BIGNUMs cannot not be used in parallel!) */
 #define BN_with_flags(dest,b,n)  ((dest)->d=(b)->d, \
@@ -428,6 +437,9 @@ BIGNUM *BN_copy(BIGNUM *a, const BIGNUM *b);
 void	BN_swap(BIGNUM *a, BIGNUM *b);
 BIGNUM *BN_bin2bn(const unsigned char *s, int len, BIGNUM *ret);
 int	BN_bn2bin(const BIGNUM *a, unsigned char *to);
+int	BN_bn2binpad(const BIGNUM *a, unsigned char *to, int tolen);
+BIGNUM *BN_lebin2bn(const unsigned char *s, int len, BIGNUM *ret);
+int	BN_bn2lebinpad(const BIGNUM *a, unsigned char *to, int tolen);
 BIGNUM *BN_mpi2bn(const unsigned char *s, int len, BIGNUM *ret);
 int	BN_bn2mpi(const BIGNUM *a, unsigned char *to);
 int	BN_sub(BIGNUM *r, const BIGNUM *a, const BIGNUM *b);

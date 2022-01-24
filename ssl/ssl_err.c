@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_err.c,v 1.37 2020/01/21 05:19:02 jsing Exp $ */
+/* $OpenBSD: ssl_err.c,v 1.39 2021/09/10 09:25:29 tb Exp $ */
 /* ====================================================================
  * Copyright (c) 1999-2011 The OpenSSL Project.  All rights reserved.
  *
@@ -61,6 +61,7 @@
 #include <stdio.h>
 
 #include <openssl/err.h>
+#include <openssl/opensslconf.h>
 #include <openssl/ssl.h>
 
 #include "ssl_locl.h"
@@ -293,6 +294,7 @@ static ERR_STRING_DATA SSL_str_reasons[]= {
 	{ERR_REASON(SSL_R_MISSING_VERIFY_MESSAGE), "missing verify message"},
 	{ERR_REASON(SSL_R_MULTIPLE_SGC_RESTARTS) , "multiple sgc restarts"},
 	{ERR_REASON(SSL_R_NON_SSLV2_INITIAL_PACKET), "non sslv2 initial packet"},
+	{ERR_REASON(SSL_R_NO_APPLICATION_PROTOCOL), "no application protocol"},
 	{ERR_REASON(SSL_R_NO_CERTIFICATES_RETURNED), "no certificates returned"},
 	{ERR_REASON(SSL_R_NO_CERTIFICATE_ASSIGNED), "no certificate assigned"},
 	{ERR_REASON(SSL_R_NO_CERTIFICATE_RETURNED), "no certificate returned"},

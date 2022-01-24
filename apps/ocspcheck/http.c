@@ -1,4 +1,4 @@
-/*	$Id: http.c,v 1.13 2020/01/11 17:37:19 sthen Exp $ */
+/*	$Id: http.c,v 1.15 2021/09/14 16:37:20 tb Exp $ */
 /*
  * Copyright (c) 2016 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -119,15 +119,10 @@ dotlswrite(const void *buf, size_t sz, const struct http *http)
 }
 
 int
-http_init()
+http_init(void)
 {
 	if (tlscfg != NULL)
 		return 0;
-
-	if (tls_init() == -1) {
-		warn("tls_init");
-		goto err;
-	}
 
 	tlscfg = tls_config_new();
 	if (tlscfg == NULL) {

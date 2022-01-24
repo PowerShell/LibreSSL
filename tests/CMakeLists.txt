@@ -132,10 +132,9 @@ if(NOT BUILD_SHARED_LIBS)
 endif()
 
 # clienttest
-# disabled
-#add_executable(clienttest clienttest.c)
-#target_link_libraries(clienttest ${OPENSSL_LIBS})
-#add_test(clienttest clienttest)
+add_executable(clienttest clienttest.c)
+target_link_libraries(clienttest ${OPENSSL_LIBS})
+add_test(clienttest clienttest)
 
 # cmstest
 add_executable(cmstest cmstest.c)
@@ -144,7 +143,7 @@ add_test(cmstest cmstest)
 
 # configtest
 add_executable(configtest configtest.c)
-target_link_libraries(configtest ${OPENSSL_LIBS})
+target_link_libraries(configtest ${LIBTLS_LIBS})
 add_test(configtest configtest)
 
 # constraints
@@ -174,6 +173,20 @@ add_executable(dsatest dsatest.c)
 target_link_libraries(dsatest ${OPENSSL_LIBS})
 add_test(dsatest dsatest)
 
+# dtlstest
+if(NOT BUILD_SHARED_LIBS AND NOT WIN32)
+	add_executable(dtlstest dtlstest.c)
+	target_link_libraries(dtlstest ${OPENSSL_LIBS})
+	add_test(NAME dtlstest COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/dtlstest.sh)
+	set_tests_properties(dtlstest PROPERTIES ENVIRONMENT "srcdir=${TEST_SOURCE_DIR}")
+endif()
+
+if(NOT BUILD_SHARED_LIBS)
+# ec_point_conversion
+add_executable(ec_point_conversion ec_point_conversion.c)
+target_link_libraries(ec_point_conversion ${OPENSSL_LIBS})
+add_test(ec_point_conversion ec_point_conversion)
+
 # ecdhtest
 add_executable(ecdhtest ecdhtest.c)
 target_link_libraries(ecdhtest ${OPENSSL_LIBS})
@@ -188,6 +201,7 @@ add_test(ecdsatest ecdsatest)
 add_executable(ectest ectest.c)
 target_link_libraries(ectest ${OPENSSL_LIBS})
 add_test(ectest ectest)
+endif()
 
 # enginetest
 add_executable(enginetest enginetest.c)
@@ -269,7 +283,7 @@ if(NOT BUILD_SHARED_LIBS)
 	add_test(key_schedule key_schedule)
 
 	add_executable(keypairtest keypairtest.c)
-	target_link_libraries(keypairtest ${OPENSSL_LIBS})
+	target_link_libraries(keypairtest ${LIBTLS_LIBS})
 	add_test(keypairtest keypairtest
 		${CMAKE_CURRENT_SOURCE_DIR}/ca.pem
 		${CMAKE_CURRENT_SOURCE_DIR}/server.pem
@@ -432,6 +446,13 @@ add_executable(sm4test sm4test.c)
 target_link_libraries(sm4test ${OPENSSL_LIBS})
 add_test(sm4test sm4test)
 
+# ssl_get_shared_ciphers
+add_executable(ssl_get_shared_ciphers ssl_get_shared_ciphers.c)
+set_source_files_properties(ssl_get_shared_ciphers.c PROPERTIES COMPILE_FLAGS
+	-DCERTSDIR=\\"${CMAKE_CURRENT_SOURCE_DIR}\\")
+target_link_libraries(ssl_get_shared_ciphers ${OPENSSL_LIBS})
+add_test(ssl_get_shared_ciphers ssl_get_shared_ciphers)
+
 # ssl_versions
 if(NOT BUILD_SHARED_LIBS)
 	add_executable(ssl_versions ssl_versions.c)
@@ -485,23 +506,30 @@ if(NOT BUILD_SHARED_LIBS)
 	add_test(tlsexttest tlsexttest)
 endif()
 
-# tlstest
-set(TLSTEST_SRC tlstest.c)
-check_function_exists(pipe2 HAVE_PIPE2)
-if(HAVE_PIPE2)
-	add_definitions(-DHAVE_PIPE2)
-else()
-	set(TLSTEST_SRC ${TLSTEST_SRC} compat/pipe2.c)
-endif()
+# tlslegacytest
+add_executable(tlslegacytest tlslegacytest.c)
+target_link_libraries(tlslegacytest ${OPENSSL_LIBS})
+add_test(tlslegacytest tlslegacytest)
 
-add_executable(tlstest ${TLSTEST_SRC})
-target_link_libraries(tlstest ${OPENSSL_LIBS})
-if(NOT MSVC)
-	add_test(NAME tlstest COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tlstest.sh)
-else()
-	add_test(NAME tlstest COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tlstest.bat $<TARGET_FILE:tlstest>)
+# tlstest
+if(NOT CMAKE_SYSTEM_NAME MATCHES "WindowsStore")
+	set(TLSTEST_SRC tlstest.c)
+	check_function_exists(pipe2 HAVE_PIPE2)
+	if(HAVE_PIPE2)
+		add_definitions(-DHAVE_PIPE2)
+	else()
+		set(TLSTEST_SRC ${TLSTEST_SRC} compat/pipe2.c)
+	endif()
+
+	add_executable(tlstest ${TLSTEST_SRC})
+	target_link_libraries(tlstest ${LIBTLS_LIBS})
+	if(NOT MSVC)
+		add_test(NAME tlstest COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tlstest.sh)
+	else()
+		add_test(NAME tlstest COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tlstest.bat $<TARGET_FILE:tlstest>)
+	endif()
+	set_tests_properties(tlstest PROPERTIES ENVIRONMENT "srcdir=${TEST_SOURCE_DIR}")
 endif()
-set_tests_properties(tlstest PROPERTIES ENVIRONMENT "srcdir=${TEST_SOURCE_DIR}")
 
 # tls_ext_alpn
 if(NOT BUILD_SHARED_LIBS)
@@ -534,7 +562,7 @@ endif()
 # verifytest
 if(NOT BUILD_SHARED_LIBS)
 	add_executable(verifytest verifytest.c)
-	target_link_libraries(verifytest ${OPENSSL_LIBS})
+	target_link_libraries(verifytest ${LIBTLS_LIBS})
 	add_test(verifytest verifytest)
 endif()
 

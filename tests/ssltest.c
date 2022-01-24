@@ -326,7 +326,6 @@ static int debug = 0;
 int doit_biopair(SSL *s_ssl, SSL *c_ssl, long bytes, clock_t *s_time,
     clock_t *c_time);
 int doit(SSL *s_ssl, SSL *c_ssl, long bytes);
-static int do_test_cipherlist(void);
 
 static void
 sv_usage(void)
@@ -362,7 +361,6 @@ sv_usage(void)
 	fprintf(stderr, " -named_curve arg  - Elliptic curve name to use for ephemeral ECDH keys.\n" \
 	               "                 Use \"openssl ecparam -list_curves\" for all names\n"  \
 	               "                 (default is sect163r2).\n");
-	fprintf(stderr, " -test_cipherlist - verifies the order of the ssl cipher lists\n");
 	fprintf(stderr, " -alpn_client <string> - have client side offer ALPN\n");
 	fprintf(stderr, " -alpn_server <string> - have server side offer ALPN\n");
 	fprintf(stderr, " -alpn_expected <string> - the ALPN protocol that should be negotiated\n");
@@ -432,7 +430,6 @@ main(int argc, char *argv[])
 	int no_ecdhe = 0;
 	int print_time = 0;
 	clock_t s_time = 0, c_time = 0;
-	int test_cipherlist = 0;
 
 	verbose = 0;
 	debug = 0;
@@ -546,8 +543,6 @@ main(int argc, char *argv[])
 			app_verify_arg.app_verify = 1;
 		} else if (strcmp(*argv, "-proxy") == 0) {
 			app_verify_arg.allow_proxy_certs = 1;
-		} else if (strcmp(*argv, "-test_cipherlist") == 0) {
-			test_cipherlist = 1;
 		} else if (strcmp(*argv, "-alpn_client") == 0) {
 			if (--argc < 1)
 				goto bad;
@@ -571,14 +566,6 @@ main(int argc, char *argv[])
 	if (badop) {
 bad:
 		sv_usage();
-		goto end;
-	}
-
-	if (test_cipherlist == 1) {
-		/* ensure that the cipher list are correctly sorted and exit */
-		if (do_test_cipherlist() == 0)
-			exit(1);
-		ret = 0;
 		goto end;
 	}
 
@@ -1921,29 +1908,4 @@ get_dh1024dsa()
 	}
 	dh->length = 160;
 	return (dh);
-}
-
-static int
-do_test_cipherlist(void)
-{
-	int i = 0;
-	const SSL_METHOD *meth;
-	const SSL_CIPHER *ci, *tci = NULL;
-
-	fprintf(stderr, "testing TLSv1 cipher list order: ");
-	meth = TLSv1_method();
-	tci = NULL;
-	while ((ci = meth->get_cipher(i++)) != NULL) {
-		if (tci != NULL) {
-			if (ci->id >= tci->id) {
-				fprintf(stderr,
-				    "failed %lx vs. %lx\n", ci->id, tci->id);
-				return 0;
-			}
-		}
-		tci = ci;
-	}
-	fprintf(stderr, "ok\n");
-
-	return 1;
 }

@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_packet.c,v 1.10 2021/02/25 17:06:05 jsing Exp $ */
+/* $OpenBSD: ssl_packet.c,v 1.12 2021/07/01 17:53:39 jsing Exp $ */
 /*
  * Copyright (c) 2016, 2017 Joel Sing <jsing@openbsd.org>
  *
@@ -15,9 +15,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include "ssl_locl.h"
-
 #include "bytestring.h"
+#include "ssl_locl.h"
 
 static int
 ssl_is_sslv2_client_hello(CBS *header)
@@ -247,8 +246,7 @@ ssl_server_legacy_first_packet(SSL *s)
 		return 1;
 
 	/* Only continue if this is not a version locked method. */
-	if (s->method->internal->min_tls_version ==
-	    s->method->internal->max_tls_version)
+	if (s->method->min_tls_version == s->method->max_tls_version)
 		return 1;
 
 	if (ssl_is_sslv2_client_hello(&header) == 1) {

@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_pkt.c,v 1.40 2021/03/29 16:46:09 jsing Exp $ */
+/* $OpenBSD: ssl_pkt.c,v 1.50 2021/08/30 19:25:43 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -112,12 +112,12 @@
 #include <errno.h>
 #include <stdio.h>
 
-#include "ssl_locl.h"
-
 #include <openssl/buffer.h>
 #include <openssl/evp.h>
 
 #include "bytestring.h"
+#include "dtls_locl.h"
+#include "ssl_locl.h"
 
 static int do_ssl3_write(SSL *s, int type, const unsigned char *buf,
     unsigned int len);
@@ -431,6 +431,16 @@ ssl3_get_record(SSL *s)
 
 	if (rr->length == 0) {
 		/*
+		 * Zero-length fragments are only permitted for application
+		 * data, as per RFC 5246 section 6.2.1.
+		 */
+		if (rr->type != SSL3_RT_APPLICATION_DATA) {
+			SSLerror(s, SSL_R_BAD_LENGTH);
+			al = SSL_AD_UNEXPECTED_MESSAGE;
+			goto fatal_err;
+		}
+
+		/*
 		 * CBC countermeasures for known IV weaknesses can legitimately
 		 * insert a single empty record, so we allow ourselves to read
 		 * once past a single empty record without forcing want_read.
@@ -543,7 +553,7 @@ do_ssl3_write(SSL *s, int type, const unsigned char *buf, unsigned int len)
 
 	/* If we have an alert to send, let's send it. */
 	if (S3I(s)->alert_dispatch) {
-		if ((ret = s->method->ssl_dispatch_alert(s)) <= 0)
+		if ((ret = ssl3_dispatch_alert(s)) <= 0)
 			return (ret);
 		/* If it went, fall through and send more stuff. */
 
@@ -704,8 +714,7 @@ ssl3_write_pending(SSL *s, int type, const unsigned char *buf, unsigned int len)
 int
 ssl3_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek)
 {
-	void (*cb)(const SSL *ssl, int type2, int val) = NULL;
-	int al, i, j, ret, rrcount = 0;
+	int al, i, ret, rrcount = 0;
 	unsigned int n;
 	SSL3_RECORD_INTERNAL *rr;
 
@@ -904,10 +913,8 @@ ssl3_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek)
 			goto fatal_err;
 		}
 
-		if (s->internal->msg_callback)
-			s->internal->msg_callback(0, s->version, SSL3_RT_HANDSHAKE,
-			    S3I(s)->handshake_fragment, 4, s,
-			    s->internal->msg_callback_arg);
+		ssl_msg_callback(s, 0, SSL3_RT_HANDSHAKE,
+		    S3I(s)->handshake_fragment, 4);
 
 		if (SSL_is_init_finished(s) &&
 		    !(s->s3->flags & SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS) &&
@@ -968,19 +975,11 @@ ssl3_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek)
 
 		S3I(s)->alert_fragment_len = 0;
 
-		if (s->internal->msg_callback)
-			s->internal->msg_callback(0, s->version, SSL3_RT_ALERT,
-			    S3I(s)->alert_fragment, 2, s, s->internal->msg_callback_arg);
+		ssl_msg_callback(s, 0, SSL3_RT_ALERT,
+		    S3I(s)->alert_fragment, 2);
 
-		if (s->internal->info_callback != NULL)
-			cb = s->internal->info_callback;
-		else if (s->ctx->internal->info_callback != NULL)
-			cb = s->ctx->internal->info_callback;
-
-		if (cb != NULL) {
-			j = (alert_level << 8) | alert_descr;
-			cb(s, SSL_CB_READ_ALERT, j);
-		}
+		ssl_info_callback(s, SSL_CB_READ_ALERT,
+		    (alert_level << 8) | alert_descr);
 
 		if (alert_level == SSL3_AL_WARNING) {
 			S3I(s)->warn_alert = alert_descr;
@@ -1054,11 +1053,7 @@ ssl3_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek)
 
 		rr->length = 0;
 
-		if (s->internal->msg_callback) {
-			s->internal->msg_callback(0, s->version,
-			    SSL3_RT_CHANGE_CIPHER_SPEC, rr->data, 1, s,
-			    s->internal->msg_callback_arg);
-		}
+		ssl_msg_callback(s, 0, SSL3_RT_CHANGE_CIPHER_SPEC, rr->data, 1);
 
 		S3I(s)->change_cipher_spec = 1;
 		if (!ssl3_do_change_cipher_spec(s))
@@ -1154,15 +1149,6 @@ ssl3_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek)
 int
 ssl3_do_change_cipher_spec(SSL *s)
 {
-	int i;
-	const char *sender;
-	int slen;
-
-	if (S3I(s)->hs.state & SSL_ST_ACCEPT)
-		i = SSL3_CHANGE_CIPHER_SERVER_READ;
-	else
-		i = SSL3_CHANGE_CIPHER_CLIENT_READ;
-
 	if (S3I(s)->hs.tls12.key_block == NULL) {
 		if (s->session == NULL || s->session->master_key_length == 0) {
 			/* might happen if dtls1_read_bytes() calls this */
@@ -1175,83 +1161,74 @@ ssl3_do_change_cipher_spec(SSL *s)
 			return (0);
 	}
 
-	if (!tls1_change_cipher_state(s, i))
+	if (!tls1_change_read_cipher_state(s))
 		return (0);
 
-	/* we have to record the message digest at
-	 * this point so we can get it before we read
-	 * the finished message */
-	if (S3I(s)->hs.state & SSL_ST_CONNECT) {
-		sender = TLS_MD_SERVER_FINISH_CONST;
-		slen = TLS_MD_SERVER_FINISH_CONST_SIZE;
-	} else {
-		sender = TLS_MD_CLIENT_FINISH_CONST;
-		slen = TLS_MD_CLIENT_FINISH_CONST_SIZE;
-	}
-
-	i = tls1_final_finish_mac(s, sender, slen,
-	    S3I(s)->hs.peer_finished);
-	if (i == 0) {
-		SSLerror(s, ERR_R_INTERNAL_ERROR);
-		return 0;
-	}
-	S3I(s)->hs.peer_finished_len = i;
+	/*
+	 * We have to record the message digest at this point so we can get it
+	 * before we read the finished message.
+	 */
+	if (!tls12_derive_peer_finished(s))
+		return (0);
 
 	return (1);
+}
+
+static int
+ssl3_write_alert(SSL *s)
+{
+	if (SSL_is_dtls(s))
+		return do_dtls1_write(s, SSL3_RT_ALERT, S3I(s)->send_alert,
+		    sizeof(S3I(s)->send_alert));
+
+	return do_ssl3_write(s, SSL3_RT_ALERT, S3I(s)->send_alert,
+	    sizeof(S3I(s)->send_alert));
 }
 
 int
 ssl3_send_alert(SSL *s, int level, int desc)
 {
-	/* Map tls/ssl alert value to correct one */
-	desc = tls1_alert_code(desc);
-	if (desc < 0)
-		return -1;
-	/* If a fatal one, remove from cache */
-	if ((level == 2) && (s->session != NULL))
+	/* If alert is fatal, remove session from cache. */
+	if (level == SSL3_AL_FATAL)
 		SSL_CTX_remove_session(s->ctx, s->session);
 
 	S3I(s)->alert_dispatch = 1;
 	S3I(s)->send_alert[0] = level;
 	S3I(s)->send_alert[1] = desc;
-	if (S3I(s)->wbuf.left == 0) /* data still being written out? */
-		return s->method->ssl_dispatch_alert(s);
 
-	/* else data is still being written out, we will get written
-	 * some time in the future */
-	return -1;
+	/*
+	 * If data is still being written out, the alert will be dispatched at
+	 * some point in the future.
+	 */
+	if (S3I(s)->wbuf.left != 0)
+		return -1;
+
+	return ssl3_dispatch_alert(s);
 }
 
 int
 ssl3_dispatch_alert(SSL *s)
 {
-	int i, j;
-	void (*cb)(const SSL *ssl, int type, int val) = NULL;
+	int ret;
 
 	S3I(s)->alert_dispatch = 0;
-	i = do_ssl3_write(s, SSL3_RT_ALERT, &S3I(s)->send_alert[0], 2);
-	if (i <= 0) {
+	if ((ret = ssl3_write_alert(s)) <= 0) {
 		S3I(s)->alert_dispatch = 1;
-	} else {
-		/* Alert sent to BIO.  If it is important, flush it now.
-		 * If the message does not get sent due to non-blocking IO,
-		 * we will not worry too much. */
-		if (S3I(s)->send_alert[0] == SSL3_AL_FATAL)
-			(void)BIO_flush(s->wbio);
-
-		if (s->internal->msg_callback)
-			s->internal->msg_callback(1, s->version, SSL3_RT_ALERT,
-			    S3I(s)->send_alert, 2, s, s->internal->msg_callback_arg);
-
-		if (s->internal->info_callback != NULL)
-			cb = s->internal->info_callback;
-		else if (s->ctx->internal->info_callback != NULL)
-			cb = s->ctx->internal->info_callback;
-
-		if (cb != NULL) {
-			j = (S3I(s)->send_alert[0]<<8)|S3I(s)->send_alert[1];
-			cb(s, SSL_CB_WRITE_ALERT, j);
-		}
+		return ret;
 	}
-	return (i);
+
+	/*
+	 * Alert sent to BIO.  If it is important, flush it now.
+	 * If the message does not get sent due to non-blocking IO,
+	 * we will not worry too much.
+	 */
+	if (S3I(s)->send_alert[0] == SSL3_AL_FATAL)
+		(void)BIO_flush(s->wbio);
+
+	ssl_msg_callback(s, 1, SSL3_RT_ALERT, S3I(s)->send_alert, 2);
+
+	ssl_info_callback(s, SSL_CB_WRITE_ALERT,
+	    (S3I(s)->send_alert[0] << 8) | S3I(s)->send_alert[1]);
+
+	return ret;
 }
