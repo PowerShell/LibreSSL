@@ -1,5 +1,6 @@
-.\" $OpenBSD: X509_check_purpose.3,v 1.1 2019/08/22 15:15:35 schwarze Exp $
-.\" Copyright (c) 2019 Ingo Schwarze <schwarze@openbsd.org>
+.\" $OpenBSD: X509_check_purpose.3,v 1.6 2021/07/27 13:27:46 schwarze Exp $
+.\"
+.\" Copyright (c) 2019, 2021 Ingo Schwarze <schwarze@openbsd.org>
 .\"
 .\" Permission to use, copy, modify, and distribute this software for any
 .\" purpose with or without fee is hereby granted, provided that the above
@@ -13,7 +14,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: August 22 2019 $
+.Dd $Mdocdate: July 27 2021 $
 .Dt X509_CHECK_PURPOSE 3
 .Os
 .Sh NAME
@@ -330,6 +331,16 @@ is -1,
 always succeeds, no matter whether or not the
 .Fa ca
 flag is set.
+.Pp
+If the function
+.Xr X509_PURPOSE_add 3
+was called before
+.Fn X509_check_purpose ,
+it may have installed different, user-supplied checking functions
+for some of the standard purposes listed above, or it may have
+installed additional, user-supplied checking functions for user-defined
+.Fa purpose
+identifiers not listed above.
 .Sh RETURN VALUES
 .Fn X509_check_purpose
 returns the following values:
@@ -362,14 +373,17 @@ is non-zero, the following values can also be returned:
 .Fa certificate
 can be used as a CA for the
 .Fa purpose .
-.It 3 Ta Success Ta The Fa certificate No is a version 1 CA.
+.It 3 Ta Success Ta The Fa certificate No is a version 1 CA .
 .It 4 Ta Success Ta The Key Usage allows Dv keyCertSign .
 .It 5 Ta Success Ta A Netscape Cert Type allows usage as a CA.
 .El
 .Sh SEE ALSO
 .Xr BASIC_CONSTRAINTS_new 3 ,
 .Xr EXTENDED_KEY_USAGE_new 3 ,
+.Xr X509_check_trust 3 ,
 .Xr X509_new 3 ,
+.Xr X509_policy_check 3 ,
+.Xr X509_PURPOSE_set 3 ,
 .Xr X509V3_get_d2i 3 ,
 .Xr x509v3.cnf 5
 .Sh STANDARDS

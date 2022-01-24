@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_rsa.c,v 1.32 2021/03/19 19:51:07 tb Exp $ */
+/* $OpenBSD: ssl_rsa.c,v 1.34 2021/06/11 11:13:53 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -58,13 +58,13 @@
 
 #include <stdio.h>
 
-#include "ssl_locl.h"
-
 #include <openssl/bio.h>
 #include <openssl/evp.h>
 #include <openssl/objects.h>
 #include <openssl/pem.h>
 #include <openssl/x509.h>
+
+#include "ssl_locl.h"
 
 static int ssl_set_cert(CERT *c, X509 *x509);
 static int ssl_set_pkey(CERT *c, EVP_PKEY *pkey);
@@ -120,7 +120,7 @@ SSL_use_certificate_file(SSL *ssl, const char *file, int type)
 	}
 
 	ret = SSL_use_certificate(ssl, x);
-end:
+ end:
 	X509_free(x);
 	BIO_free(in);
 	return (ret);
@@ -243,7 +243,7 @@ SSL_use_RSAPrivateKey_file(SSL *ssl, const char *file, int type)
 	}
 	ret = SSL_use_RSAPrivateKey(ssl, rsa);
 	RSA_free(rsa);
-end:
+ end:
 	BIO_free(in);
 	return (ret);
 }
@@ -312,7 +312,7 @@ SSL_use_PrivateKey_file(SSL *ssl, const char *file, int type)
 	}
 	ret = SSL_use_PrivateKey(ssl, pkey);
 	EVP_PKEY_free(pkey);
-end:
+ end:
 	BIO_free(in);
 	return (ret);
 }
@@ -436,7 +436,7 @@ SSL_CTX_use_certificate_file(SSL_CTX *ctx, const char *file, int type)
 	}
 
 	ret = SSL_CTX_use_certificate(ctx, x);
-end:
+ end:
 	X509_free(x);
 	BIO_free(in);
 	return (ret);
@@ -517,7 +517,7 @@ SSL_CTX_use_RSAPrivateKey_file(SSL_CTX *ctx, const char *file, int type)
 	}
 	ret = SSL_CTX_use_RSAPrivateKey(ctx, rsa);
 	RSA_free(rsa);
-end:
+ end:
 	BIO_free(in);
 	return (ret);
 }
@@ -583,7 +583,7 @@ SSL_CTX_use_PrivateKey_file(SSL_CTX *ctx, const char *file, int type)
 	}
 	ret = SSL_CTX_use_PrivateKey(ctx, pkey);
 	EVP_PKEY_free(pkey);
-end:
+ end:
 	BIO_free(in);
 	return (ret);
 }
@@ -674,7 +674,7 @@ use_certificate_chain_file(const char *file, CERT *cert,
 
 	ret = use_certificate_chain_bio(in, cert, passwd_cb, passwd_arg);
 
-end:
+ end:
 	BIO_free(in);
 	return (ret);
 }
@@ -711,7 +711,7 @@ SSL_CTX_use_certificate_chain_mem(SSL_CTX *ctx, void *buf, int len)
 	    ctx->default_passwd_callback,
 	    ctx->default_passwd_callback_userdata);
 
-end:
+ end:
 	BIO_free(in);
 	return (ret);
 }

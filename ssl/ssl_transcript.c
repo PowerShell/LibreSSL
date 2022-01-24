@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_transcript.c,v 1.2 2020/02/05 16:47:34 jsing Exp $ */
+/* $OpenBSD: ssl_transcript.c,v 1.5 2021/05/16 14:10:43 jsing Exp $ */
 /*
  * Copyright (c) 2017 Joel Sing <jsing@openbsd.org>
  *
@@ -15,9 +15,9 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include "ssl_locl.h"
-
 #include <openssl/ssl.h>
+
+#include "ssl_locl.h"
 
 int
 tls1_transcript_hash_init(SSL *s)
@@ -50,7 +50,7 @@ tls1_transcript_hash_init(SSL *s)
 		SSLerror(s, ERR_R_EVP_LIB);
 		goto err;
 	}
-		
+
 	return 1;
 
  err:
@@ -75,6 +75,9 @@ tls1_transcript_hash_value(SSL *s, const unsigned char *out, size_t len,
 	EVP_MD_CTX *mdctx = NULL;
 	unsigned int mdlen;
 	int ret = 0;
+
+	if (S3I(s)->handshake_hash == NULL)
+		goto err;
 
 	if (EVP_MD_CTX_size(S3I(s)->handshake_hash) > len)
 		goto err;
@@ -139,7 +142,7 @@ tls1_transcript_reset(SSL *s)
 	 * it is impossible to tell if it succeeded (returning a length of zero)
 	 * or if it failed (and returned zero)... our implementation never
 	 * fails with a length of zero, so we trust all is okay...
-	 */ 
+	 */
 	(void)BUF_MEM_grow_clean(S3I(s)->handshake_transcript, 0);
 
 	tls1_transcript_unfreeze(s);

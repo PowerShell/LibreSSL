@@ -877,6 +877,10 @@
 #define NID_id_ct_geofeedCSVwithCRLF		1013
 #define OBJ_id_ct_geofeedCSVwithCRLF		OBJ_id_smime_ct,47L
 
+#define SN_id_ct_signedChecklist		"id-ct-signedChecklist"
+#define NID_id_ct_signedChecklist		1014
+#define OBJ_id_ct_signedChecklist		OBJ_id_smime_ct,48L
+
 #define SN_id_smime_aa_receiptRequest		"id-smime-aa-receiptRequest"
 #define NID_id_smime_aa_receiptRequest		212
 #define OBJ_id_smime_aa_receiptRequest		OBJ_id_smime_aa,1L
@@ -1585,6 +1589,11 @@
 #define LN_dvcs		"dvcs"
 #define NID_dvcs		297
 #define OBJ_dvcs		OBJ_id_kp,10L
+
+#define SN_id_kp_bgpsec_router		"id-kp-bgpsec-router"
+#define LN_id_kp_bgpsec_router		"BGPsec Router"
+#define NID_id_kp_bgpsec_router		1015
+#define OBJ_id_kp_bgpsec_router		OBJ_id_kp,30L
 
 #define SN_id_it_caProtEncCert		"id-it-caProtEncCert"
 #define NID_id_it_caProtEncCert		298

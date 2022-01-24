@@ -1,4 +1,4 @@
-/* $OpenBSD: ec_asn1.c,v 1.31 2018/09/01 16:23:15 tb Exp $ */
+/* $OpenBSD: ec_asn1.c,v 1.34 2021/08/31 20:14:40 tb Exp $ */
 /*
  * Written by Nils Larsch for the OpenSSL project.
  */
@@ -709,7 +709,7 @@ ec_asn1_group2fieldid(const EC_GROUP * group, X9_62_FIELDID * field)
 			goto err;
 		}
 		/* the parameters are specified by the prime number p */
-		if (!EC_GROUP_get_curve_GFp(group, tmp, NULL, NULL, NULL)) {
+		if (!EC_GROUP_get_curve(group, tmp, NULL, NULL, NULL)) {
 			ECerror(ERR_R_EC_LIB);
 			goto err;
 		}
@@ -801,12 +801,12 @@ ec_asn1_group2fieldid(const EC_GROUP * group, X9_62_FIELDID * field)
 static int 
 ec_asn1_group2curve(const EC_GROUP * group, X9_62_CURVE * curve)
 {
-	int ok = 0, nid;
 	BIGNUM *tmp_1 = NULL, *tmp_2 = NULL;
 	unsigned char *buffer_1 = NULL, *buffer_2 = NULL, *a_buf = NULL,
 	*b_buf = NULL;
 	size_t len_1, len_2;
 	unsigned char char_zero = 0;
+	int ok = 0;
 
 	if (!group || !curve || !curve->a || !curve->b)
 		return 0;
@@ -815,23 +815,12 @@ ec_asn1_group2curve(const EC_GROUP * group, X9_62_CURVE * curve)
 		ECerror(ERR_R_MALLOC_FAILURE);
 		goto err;
 	}
-	nid = EC_METHOD_get_field_type(EC_GROUP_method_of(group));
 
 	/* get a and b */
-	if (nid == NID_X9_62_prime_field) {
-		if (!EC_GROUP_get_curve_GFp(group, NULL, tmp_1, tmp_2, NULL)) {
-			ECerror(ERR_R_EC_LIB);
-			goto err;
-		}
+	if (!EC_GROUP_get_curve(group, NULL, tmp_1, tmp_2, NULL)) {
+		ECerror(ERR_R_EC_LIB);
+		goto err;
 	}
-#ifndef OPENSSL_NO_EC2M
-	else {			/* nid == NID_X9_62_characteristic_two_field */
-		if (!EC_GROUP_get_curve_GF2m(group, NULL, tmp_1, tmp_2, NULL)) {
-			ECerror(ERR_R_EC_LIB);
-			goto err;
-		}
-	}
-#endif
 	len_1 = (size_t) BN_num_bytes(tmp_1);
 	len_2 = (size_t) BN_num_bytes(tmp_2);
 
@@ -1028,7 +1017,7 @@ ec_asn1_group2pkparameters(const EC_GROUP * group, ECPKPARAMETERS * params)
 			if ((ret->value.named_curve = OBJ_nid2obj(tmp)) == NULL)
 				ok = 0;
 		} else
-			/* we don't kmow the nid => ERROR */
+			/* we don't know the group => ERROR */
 			ok = 0;
 	} else {
 		/* use the ECPARAMETERS structure */

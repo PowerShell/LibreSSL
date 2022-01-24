@@ -132,10 +132,9 @@ check_PROGRAMS += cipherstest
 cipherstest_SOURCES = cipherstest.c
 
 # clienttest
-# disabled
-#TESTS += clienttest
-#check_PROGRAMS += clienttest
-#clienttest_SOURCES = clienttest.c
+TESTS += clienttest
+check_PROGRAMS += clienttest
+clienttest_SOURCES = clienttest.c
 
 # cmstest
 TESTS += cmstest
@@ -171,6 +170,19 @@ dhtest_SOURCES = dhtest.c
 TESTS += dsatest
 check_PROGRAMS += dsatest
 dsatest_SOURCES = dsatest.c
+
+# dtlstest
+if !HOST_WIN
+TESTS += dtlstest.sh
+check_PROGRAMS += dtlstest
+dtlstest_SOURCES = dtlstest.c
+endif
+EXTRA_DIST += dtlstest.sh
+
+# ec_point_conversion
+TESTS += ec_point_conversion
+check_PROGRAMS += ec_point_conversion
+ec_point_conversion_SOURCES = ec_point_conversion.c
 
 # ecdhtest
 TESTS += ecdhtest
@@ -405,6 +417,12 @@ TESTS += sm4test
 check_PROGRAMS += sm4test
 sm4test_SOURCES = sm4test.c
 
+# ssl_get_shared_ciphers
+TESTS += ssl_get_shared_ciphers
+ssl_get_shared_ciphers_CPPFLAGS = $(AM_CPPFLAGS) -DCERTSDIR=\"$(srcdir)\"
+check_PROGRAMS += ssl_get_shared_ciphers
+ssl_get_shared_ciphers_SOURCES = ssl_get_shared_ciphers.c
+
 # ssl_methods
 TESTS += ssl_methods
 check_PROGRAMS += ssl_methods
@@ -444,6 +462,11 @@ timingsafe_SOURCES = timingsafe.c
 TESTS += tlsexttest
 check_PROGRAMS += tlsexttest
 tlsexttest_SOURCES = tlsexttest.c
+
+# tlslegacytest
+TESTS += tlslegacytest
+check_PROGRAMS += tlslegacytest
+tlslegacytest_SOURCES = tlslegacytest.c
 
 # tlstest
 TESTS += tlstest.sh

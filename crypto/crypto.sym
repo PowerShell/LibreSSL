@@ -425,6 +425,8 @@ BN_add_word
 BN_asc2bn
 BN_bin2bn
 BN_bn2bin
+BN_bn2binpad
+BN_bn2lebinpad
 BN_bn2dec
 BN_bn2hex
 BN_bn2mpi
@@ -468,6 +470,7 @@ BN_is_prime_ex
 BN_is_prime_fasttest
 BN_is_prime_fasttest_ex
 BN_kronecker
+BN_lebin2bn
 BN_lshift
 BN_lshift1
 BN_mask_bits
@@ -1047,6 +1050,7 @@ EC_GROUP_get0_seed
 EC_GROUP_get_asn1_flag
 EC_GROUP_get_basis_type
 EC_GROUP_get_cofactor
+EC_GROUP_get_curve
 EC_GROUP_get_curve_GF2m
 EC_GROUP_get_curve_GFp
 EC_GROUP_get_curve_name
@@ -1062,8 +1066,10 @@ EC_GROUP_new
 EC_GROUP_new_by_curve_name
 EC_GROUP_new_curve_GF2m
 EC_GROUP_new_curve_GFp
+EC_GROUP_order_bits
 EC_GROUP_precompute_mult
 EC_GROUP_set_asn1_flag
+EC_GROUP_set_curve
 EC_GROUP_set_curve_GF2m
 EC_GROUP_set_curve_GFp
 EC_GROUP_set_curve_name
@@ -1128,6 +1134,7 @@ EC_POINT_dbl
 EC_POINT_dup
 EC_POINT_free
 EC_POINT_get_Jprojective_coordinates_GFp
+EC_POINT_get_affine_coordinates
 EC_POINT_get_affine_coordinates_GF2m
 EC_POINT_get_affine_coordinates_GFp
 EC_POINT_hex2point
@@ -1143,8 +1150,10 @@ EC_POINT_point2bn
 EC_POINT_point2hex
 EC_POINT_point2oct
 EC_POINT_set_Jprojective_coordinates_GFp
+EC_POINT_set_affine_coordinates
 EC_POINT_set_affine_coordinates_GF2m
 EC_POINT_set_affine_coordinates_GFp
+EC_POINT_set_compressed_coordinates
 EC_POINT_set_compressed_coordinates_GF2m
 EC_POINT_set_compressed_coordinates_GFp
 EC_POINT_set_to_infinity
@@ -1447,9 +1456,11 @@ EVP_DigestFinal
 EVP_DigestFinal_ex
 EVP_DigestInit
 EVP_DigestInit_ex
+EVP_DigestSign
 EVP_DigestSignFinal
 EVP_DigestSignInit
 EVP_DigestUpdate
+EVP_DigestVerify
 EVP_DigestVerifyFinal
 EVP_DigestVerifyInit
 EVP_ENCODE_CTX_free

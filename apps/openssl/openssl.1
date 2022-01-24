@@ -1,4 +1,4 @@
-.\" $OpenBSD: openssl.1,v 1.129 2021/03/17 18:08:32 jsing Exp $
+.\" $OpenBSD: openssl.1,v 1.132 2021/09/05 06:16:30 jmc Exp $
 .\" ====================================================================
 .\" Copyright (c) 1998-2002 The OpenSSL Project.  All rights reserved.
 .\"
@@ -110,7 +110,7 @@
 .\" copied and put under another distribution licence
 .\" [including the GNU Public Licence.]
 .\"
-.Dd $Mdocdate: March 17 2021 $
+.Dd $Mdocdate: September 5 2021 $
 .Dt OPENSSL 1
 .Os
 .Sh NAME
@@ -843,6 +843,11 @@ is given,
 several valid certificate entries may have the exact same subject.
 The default value is
 .Cm yes .
+.Pp
+Note that it is valid in some circumstances for certificates to be created
+without any subject.
+In cases where there are multiple certificates without
+subjects this does not count as a duplicate.
 .It Cm x509_extensions
 The same as
 .Fl extensions .
@@ -4607,6 +4612,7 @@ will be used.
 .Op Fl keymatexportlen Ar len
 .Op Fl msg
 .Op Fl mtu Ar mtu
+.Op Fl naccept Ar num
 .Op Fl named_curve Ar arg
 .Op Fl nbio
 .Op Fl nbio_test
@@ -4807,6 +4813,10 @@ Export len bytes of keying material (default 20).
 Show all protocol messages with hex dump.
 .It Fl mtu Ar mtu
 Set the link layer MTU.
+.It Fl naccept Ar num
+Terminate server after
+.Ar num
+connections.
 .It Fl named_curve Ar arg
 Specify the elliptic curve name to use for ephemeral ECDH keys.
 This option is deprecated; use

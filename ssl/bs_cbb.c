@@ -1,4 +1,4 @@
-/*	$OpenBSD: bs_cbb.c,v 1.24 2021/01/04 19:19:12 tb Exp $	*/
+/*	$OpenBSD: bs_cbb.c,v 1.26 2021/05/16 10:58:27 jsing Exp $	*/
 /*
  * Copyright (c) 2014, Google Inc.
  *
@@ -12,12 +12,11 @@
  * SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
  * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
  * OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
- * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE. */
+ * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
 
 #include <stdlib.h>
 #include <string.h>
-
-#include <openssl/opensslconf.h>
 
 #include "bytestring.h"
 

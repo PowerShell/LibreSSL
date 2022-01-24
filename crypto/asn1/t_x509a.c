@@ -1,4 +1,4 @@
-/* $OpenBSD: t_x509a.c,v 1.8.16.1 2021/08/20 19:54:59 benno Exp $ */
+/* $OpenBSD: t_x509a.c,v 1.9 2021/07/10 17:45:16 schwarze Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 1999.
  */
