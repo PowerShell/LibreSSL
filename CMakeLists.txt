@@ -44,7 +44,7 @@ set(OPENSSLDIR ${OPENSSLDIR} CACHE PATH "Set the default openssl directory" FORC
 
 option(USE_STATIC_MSVC_RUNTIMES "Use /MT instead of /MD in MSVC" ON)
 if(USE_STATIC_MSVC_RUNTIMES)
-    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded")
 endif()
 
 message(STATUS "USE_STATIC_MSVC_RUNTIMES: ${USE_STATIC_MSVC_RUNTIMES}")
