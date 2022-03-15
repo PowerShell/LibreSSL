@@ -50,6 +50,14 @@ endif()
 message(STATUS "USE_STATIC_MSVC_RUNTIMES: ${USE_STATIC_MSVC_RUNTIMES}")
 message(STATUS "CMAKE_MSVC_RUNTIME_LIBRARY: ${CMAKE_MSVC_RUNTIME_LIBRARY}")
 
+if(MSVC)
+    add_compile_options(
+        $<$<CONFIG:>:/MT> #---------|
+        $<$<CONFIG:Debug>:/MTd> #---|-- Statically link the runtime libraries
+        $<$<CONFIG:Release>:/MT> #--|
+    )
+endif()
+
 if(NOT LIBRESSL_SKIP_INSTALL)
 	set( ENABLE_LIBRESSL_INSTALL ON )
 endif(NOT LIBRESSL_SKIP_INSTALL)
