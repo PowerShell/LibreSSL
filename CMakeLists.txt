@@ -52,9 +52,11 @@ message(STATUS "CMAKE_MSVC_RUNTIME_LIBRARY: ${CMAKE_MSVC_RUNTIME_LIBRARY}")
 
 if(MSVC)
     add_compile_options(
-        $<$<CONFIG:>:/MT> #---------|
-        $<$<CONFIG:Debug>:/MTd> #---|-- Statically link the runtime libraries
-        $<$<CONFIG:Release>:/MT> #--|
+        $<$<CONFIG:>:/MT>
+        $<$<CONFIG:Debug>:/MTd>
+        $<$<CONFIG:Release>:/MT>
+		$<$<CONFIG:MinSizeRel>:/MT>
+		$<$<CONFIG:RelWithDebInfo>:/MT>
     )
 endif()
 
