@@ -42,7 +42,7 @@ option(ENABLE_EXTRATESTS "Enable extra tests that may be unreliable on some plat
 option(ENABLE_NC "Enable installing TLS-enabled nc(1)" OFF)
 set(OPENSSLDIR ${OPENSSLDIR} CACHE PATH "Set the default openssl directory" FORCE)
 
-option(USE_STATIC_MSVC_RUNTIMES "Use /MT instead of /MD in MSVC" OFF)
+option(USE_STATIC_MSVC_RUNTIMES "Use /MT instead of /MD in MSVC" ON)
 if(USE_STATIC_MSVC_RUNTIMES)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
