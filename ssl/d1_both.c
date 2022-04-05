@@ -1,4 +1,4 @@
-/* $OpenBSD: d1_both.c,v 1.78 2021/09/04 14:24:28 jsing Exp $ */
+/* $OpenBSD: d1_both.c,v 1.68 2021/02/27 14:20:50 jsing Exp $ */
 /*
  * DTLS implementation written by Nagendra Modadugu
  * (nagendra@cs.stanford.edu) for the OpenSSL project 2005.
@@ -117,15 +117,15 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "ssl_locl.h"
+
 #include <openssl/buffer.h>
 #include <openssl/evp.h>
 #include <openssl/objects.h>
 #include <openssl/x509.h>
 
-#include "bytestring.h"
-#include "dtls_locl.h"
 #include "pqueue.h"
-#include "ssl_locl.h"
+#include "bytestring.h"
 
 #define RSMBLY_BITMASK_SIZE(msg_len) (((msg_len) + 7) / 8)
 
@@ -380,23 +380,23 @@ dtls1_get_message(SSL *s, int st1, int stn, int mt, long max, int *ok)
 	 * s3->internal->tmp is used to store messages that are unexpected, caused
 	 * by the absence of an optional handshake message
 	 */
-	if (S3I(s)->hs.tls12.reuse_message) {
-		S3I(s)->hs.tls12.reuse_message = 0;
-		if ((mt >= 0) && (S3I(s)->hs.tls12.message_type != mt)) {
+	if (S3I(s)->tmp.reuse_message) {
+		S3I(s)->tmp.reuse_message = 0;
+		if ((mt >= 0) && (S3I(s)->tmp.message_type != mt)) {
 			al = SSL_AD_UNEXPECTED_MESSAGE;
 			SSLerror(s, SSL_R_UNEXPECTED_MESSAGE);
 			goto fatal_err;
 		}
 		*ok = 1;
 		s->internal->init_msg = s->internal->init_buf->data + DTLS1_HM_HEADER_LENGTH;
-		s->internal->init_num = (int)S3I(s)->hs.tls12.message_size;
+		s->internal->init_num = (int)S3I(s)->tmp.message_size;
 		return s->internal->init_num;
 	}
 
 	msg_hdr = &D1I(s)->r_msg_hdr;
 	memset(msg_hdr, 0, sizeof(struct hm_header_st));
 
- again:
+again:
 	i = dtls1_get_message_fragment(s, st1, stn, max, ok);
 	if (i == DTLS1_HM_BAD_FRAGMENT ||
 	    i == DTLS1_HM_FRAGMENT_RETRY)  /* bad fragment received */
@@ -466,9 +466,9 @@ dtls1_preprocess_fragment(SSL *s, struct hm_header_st *msg_hdr, int max)
 			return SSL_AD_INTERNAL_ERROR;
 		}
 
-		S3I(s)->hs.tls12.message_size = msg_len;
+		S3I(s)->tmp.message_size = msg_len;
 		D1I(s)->r_msg_hdr.msg_len = msg_len;
-		S3I(s)->hs.tls12.message_type = msg_hdr->type;
+		S3I(s)->tmp.message_type = msg_hdr->type;
 		D1I(s)->r_msg_hdr.type = msg_hdr->type;
 		D1I(s)->r_msg_hdr.seq = msg_hdr->seq;
 	} else if (msg_len != D1I(s)->r_msg_hdr.msg_len) {
@@ -600,7 +600,7 @@ dtls1_reassemble_fragment(SSL *s, struct hm_header_st* msg_hdr, int *ok)
 		unsigned char devnull [256];
 
 		while (frag_len) {
-			i = s->method->ssl_read_bytes(s, SSL3_RT_HANDSHAKE,
+			i = s->method->internal->ssl_read_bytes(s, SSL3_RT_HANDSHAKE,
 			    devnull, frag_len > sizeof(devnull) ?
 			    sizeof(devnull) : frag_len, 0);
 			if (i <= 0)
@@ -612,7 +612,7 @@ dtls1_reassemble_fragment(SSL *s, struct hm_header_st* msg_hdr, int *ok)
 	}
 
 	/* read the body of the fragment (header has already been read */
-	i = s->method->ssl_read_bytes(s, SSL3_RT_HANDSHAKE,
+	i = s->method->internal->ssl_read_bytes(s, SSL3_RT_HANDSHAKE,
 	    frag->fragment + msg_hdr->frag_off, frag_len, 0);
 	if (i <= 0 || (unsigned long)i != frag_len)
 		goto err;
@@ -644,7 +644,7 @@ dtls1_reassemble_fragment(SSL *s, struct hm_header_st* msg_hdr, int *ok)
 
 	return DTLS1_HM_FRAGMENT_RETRY;
 
- err:
+err:
 	if (item == NULL && frag != NULL)
 		dtls1_hm_fragment_free(frag);
 	*ok = 0;
@@ -690,7 +690,7 @@ dtls1_process_out_of_seq_message(SSL *s, struct hm_header_st* msg_hdr, int *ok)
 		unsigned char devnull [256];
 
 		while (frag_len) {
-			i = s->method->ssl_read_bytes(s, SSL3_RT_HANDSHAKE,
+			i = s->method->internal->ssl_read_bytes(s, SSL3_RT_HANDSHAKE,
 			    devnull, frag_len > sizeof(devnull) ?
 			    sizeof(devnull) : frag_len, 0);
 			if (i <= 0)
@@ -712,7 +712,7 @@ dtls1_process_out_of_seq_message(SSL *s, struct hm_header_st* msg_hdr, int *ok)
 
 		if (frag_len) {
 			/* read the body of the fragment (header has already been read */
-			i = s->method->ssl_read_bytes(s, SSL3_RT_HANDSHAKE,
+			i = s->method->internal->ssl_read_bytes(s, SSL3_RT_HANDSHAKE,
 			    frag->fragment, frag_len, 0);
 			if (i <= 0 || (unsigned long)i != frag_len)
 				goto err;
@@ -731,7 +731,7 @@ dtls1_process_out_of_seq_message(SSL *s, struct hm_header_st* msg_hdr, int *ok)
 
 	return DTLS1_HM_FRAGMENT_RETRY;
 
- err:
+err:
 	if (item == NULL && frag != NULL)
 		dtls1_hm_fragment_free(frag);
 	*ok = 0;
@@ -744,11 +744,10 @@ dtls1_get_message_fragment(SSL *s, int st1, int stn, long max, int *ok)
 {
 	unsigned char wire[DTLS1_HM_HEADER_LENGTH];
 	unsigned long len, frag_off, frag_len;
-	struct hm_header_st msg_hdr;
 	int i, al;
-	CBS cbs;
+	struct hm_header_st msg_hdr;
 
- again:
+again:
 	/* see if we have the required fragment already */
 	if ((frag_len = dtls1_retrieve_buffered_fragment(s, max, ok)) || *ok) {
 		if (*ok)
@@ -757,18 +756,18 @@ dtls1_get_message_fragment(SSL *s, int st1, int stn, long max, int *ok)
 	}
 
 	/* read handshake message header */
-	i = s->method->ssl_read_bytes(s, SSL3_RT_HANDSHAKE, wire,
+	i = s->method->internal->ssl_read_bytes(s, SSL3_RT_HANDSHAKE, wire,
 	    DTLS1_HM_HEADER_LENGTH, 0);
-	if (i <= 0) {
-	 	/* nbio, or an error */
+	if (i <= 0) 	/* nbio, or an error */
+	{
 		s->internal->rwstate = SSL_READING;
 		*ok = 0;
 		return i;
 	}
-
-	CBS_init(&cbs, wire, i);
-	if (!dtls1_get_message_header(&cbs, &msg_hdr)) {
-		/* Handshake fails if message header is incomplete. */
+	/* Handshake fails if message header is incomplete */
+	if (i != DTLS1_HM_HEADER_LENGTH ||
+	    /* parse the message fragment header */
+	    dtls1_get_message_header(wire, &msg_hdr) == 0) {
 		al = SSL_AD_UNEXPECTED_MESSAGE;
 		SSLerror(s, SSL_R_UNEXPECTED_MESSAGE);
 		goto fatal_err;
@@ -826,7 +825,7 @@ dtls1_get_message_fragment(SSL *s, int st1, int stn, long max, int *ok)
 	if (frag_len > 0) {
 		unsigned char *p = (unsigned char *)s->internal->init_buf->data + DTLS1_HM_HEADER_LENGTH;
 
-		i = s->method->ssl_read_bytes(s, SSL3_RT_HANDSHAKE,
+		i = s->method->internal->ssl_read_bytes(s, SSL3_RT_HANDSHAKE,
 		    &p[frag_off], frag_len, 0);
 		/* XDTLS:  fix this--message fragments cannot span multiple packets */
 		if (i <= 0) {
@@ -842,8 +841,8 @@ dtls1_get_message_fragment(SSL *s, int st1, int stn, long max, int *ok)
 	 * handshake to fail
 	 */
 	if (i != (int)frag_len) {
-		al = SSL_AD_ILLEGAL_PARAMETER;
-		SSLerror(s, SSL_R_SSLV3_ALERT_ILLEGAL_PARAMETER);
+		al = SSL3_AD_ILLEGAL_PARAMETER;
+		SSLerror(s, SSL3_AD_ILLEGAL_PARAMETER);
 		goto fatal_err;
 	}
 
@@ -973,8 +972,7 @@ dtls1_buffer_message(SSL *s, int is_ccs)
 
 	/* save current state*/
 	frag->msg_header.saved_retransmit_state.session = s->session;
-	frag->msg_header.saved_retransmit_state.epoch =
-	    tls12_record_layer_write_epoch(s->internal->rl);
+	frag->msg_header.saved_retransmit_state.epoch = D1I(s)->w_epoch;
 
 	memset(seq64be, 0, sizeof(seq64be));
 	seq64be[6] = (unsigned char)(dtls1_get_queue_priority(
@@ -1041,14 +1039,15 @@ dtls1_retransmit_message(SSL *s, unsigned short seq, unsigned long frag_off,
 
 	/* save current state */
 	saved_state.session = s->session;
-	saved_state.epoch = tls12_record_layer_write_epoch(s->internal->rl);
+	saved_state.epoch = D1I(s)->w_epoch;
 
 	D1I(s)->retransmitting = 1;
 
 	/* restore state in which the message was originally sent */
 	s->session = frag->msg_header.saved_retransmit_state.session;
-	if (!tls12_record_layer_use_write_epoch(s->internal->rl,
-	    frag->msg_header.saved_retransmit_state.epoch))
+	D1I(s)->w_epoch = frag->msg_header.saved_retransmit_state.epoch;
+
+	if (!tls12_record_layer_use_write_epoch(s->internal->rl, D1I(s)->w_epoch))
 		return 0;
 
 	ret = dtls1_do_write(s, frag->msg_header.is_ccs ?
@@ -1056,8 +1055,9 @@ dtls1_retransmit_message(SSL *s, unsigned short seq, unsigned long frag_off,
 
 	/* restore current state */
 	s->session = saved_state.session;
-	if (!tls12_record_layer_use_write_epoch(s->internal->rl,
-	    saved_state.epoch))
+	D1I(s)->w_epoch = saved_state.epoch;
+
+	if (!tls12_record_layer_use_write_epoch(s->internal->rl, D1I(s)->w_epoch))
 		return 0;
 
 	D1I(s)->retransmitting = 0;
@@ -1173,23 +1173,26 @@ dtls1_guess_mtu(unsigned int curr_mtu)
 }
 
 int
-dtls1_get_message_header(CBS *header, struct hm_header_st *msg_hdr)
+dtls1_get_message_header(unsigned char *data, struct hm_header_st *msg_hdr)
 {
+	CBS header;
 	uint32_t msg_len, frag_off, frag_len;
 	uint16_t seq;
 	uint8_t type;
 
+	CBS_init(&header, data, sizeof(*msg_hdr));
+
 	memset(msg_hdr, 0, sizeof(*msg_hdr));
 
-	if (!CBS_get_u8(header, &type))
+	if (!CBS_get_u8(&header, &type))
 		return 0;
-	if (!CBS_get_u24(header, &msg_len))
+	if (!CBS_get_u24(&header, &msg_len))
 		return 0;
-	if (!CBS_get_u16(header, &seq))
+	if (!CBS_get_u16(&header, &seq))
 		return 0;
-	if (!CBS_get_u24(header, &frag_off))
+	if (!CBS_get_u24(&header, &frag_off))
 		return 0;
-	if (!CBS_get_u24(header, &frag_len))
+	if (!CBS_get_u24(&header, &frag_len))
 		return 0;
 
 	msg_hdr->type = type;
@@ -1199,4 +1202,12 @@ dtls1_get_message_header(CBS *header, struct hm_header_st *msg_hdr)
 	msg_hdr->frag_len = frag_len;
 
 	return 1;
+}
+
+void
+dtls1_get_ccs_header(unsigned char *data, struct ccs_header_st *ccs_hdr)
+{
+	memset(ccs_hdr, 0, sizeof(struct ccs_header_st));
+
+	ccs_hdr->type = *(data++);
 }

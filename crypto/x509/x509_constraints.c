@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_constraints.c,v 1.17 2021/09/23 15:49:48 jsing Exp $ */
+/* $OpenBSD: x509_constraints.c,v 1.15.2.1 2021/09/26 14:07:40 deraadt Exp $ */
 /*
  * Copyright (c) 2020 Bob Beck <beck@openbsd.org>
  *
@@ -169,15 +169,13 @@ x509_constraints_names_dup(struct x509_constraints_names *names)
 /*
  * Validate that the name contains only a hostname consisting of RFC
  * 5890 compliant A-labels (see RFC 6066 section 3). This is more
- * permissive to allow for a leading '.'  for a subdomain based
- * constraint, as well as allowing for '_' which is commonly accepted
- * by nonconformant DNS implementaitons.
- *
- * if "wildcards" is set it allows '*' to occur in the string at the end of a
- * component.
+ * permissive to allow for a leading '*' for a SAN DNSname wildcard,
+ * or a leading '.'  for a subdomain based constraint, as well as
+ * allowing for '_' which is commonly accepted by nonconformant
+ * DNS implementaitons.
  */
 static int
-x509_constraints_valid_domain_internal(uint8_t *name, size_t len, int wildcards)
+x509_constraints_valid_domain_internal(uint8_t *name, size_t len)
 {
 	uint8_t prev, c = 0;
 	int component = 0;
@@ -200,8 +198,8 @@ x509_constraints_valid_domain_internal(uint8_t *name, size_t len, int wildcards)
 		if (!isalnum(c) && c != '-' && c != '.' && c != '_' && c != '*')
 			return 0;
 
-		/* if it is a '*', fail if not wildcards */
-		if (!wildcards && c == '*')
+		/* '*' can only be the first thing. */
+		if (c == '*' && !first)
 			return 0;
 
 		/* '-' must not start a component or be at the end. */
@@ -223,13 +221,6 @@ x509_constraints_valid_domain_internal(uint8_t *name, size_t len, int wildcards)
 			component = 0;
 			continue;
 		}
-		/*
-		 * Wildcards can only occur at the end of a component.
-		 * c*.com is valid, c*c.com is not.
-		 */
-		if (prev == '*')
-			return 0;
-
 		/* Components must be 63 chars or less. */
 		if (++component > 63)
 			return 0;
@@ -242,13 +233,15 @@ x509_constraints_valid_domain(uint8_t *name, size_t len)
 {
 	if (len == 0)
 		return 0;
+	if (name[0] == '*') /* wildcard not allowed in a domain name */
+		return 0;
 	/*
 	 * A domain may not be less than two characters, so you can't
 	 * have a require subdomain name with less than that.
 	 */
 	if (len < 3 && name[0] == '.')
 		return 0;
-	return x509_constraints_valid_domain_internal(name, len, 0);
+	return x509_constraints_valid_domain_internal(name, len);
 }
 
 int
@@ -259,13 +252,15 @@ x509_constraints_valid_host(uint8_t *name, size_t len)
 
 	if (len == 0)
 		return 0;
+	if (name[0] == '*') /* wildcard not allowed in a host name */
+		return 0;
 	if (name[0] == '.') /* leading . not allowed in a host name*/
 		return 0;
 	if (inet_pton(AF_INET, name, &sin4) == 1)
 		return 0;
 	if (inet_pton(AF_INET6, name, &sin6) == 1)
 		return 0;
-	return x509_constraints_valid_domain_internal(name, len, 0);
+	return x509_constraints_valid_domain_internal(name, len);
 }
 
 int
@@ -288,7 +283,7 @@ x509_constraints_valid_sandns(uint8_t *name, size_t len)
 	if (len >= 4 && name[0] == '*' && name[1] != '.')
 		return 0;
 
-	return x509_constraints_valid_domain_internal(name, len, 1);
+	return x509_constraints_valid_domain_internal(name, len);
 }
 
 static inline int
@@ -440,13 +435,16 @@ x509_constraints_valid_domain_constraint(uint8_t *constraint, size_t len)
 	if (len == 0)
 		return 1;	/* empty constraints match */
 
+	if (constraint[0] == '*') /* wildcard not allowed in a constraint */
+		return 0;
+
 	/*
 	 * A domain may not be less than two characters, so you
 	 * can't match a single domain of less than that
 	 */
 	if (len < 3 && constraint[0] == '.')
 		return 0;
-	return x509_constraints_valid_domain_internal(constraint, len, 0);
+	return x509_constraints_valid_domain_internal(constraint, len);
 }
 
 /*

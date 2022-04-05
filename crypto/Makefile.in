@@ -487,21 +487,20 @@ am__libcrypto_la_SOURCES_DIST = aes/aes-elf-armv4.S \
 	ui/ui_util.c whrlpool/wp_dgst.c x509/by_dir.c x509/by_file.c \
 	x509/by_mem.c x509/pcy_cache.c x509/pcy_data.c x509/pcy_lib.c \
 	x509/pcy_map.c x509/pcy_node.c x509/pcy_tree.c \
-	x509/x509_addr.c x509/x509_akey.c x509/x509_akeya.c \
-	x509/x509_alt.c x509/x509_att.c x509/x509_asid.c \
-	x509/x509_bcons.c x509/x509_bitst.c x509/x509_cmp.c \
-	x509/x509_conf.c x509/x509_constraints.c x509/x509_cpols.c \
-	x509/x509_crld.c x509/x509_d2.c x509/x509_def.c \
-	x509/x509_enum.c x509/x509_err.c x509/x509_ext.c \
-	x509/x509_extku.c x509/x509_genn.c x509/x509_ia5.c \
-	x509/x509_info.c x509/x509_int.c x509/x509_issuer_cache.c \
-	x509/x509_lib.c x509/x509_lu.c x509/x509_ncons.c \
-	x509/x509_obj.c x509/x509_ocsp.c x509/x509_pci.c \
-	x509/x509_pcia.c x509/x509_pcons.c x509/x509_pku.c \
-	x509/x509_pmaps.c x509/x509_prn.c x509/x509_purp.c \
-	x509/x509_r2x.c x509/x509_req.c x509/x509_set.c \
-	x509/x509_skey.c x509/x509_sxnet.c x509/x509_trs.c \
-	x509/x509_txt.c x509/x509_utl.c x509/x509_v3.c \
+	x509/x509_akey.c x509/x509_akeya.c x509/x509_alt.c \
+	x509/x509_att.c x509/x509_bcons.c x509/x509_bitst.c \
+	x509/x509_cmp.c x509/x509_conf.c x509/x509_constraints.c \
+	x509/x509_cpols.c x509/x509_crld.c x509/x509_d2.c \
+	x509/x509_def.c x509/x509_enum.c x509/x509_err.c \
+	x509/x509_ext.c x509/x509_extku.c x509/x509_genn.c \
+	x509/x509_ia5.c x509/x509_info.c x509/x509_int.c \
+	x509/x509_issuer_cache.c x509/x509_lib.c x509/x509_lu.c \
+	x509/x509_ncons.c x509/x509_obj.c x509/x509_ocsp.c \
+	x509/x509_pci.c x509/x509_pcia.c x509/x509_pcons.c \
+	x509/x509_pku.c x509/x509_pmaps.c x509/x509_prn.c \
+	x509/x509_purp.c x509/x509_r2x.c x509/x509_req.c \
+	x509/x509_set.c x509/x509_skey.c x509/x509_sxnet.c \
+	x509/x509_trs.c x509/x509_txt.c x509/x509_utl.c x509/x509_v3.c \
 	x509/x509_verify.c x509/x509_vfy.c x509/x509_vpm.c \
 	x509/x509cset.c x509/x509name.c x509/x509rset.c \
 	x509/x509spki.c x509/x509type.c x509/x_all.c
@@ -884,9 +883,8 @@ am_libcrypto_la_OBJECTS = $(am__objects_31) $(am__objects_33) \
 	x509/libcrypto_la-pcy_cache.lo x509/libcrypto_la-pcy_data.lo \
 	x509/libcrypto_la-pcy_lib.lo x509/libcrypto_la-pcy_map.lo \
 	x509/libcrypto_la-pcy_node.lo x509/libcrypto_la-pcy_tree.lo \
-	x509/libcrypto_la-x509_addr.lo x509/libcrypto_la-x509_akey.lo \
-	x509/libcrypto_la-x509_akeya.lo x509/libcrypto_la-x509_alt.lo \
-	x509/libcrypto_la-x509_att.lo x509/libcrypto_la-x509_asid.lo \
+	x509/libcrypto_la-x509_akey.lo x509/libcrypto_la-x509_akeya.lo \
+	x509/libcrypto_la-x509_alt.lo x509/libcrypto_la-x509_att.lo \
 	x509/libcrypto_la-x509_bcons.lo \
 	x509/libcrypto_la-x509_bitst.lo x509/libcrypto_la-x509_cmp.lo \
 	x509/libcrypto_la-x509_conf.lo \
@@ -1562,11 +1560,9 @@ am__depfiles_remade = ./$(DEPDIR)/libcrypto_la-armcap.Plo \
 	x509/$(DEPDIR)/libcrypto_la-pcy_map.Plo \
 	x509/$(DEPDIR)/libcrypto_la-pcy_node.Plo \
 	x509/$(DEPDIR)/libcrypto_la-pcy_tree.Plo \
-	x509/$(DEPDIR)/libcrypto_la-x509_addr.Plo \
 	x509/$(DEPDIR)/libcrypto_la-x509_akey.Plo \
 	x509/$(DEPDIR)/libcrypto_la-x509_akeya.Plo \
 	x509/$(DEPDIR)/libcrypto_la-x509_alt.Plo \
-	x509/$(DEPDIR)/libcrypto_la-x509_asid.Plo \
 	x509/$(DEPDIR)/libcrypto_la-x509_att.Plo \
 	x509/$(DEPDIR)/libcrypto_la-x509_bcons.Plo \
 	x509/$(DEPDIR)/libcrypto_la-x509_bitst.Plo \
@@ -2106,21 +2102,20 @@ libcrypto_la_SOURCES = $(am__append_37) $(am__append_39) \
 	ui/ui_util.c whrlpool/wp_dgst.c x509/by_dir.c x509/by_file.c \
 	x509/by_mem.c x509/pcy_cache.c x509/pcy_data.c x509/pcy_lib.c \
 	x509/pcy_map.c x509/pcy_node.c x509/pcy_tree.c \
-	x509/x509_addr.c x509/x509_akey.c x509/x509_akeya.c \
-	x509/x509_alt.c x509/x509_att.c x509/x509_asid.c \
-	x509/x509_bcons.c x509/x509_bitst.c x509/x509_cmp.c \
-	x509/x509_conf.c x509/x509_constraints.c x509/x509_cpols.c \
-	x509/x509_crld.c x509/x509_d2.c x509/x509_def.c \
-	x509/x509_enum.c x509/x509_err.c x509/x509_ext.c \
-	x509/x509_extku.c x509/x509_genn.c x509/x509_ia5.c \
-	x509/x509_info.c x509/x509_int.c x509/x509_issuer_cache.c \
-	x509/x509_lib.c x509/x509_lu.c x509/x509_ncons.c \
-	x509/x509_obj.c x509/x509_ocsp.c x509/x509_pci.c \
-	x509/x509_pcia.c x509/x509_pcons.c x509/x509_pku.c \
-	x509/x509_pmaps.c x509/x509_prn.c x509/x509_purp.c \
-	x509/x509_r2x.c x509/x509_req.c x509/x509_set.c \
-	x509/x509_skey.c x509/x509_sxnet.c x509/x509_trs.c \
-	x509/x509_txt.c x509/x509_utl.c x509/x509_v3.c \
+	x509/x509_akey.c x509/x509_akeya.c x509/x509_alt.c \
+	x509/x509_att.c x509/x509_bcons.c x509/x509_bitst.c \
+	x509/x509_cmp.c x509/x509_conf.c x509/x509_constraints.c \
+	x509/x509_cpols.c x509/x509_crld.c x509/x509_d2.c \
+	x509/x509_def.c x509/x509_enum.c x509/x509_err.c \
+	x509/x509_ext.c x509/x509_extku.c x509/x509_genn.c \
+	x509/x509_ia5.c x509/x509_info.c x509/x509_int.c \
+	x509/x509_issuer_cache.c x509/x509_lib.c x509/x509_lu.c \
+	x509/x509_ncons.c x509/x509_obj.c x509/x509_ocsp.c \
+	x509/x509_pci.c x509/x509_pcia.c x509/x509_pcons.c \
+	x509/x509_pku.c x509/x509_pmaps.c x509/x509_prn.c \
+	x509/x509_purp.c x509/x509_r2x.c x509/x509_req.c \
+	x509/x509_set.c x509/x509_skey.c x509/x509_sxnet.c \
+	x509/x509_trs.c x509/x509_txt.c x509/x509_utl.c x509/x509_v3.c \
 	x509/x509_verify.c x509/x509_vfy.c x509/x509_vpm.c \
 	x509/x509cset.c x509/x509name.c x509/x509rset.c \
 	x509/x509spki.c x509/x509type.c x509/x_all.c
@@ -3804,8 +3799,6 @@ x509/libcrypto_la-pcy_node.lo: x509/$(am__dirstamp) \
 	x509/$(DEPDIR)/$(am__dirstamp)
 x509/libcrypto_la-pcy_tree.lo: x509/$(am__dirstamp) \
 	x509/$(DEPDIR)/$(am__dirstamp)
-x509/libcrypto_la-x509_addr.lo: x509/$(am__dirstamp) \
-	x509/$(DEPDIR)/$(am__dirstamp)
 x509/libcrypto_la-x509_akey.lo: x509/$(am__dirstamp) \
 	x509/$(DEPDIR)/$(am__dirstamp)
 x509/libcrypto_la-x509_akeya.lo: x509/$(am__dirstamp) \
@@ -3813,8 +3806,6 @@ x509/libcrypto_la-x509_akeya.lo: x509/$(am__dirstamp) \
 x509/libcrypto_la-x509_alt.lo: x509/$(am__dirstamp) \
 	x509/$(DEPDIR)/$(am__dirstamp)
 x509/libcrypto_la-x509_att.lo: x509/$(am__dirstamp) \
-	x509/$(DEPDIR)/$(am__dirstamp)
-x509/libcrypto_la-x509_asid.lo: x509/$(am__dirstamp) \
 	x509/$(DEPDIR)/$(am__dirstamp)
 x509/libcrypto_la-x509_bcons.lo: x509/$(am__dirstamp) \
 	x509/$(DEPDIR)/$(am__dirstamp)
@@ -4665,11 +4656,9 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@x509/$(DEPDIR)/libcrypto_la-pcy_map.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@x509/$(DEPDIR)/libcrypto_la-pcy_node.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@x509/$(DEPDIR)/libcrypto_la-pcy_tree.Plo@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@x509/$(DEPDIR)/libcrypto_la-x509_addr.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@x509/$(DEPDIR)/libcrypto_la-x509_akey.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@x509/$(DEPDIR)/libcrypto_la-x509_akeya.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@x509/$(DEPDIR)/libcrypto_la-x509_alt.Plo@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@x509/$(DEPDIR)/libcrypto_la-x509_asid.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@x509/$(DEPDIR)/libcrypto_la-x509_att.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@x509/$(DEPDIR)/libcrypto_la-x509_bcons.Plo@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@x509/$(DEPDIR)/libcrypto_la-x509_bitst.Plo@am__quote@ # am--include-marker
@@ -8974,13 +8963,6 @@ x509/libcrypto_la-pcy_tree.lo: x509/pcy_tree.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcrypto_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o x509/libcrypto_la-pcy_tree.lo `test -f 'x509/pcy_tree.c' || echo '$(srcdir)/'`x509/pcy_tree.c
 
-x509/libcrypto_la-x509_addr.lo: x509/x509_addr.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcrypto_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT x509/libcrypto_la-x509_addr.lo -MD -MP -MF x509/$(DEPDIR)/libcrypto_la-x509_addr.Tpo -c -o x509/libcrypto_la-x509_addr.lo `test -f 'x509/x509_addr.c' || echo '$(srcdir)/'`x509/x509_addr.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) x509/$(DEPDIR)/libcrypto_la-x509_addr.Tpo x509/$(DEPDIR)/libcrypto_la-x509_addr.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='x509/x509_addr.c' object='x509/libcrypto_la-x509_addr.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcrypto_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o x509/libcrypto_la-x509_addr.lo `test -f 'x509/x509_addr.c' || echo '$(srcdir)/'`x509/x509_addr.c
-
 x509/libcrypto_la-x509_akey.lo: x509/x509_akey.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcrypto_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT x509/libcrypto_la-x509_akey.lo -MD -MP -MF x509/$(DEPDIR)/libcrypto_la-x509_akey.Tpo -c -o x509/libcrypto_la-x509_akey.lo `test -f 'x509/x509_akey.c' || echo '$(srcdir)/'`x509/x509_akey.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) x509/$(DEPDIR)/libcrypto_la-x509_akey.Tpo x509/$(DEPDIR)/libcrypto_la-x509_akey.Plo
@@ -9008,13 +8990,6 @@ x509/libcrypto_la-x509_att.lo: x509/x509_att.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='x509/x509_att.c' object='x509/libcrypto_la-x509_att.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcrypto_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o x509/libcrypto_la-x509_att.lo `test -f 'x509/x509_att.c' || echo '$(srcdir)/'`x509/x509_att.c
-
-x509/libcrypto_la-x509_asid.lo: x509/x509_asid.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcrypto_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT x509/libcrypto_la-x509_asid.lo -MD -MP -MF x509/$(DEPDIR)/libcrypto_la-x509_asid.Tpo -c -o x509/libcrypto_la-x509_asid.lo `test -f 'x509/x509_asid.c' || echo '$(srcdir)/'`x509/x509_asid.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) x509/$(DEPDIR)/libcrypto_la-x509_asid.Tpo x509/$(DEPDIR)/libcrypto_la-x509_asid.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='x509/x509_asid.c' object='x509/libcrypto_la-x509_asid.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcrypto_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o x509/libcrypto_la-x509_asid.lo `test -f 'x509/x509_asid.c' || echo '$(srcdir)/'`x509/x509_asid.c
 
 x509/libcrypto_la-x509_bcons.lo: x509/x509_bcons.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(libcrypto_la_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT x509/libcrypto_la-x509_bcons.lo -MD -MP -MF x509/$(DEPDIR)/libcrypto_la-x509_bcons.Tpo -c -o x509/libcrypto_la-x509_bcons.lo `test -f 'x509/x509_bcons.c' || echo '$(srcdir)/'`x509/x509_bcons.c
@@ -10302,11 +10277,9 @@ distclean: distclean-am
 	-rm -f x509/$(DEPDIR)/libcrypto_la-pcy_map.Plo
 	-rm -f x509/$(DEPDIR)/libcrypto_la-pcy_node.Plo
 	-rm -f x509/$(DEPDIR)/libcrypto_la-pcy_tree.Plo
-	-rm -f x509/$(DEPDIR)/libcrypto_la-x509_addr.Plo
 	-rm -f x509/$(DEPDIR)/libcrypto_la-x509_akey.Plo
 	-rm -f x509/$(DEPDIR)/libcrypto_la-x509_akeya.Plo
 	-rm -f x509/$(DEPDIR)/libcrypto_la-x509_alt.Plo
-	-rm -f x509/$(DEPDIR)/libcrypto_la-x509_asid.Plo
 	-rm -f x509/$(DEPDIR)/libcrypto_la-x509_att.Plo
 	-rm -f x509/$(DEPDIR)/libcrypto_la-x509_bcons.Plo
 	-rm -f x509/$(DEPDIR)/libcrypto_la-x509_bitst.Plo
@@ -11032,11 +11005,9 @@ maintainer-clean: maintainer-clean-am
 	-rm -f x509/$(DEPDIR)/libcrypto_la-pcy_map.Plo
 	-rm -f x509/$(DEPDIR)/libcrypto_la-pcy_node.Plo
 	-rm -f x509/$(DEPDIR)/libcrypto_la-pcy_tree.Plo
-	-rm -f x509/$(DEPDIR)/libcrypto_la-x509_addr.Plo
 	-rm -f x509/$(DEPDIR)/libcrypto_la-x509_akey.Plo
 	-rm -f x509/$(DEPDIR)/libcrypto_la-x509_akeya.Plo
 	-rm -f x509/$(DEPDIR)/libcrypto_la-x509_alt.Plo
-	-rm -f x509/$(DEPDIR)/libcrypto_la-x509_asid.Plo
 	-rm -f x509/$(DEPDIR)/libcrypto_la-x509_att.Plo
 	-rm -f x509/$(DEPDIR)/libcrypto_la-x509_bcons.Plo
 	-rm -f x509/$(DEPDIR)/libcrypto_la-x509_bitst.Plo

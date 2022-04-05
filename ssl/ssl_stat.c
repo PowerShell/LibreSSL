@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_stat.c,v 1.17 2021/06/13 15:51:10 jsing Exp $ */
+/* $OpenBSD: ssl_stat.c,v 1.14 2017/05/07 04:22:24 beck Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -578,88 +578,94 @@ SSL_alert_desc_string(int value)
 	const char *str;
 
 	switch (value & 0xff) {
-	case SSL_AD_CLOSE_NOTIFY:
+	case SSL3_AD_CLOSE_NOTIFY:
 		str = "CN";
 		break;
-	case SSL_AD_UNEXPECTED_MESSAGE:
+	case SSL3_AD_UNEXPECTED_MESSAGE:
 		str = "UM";
 		break;
-	case SSL_AD_BAD_RECORD_MAC:
+	case SSL3_AD_BAD_RECORD_MAC:
 		str = "BM";
 		break;
-	case SSL_AD_DECOMPRESSION_FAILURE:
+	case SSL3_AD_DECOMPRESSION_FAILURE:
 		str = "DF";
 		break;
-	case SSL_AD_HANDSHAKE_FAILURE:
+	case SSL3_AD_HANDSHAKE_FAILURE:
 		str = "HF";
 		break;
-	case SSL_AD_BAD_CERTIFICATE:
+	case SSL3_AD_NO_CERTIFICATE:
+		str = "NC";
+		break;
+	case SSL3_AD_BAD_CERTIFICATE:
 		str = "BC";
 		break;
-	case SSL_AD_UNSUPPORTED_CERTIFICATE:
+	case SSL3_AD_UNSUPPORTED_CERTIFICATE:
 		str = "UC";
 		break;
-	case SSL_AD_CERTIFICATE_REVOKED:
+	case SSL3_AD_CERTIFICATE_REVOKED:
 		str = "CR";
 		break;
-	case SSL_AD_CERTIFICATE_EXPIRED:
+	case SSL3_AD_CERTIFICATE_EXPIRED:
 		str = "CE";
 		break;
-	case SSL_AD_CERTIFICATE_UNKNOWN:
+	case SSL3_AD_CERTIFICATE_UNKNOWN:
 		str = "CU";
 		break;
-	case SSL_AD_ILLEGAL_PARAMETER:
+	case SSL3_AD_ILLEGAL_PARAMETER:
 		str = "IP";
 		break;
-	case SSL_AD_RECORD_OVERFLOW:
+	case TLS1_AD_DECRYPTION_FAILED:
+		str = "DC";
+		break;
+	case TLS1_AD_RECORD_OVERFLOW:
 		str = "RO";
 		break;
-	case SSL_AD_UNKNOWN_CA:
+	case TLS1_AD_UNKNOWN_CA:
 		str = "CA";
 		break;
-	case SSL_AD_ACCESS_DENIED:
+	case TLS1_AD_ACCESS_DENIED:
 		str = "AD";
 		break;
-	case SSL_AD_DECODE_ERROR:
+	case TLS1_AD_DECODE_ERROR:
 		str = "DE";
 		break;
-	case SSL_AD_DECRYPT_ERROR:
+	case TLS1_AD_DECRYPT_ERROR:
 		str = "CY";
 		break;
-	case SSL_AD_PROTOCOL_VERSION:
+	case TLS1_AD_EXPORT_RESTRICTION:
+		str = "ER";
+		break;
+	case TLS1_AD_PROTOCOL_VERSION:
 		str = "PV";
 		break;
-	case SSL_AD_INSUFFICIENT_SECURITY:
+	case TLS1_AD_INSUFFICIENT_SECURITY:
 		str = "IS";
 		break;
-	case SSL_AD_INTERNAL_ERROR:
+	case TLS1_AD_INTERNAL_ERROR:
 		str = "IE";
 		break;
-	case SSL_AD_USER_CANCELLED:
+	case TLS1_AD_USER_CANCELLED:
 		str = "US";
 		break;
-	case SSL_AD_NO_RENEGOTIATION:
+	case TLS1_AD_NO_RENEGOTIATION:
 		str = "NR";
 		break;
-	case SSL_AD_MISSING_EXTENSION:
-		str = "ME";
-		break;
-	case SSL_AD_UNSUPPORTED_EXTENSION:
+	case TLS1_AD_UNSUPPORTED_EXTENSION:
 		str = "UE";
 		break;
-	case SSL_AD_CERTIFICATE_UNOBTAINABLE:
+	case TLS1_AD_CERTIFICATE_UNOBTAINABLE:
 		str = "CO";
 		break;
-	case SSL_AD_UNRECOGNIZED_NAME:
+	case TLS1_AD_UNRECOGNIZED_NAME:
 		str = "UN";
 		break;
-	case SSL_AD_BAD_CERTIFICATE_STATUS_RESPONSE:
+	case TLS1_AD_BAD_CERTIFICATE_STATUS_RESPONSE:
 		str = "BR";
 		break;
-	case SSL_AD_BAD_CERTIFICATE_HASH_VALUE:
+	case TLS1_AD_BAD_CERTIFICATE_HASH_VALUE:
 		str = "BH";
 		break;
-	case SSL_AD_UNKNOWN_PSK_IDENTITY:
+	case TLS1_AD_UNKNOWN_PSK_IDENTITY:
 		str = "UP";
 		break;
 	default:
@@ -675,88 +681,94 @@ SSL_alert_desc_string_long(int value)
 	const char *str;
 
 	switch (value & 0xff) {
-	case SSL_AD_CLOSE_NOTIFY:
+	case SSL3_AD_CLOSE_NOTIFY:
 		str = "close notify";
 		break;
-	case SSL_AD_UNEXPECTED_MESSAGE:
+	case SSL3_AD_UNEXPECTED_MESSAGE:
 		str = "unexpected_message";
 		break;
-	case SSL_AD_BAD_RECORD_MAC:
+	case SSL3_AD_BAD_RECORD_MAC:
 		str = "bad record mac";
 		break;
-	case SSL_AD_DECOMPRESSION_FAILURE:
+	case SSL3_AD_DECOMPRESSION_FAILURE:
 		str = "decompression failure";
 		break;
-	case SSL_AD_HANDSHAKE_FAILURE:
+	case SSL3_AD_HANDSHAKE_FAILURE:
 		str = "handshake failure";
 		break;
-	case SSL_AD_BAD_CERTIFICATE:
+	case SSL3_AD_NO_CERTIFICATE:
+		str = "no certificate";
+		break;
+	case SSL3_AD_BAD_CERTIFICATE:
 		str = "bad certificate";
 		break;
-	case SSL_AD_UNSUPPORTED_CERTIFICATE:
+	case SSL3_AD_UNSUPPORTED_CERTIFICATE:
 		str = "unsupported certificate";
 		break;
-	case SSL_AD_CERTIFICATE_REVOKED:
+	case SSL3_AD_CERTIFICATE_REVOKED:
 		str = "certificate revoked";
 		break;
-	case SSL_AD_CERTIFICATE_EXPIRED:
+	case SSL3_AD_CERTIFICATE_EXPIRED:
 		str = "certificate expired";
 		break;
-	case SSL_AD_CERTIFICATE_UNKNOWN:
+	case SSL3_AD_CERTIFICATE_UNKNOWN:
 		str = "certificate unknown";
 		break;
-	case SSL_AD_ILLEGAL_PARAMETER:
+	case SSL3_AD_ILLEGAL_PARAMETER:
 		str = "illegal parameter";
 		break;
-	case SSL_AD_RECORD_OVERFLOW:
+	case TLS1_AD_DECRYPTION_FAILED:
+		str = "decryption failed";
+		break;
+	case TLS1_AD_RECORD_OVERFLOW:
 		str = "record overflow";
 		break;
-	case SSL_AD_UNKNOWN_CA:
+	case TLS1_AD_UNKNOWN_CA:
 		str = "unknown CA";
 		break;
-	case SSL_AD_ACCESS_DENIED:
+	case TLS1_AD_ACCESS_DENIED:
 		str = "access denied";
 		break;
-	case SSL_AD_DECODE_ERROR:
+	case TLS1_AD_DECODE_ERROR:
 		str = "decode error";
 		break;
-	case SSL_AD_DECRYPT_ERROR:
+	case TLS1_AD_DECRYPT_ERROR:
 		str = "decrypt error";
 		break;
-	case SSL_AD_PROTOCOL_VERSION:
+	case TLS1_AD_EXPORT_RESTRICTION:
+		str = "export restriction";
+		break;
+	case TLS1_AD_PROTOCOL_VERSION:
 		str = "protocol version";
 		break;
-	case SSL_AD_INSUFFICIENT_SECURITY:
+	case TLS1_AD_INSUFFICIENT_SECURITY:
 		str = "insufficient security";
 		break;
-	case SSL_AD_INTERNAL_ERROR:
+	case TLS1_AD_INTERNAL_ERROR:
 		str = "internal error";
 		break;
-	case SSL_AD_USER_CANCELLED:
+	case TLS1_AD_USER_CANCELLED:
 		str = "user canceled";
 		break;
-	case SSL_AD_NO_RENEGOTIATION:
+	case TLS1_AD_NO_RENEGOTIATION:
 		str = "no renegotiation";
 		break;
-	case SSL_AD_MISSING_EXTENSION:
-		str = "missing extension";
-		break;
-	case SSL_AD_UNSUPPORTED_EXTENSION:
+	case TLS1_AD_UNSUPPORTED_EXTENSION:
 		str = "unsupported extension";
 		break;
-	case SSL_AD_CERTIFICATE_UNOBTAINABLE:
+	case TLS1_AD_CERTIFICATE_UNOBTAINABLE:
 		str = "certificate unobtainable";
 		break;
-	case SSL_AD_UNRECOGNIZED_NAME:
+	case TLS1_AD_UNRECOGNIZED_NAME:
 		str = "unrecognized name";
 		break;
-	case SSL_AD_BAD_CERTIFICATE_STATUS_RESPONSE:
+	case TLS1_AD_BAD_CERTIFICATE_STATUS_RESPONSE:
 		str = "bad certificate status response";
 		break;
-	case SSL_AD_BAD_CERTIFICATE_HASH_VALUE:
+	case TLS1_AD_BAD_CERTIFICATE_HASH_VALUE:
 		str = "bad certificate hash value";
 		break;
-	case SSL_AD_UNKNOWN_PSK_IDENTITY:
+	case TLS1_AD_UNKNOWN_PSK_IDENTITY:
 		str = "unknown PSK identity";
 		break;
 	default:
