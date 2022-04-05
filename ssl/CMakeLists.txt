@@ -36,9 +36,6 @@ set(
 	ssl_versions.c
 	t1_enc.c
 	t1_lib.c
-	tls_content.c
-	tls12_key_schedule.c
-	tls12_lib.c
 	tls12_record_layer.c
 	tls13_buffer.c
 	tls13_client.c
@@ -54,15 +51,7 @@ set(
 	tls13_server.c
 )
 
-add_library(ssl_obj OBJECT ${SSL_SRC})
-target_include_directories(ssl_obj
-	PRIVATE
-		.
-		../include/compat
-	PUBLIC
-		../include)
-
-add_library(ssl $<TARGET_OBJECTS:ssl_obj>)
+add_library(ssl ${SSL_SRC})
 target_include_directories(ssl
 	PRIVATE
 		.

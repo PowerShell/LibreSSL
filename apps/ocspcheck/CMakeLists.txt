@@ -14,8 +14,7 @@ else()
 endif()
 
 check_function_exists(strtonum HAVE_STRTONUM)
-if(HAVE_STRTONUM AND CMAKE_SYSTEM_NAME MATCHES "Darwin" AND
-    CMAKE_HOST_SYSTEM_VERSION VERSION_GREATER_EQUAL 20)
+if(HAVE_STRTONUM)
 	add_definitions(-DHAVE_STRTONUM)
 else()
 	set(OCSPCHECK_SRC ${OCSPCHECK_SRC} compat/strtonum.c)

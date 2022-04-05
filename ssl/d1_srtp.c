@@ -1,4 +1,4 @@
-/* $OpenBSD: d1_srtp.c,v 1.29 2021/06/11 15:28:13 landry Exp $ */
+/* $OpenBSD: d1_srtp.c,v 1.26 2020/10/11 02:44:27 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -118,13 +118,12 @@
 #include <stdio.h>
 
 #include <openssl/objects.h>
-#include <openssl/opensslconf.h>
+
+#include "ssl_locl.h"
 
 #ifndef OPENSSL_NO_SRTP
 
 #include "bytestring.h"
-#include "dtls_locl.h"
-#include "ssl_locl.h"
 #include "srtp.h"
 
 static const SRTP_PROTECTION_PROFILE srtp_known_profiles[] = {
@@ -135,14 +134,6 @@ static const SRTP_PROTECTION_PROFILE srtp_known_profiles[] = {
 	{
 		"SRTP_AES128_CM_SHA1_32",
 		SRTP_AES128_CM_SHA1_32,
-	},
-	{
-		"SRTP_AEAD_AES_128_GCM",
-		SRTP_AEAD_AES_128_GCM,
-	},
-	{
-		"SRTP_AEAD_AES_256_GCM",
-		SRTP_AEAD_AES_256_GCM,
 	},
 	{0}
 };

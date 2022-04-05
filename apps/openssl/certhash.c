@@ -1,4 +1,3 @@
-/*	$OpenBSD: certhash.c,v 1.18 2021/08/28 08:16:39 tb Exp $ */
 /*
  * Copyright (c) 2014, 2015 Joel Sing <jsing@openbsd.org>
  *

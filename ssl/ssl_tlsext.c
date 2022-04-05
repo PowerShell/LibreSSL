@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_tlsext.c,v 1.99 2021/09/10 09:25:29 tb Exp $ */
+/* $OpenBSD: ssl_tlsext.c,v 1.89 2021/03/29 16:46:09 jsing Exp $ */
 /*
  * Copyright (c) 2016, 2017, 2019 Joel Sing <jsing@openbsd.org>
  * Copyright (c) 2017 Doug Hogan <doug@openbsd.org>
@@ -20,10 +20,10 @@
 #include <ctype.h>
 
 #include <openssl/ocsp.h>
-#include <openssl/opensslconf.h>
+
+#include "ssl_locl.h"
 
 #include "bytestring.h"
-#include "ssl_locl.h"
 #include "ssl_sigalgs.h"
 #include "ssl_tlsext.h"
 
@@ -85,16 +85,9 @@ tlsext_alpn_server_parse(SSL *s, uint16_t msg_types, CBS *cbs, int *alert)
 	if (s->ctx->internal->alpn_select_cb == NULL)
 		return 1;
 
-	/*
-	 * XXX - A few things should be considered here:
-	 * 1. Ensure that the same protocol is selected on session resumption.
-	 * 2. Should the callback be called even if no ALPN extension was sent?
-	 * 3. TLSv1.2 and earlier: ensure that SNI has already been processed.
-	 */
 	r = s->ctx->internal->alpn_select_cb(s, &selected, &selected_len,
 	    CBS_data(&alpn), CBS_len(&alpn),
 	    s->ctx->internal->alpn_select_cb_arg);
-
 	if (r == SSL_TLSEXT_ERR_OK) {
 		free(S3I(s)->alpn_selected);
 		if ((S3I(s)->alpn_selected = malloc(selected_len)) == NULL) {
@@ -104,18 +97,9 @@ tlsext_alpn_server_parse(SSL *s, uint16_t msg_types, CBS *cbs, int *alert)
 		}
 		memcpy(S3I(s)->alpn_selected, selected, selected_len);
 		S3I(s)->alpn_selected_len = selected_len;
-
-		return 1;
 	}
 
-	/* On SSL_TLSEXT_ERR_NOACK behave as if no callback was present. */
-	if (r == SSL_TLSEXT_ERR_NOACK)
-		return 1;
-
-	*alert = SSL_AD_NO_APPLICATION_PROTOCOL;
-	SSLerror(s, SSL_R_NO_APPLICATION_PROTOCOL);
-
-	return 0;
+	return 1;
 
  err:
 	*alert = SSL_AD_DECODE_ERROR;
@@ -155,7 +139,7 @@ tlsext_alpn_client_parse(SSL *s, uint16_t msg_type, CBS *cbs, int *alert)
 	CBS list, proto;
 
 	if (s->internal->alpn_client_proto_list == NULL) {
-		*alert = SSL_AD_UNSUPPORTED_EXTENSION;
+		*alert = TLS1_AD_UNSUPPORTED_EXTENSION;
 		return 0;
 	}
 
@@ -179,7 +163,7 @@ tlsext_alpn_client_parse(SSL *s, uint16_t msg_type, CBS *cbs, int *alert)
 	return 1;
 
  err:
-	*alert = SSL_AD_DECODE_ERROR;
+	*alert = TLS1_AD_DECODE_ERROR;
 	return 0;
 }
 
@@ -274,7 +258,7 @@ tlsext_supportedgroups_server_parse(SSL *s, uint16_t msg_type, CBS *cbs,
 
 		if ((groups = reallocarray(NULL, groups_len,
 		    sizeof(uint16_t))) == NULL) {
-			*alert = SSL_AD_INTERNAL_ERROR;
+			*alert = TLS1_AD_INTERNAL_ERROR;
 			return 0;
 		}
 
@@ -297,7 +281,7 @@ tlsext_supportedgroups_server_parse(SSL *s, uint16_t msg_type, CBS *cbs,
 	return 1;
 
  err:
-	*alert = SSL_AD_DECODE_ERROR;
+	*alert = TLS1_AD_DECODE_ERROR;
 	return 0;
 }
 
@@ -329,7 +313,7 @@ tlsext_supportedgroups_client_parse(SSL *s, uint16_t msg_type, CBS *cbs,
 	 *  https://support.f5.com/csp/article/K37345003
 	 */
 	if (!CBS_skip(cbs, CBS_len(cbs))) {
-		*alert = SSL_AD_INTERNAL_ERROR;
+		*alert = TLS1_AD_INTERNAL_ERROR;
 		return 0;
 	}
 
@@ -369,28 +353,31 @@ tlsext_ecpf_parse(SSL *s, uint16_t msg_type, CBS *cbs, int *alert)
 	CBS ecpf;
 
 	if (!CBS_get_u8_length_prefixed(cbs, &ecpf))
-		return 0;
+		goto err;
 	if (CBS_len(&ecpf) == 0)
-		return 0;
+		goto err;
 	if (CBS_len(cbs) != 0)
-		return 0;
+		goto err;
 
-	/* Must contain uncompressed (0) - RFC 8422, section 5.1.2. */
+	/* Must contain uncompressed (0) */
 	if (!CBS_contains_zero_byte(&ecpf)) {
 		SSLerror(s, SSL_R_TLS_INVALID_ECPOINTFORMAT_LIST);
-		*alert = SSL_AD_ILLEGAL_PARAMETER;
-		return 0;
+		goto err;
 	}
 
 	if (!s->internal->hit) {
 		if (!CBS_stow(&ecpf, &(SSI(s)->tlsext_ecpointformatlist),
 		    &(SSI(s)->tlsext_ecpointformatlist_length))) {
-			*alert = SSL_AD_INTERNAL_ERROR;
+			*alert = TLS1_AD_INTERNAL_ERROR;
 			return 0;
 		}
 	}
 
 	return 1;
+
+ err:
+	*alert = SSL_AD_DECODE_ERROR;
+	return 0;
 }
 
 int
@@ -521,7 +508,7 @@ tlsext_ri_client_parse(SSL *s, uint16_t msg_type, CBS *cbs, int *alert)
 	    S3I(s)->previous_server_finished_len != 0) ||
 	    (S3I(s)->previous_client_finished_len != 0 &&
 	    S3I(s)->previous_server_finished_len == 0)) {
-		*alert = SSL_AD_INTERNAL_ERROR;
+		*alert = TLS1_AD_INTERNAL_ERROR;
 		return 0;
 	}
 
@@ -574,16 +561,21 @@ tlsext_sigalgs_client_needs(SSL *s, uint16_t msg_type)
 int
 tlsext_sigalgs_client_build(SSL *s, uint16_t msg_type, CBB *cbb)
 {
-	uint16_t tls_version = S3I(s)->hs.negotiated_tls_version;
+	const uint16_t *tls_sigalgs = tls12_sigalgs;
+	size_t tls_sigalgs_len = tls12_sigalgs_len;
 	CBB sigalgs;
 
-	if (msg_type == SSL_TLSEXT_MSG_CH)
-		tls_version = S3I(s)->hs.our_min_tls_version;
+	if (S3I(s)->hs.our_min_tls_version >= TLS1_3_VERSION) {
+		tls_sigalgs = tls13_sigalgs;
+		tls_sigalgs_len = tls13_sigalgs_len;
+	}
 
 	if (!CBB_add_u16_length_prefixed(cbb, &sigalgs))
 		return 0;
-	if (!ssl_sigalgs_build(tls_version, &sigalgs))
+
+	if (!ssl_sigalgs_build(&sigalgs, tls_sigalgs, tls_sigalgs_len))
 		return 0;
+
 	if (!CBB_flush(cbb))
 		return 0;
 
@@ -614,12 +606,21 @@ tlsext_sigalgs_server_needs(SSL *s, uint16_t msg_type)
 int
 tlsext_sigalgs_server_build(SSL *s, uint16_t msg_type, CBB *cbb)
 {
+	const uint16_t *tls_sigalgs = tls12_sigalgs;
+	size_t tls_sigalgs_len = tls12_sigalgs_len;
 	CBB sigalgs;
+
+	if (S3I(s)->hs.negotiated_tls_version >= TLS1_3_VERSION) {
+		tls_sigalgs = tls13_sigalgs;
+		tls_sigalgs_len = tls13_sigalgs_len;
+	}
 
 	if (!CBB_add_u16_length_prefixed(cbb, &sigalgs))
 		return 0;
-	if (!ssl_sigalgs_build(S3I(s)->hs.negotiated_tls_version, &sigalgs))
+
+	if (!ssl_sigalgs_build(&sigalgs, tls_sigalgs, tls_sigalgs_len))
 		return 0;
+
 	if (!CBB_flush(cbb))
 		return 0;
 
@@ -739,7 +740,7 @@ tlsext_sni_server_parse(SSL *s, uint16_t msg_type, CBS *cbs, int *alert)
 	 * other implementations appear more tolerant.
 	 */
 	if (name_type != TLSEXT_NAMETYPE_host_name) {
-		*alert = SSL_AD_ILLEGAL_PARAMETER;
+		*alert = SSL3_AD_ILLEGAL_PARAMETER;
 		goto err;
 	}
 
@@ -754,25 +755,25 @@ tlsext_sni_server_parse(SSL *s, uint16_t msg_type, CBS *cbs, int *alert)
 		goto err;
 
 	if (!tlsext_sni_is_valid_hostname(&host_name)) {
-		*alert = SSL_AD_ILLEGAL_PARAMETER;
+		*alert = SSL3_AD_ILLEGAL_PARAMETER;
 		goto err;
 	}
 
 	if (s->internal->hit || S3I(s)->hs.tls13.hrr) {
 		if (s->session->tlsext_hostname == NULL) {
-			*alert = SSL_AD_UNRECOGNIZED_NAME;
+			*alert = TLS1_AD_UNRECOGNIZED_NAME;
 			goto err;
 		}
 		if (!CBS_mem_equal(&host_name, s->session->tlsext_hostname,
 		    strlen(s->session->tlsext_hostname))) {
-			*alert = SSL_AD_UNRECOGNIZED_NAME;
+			*alert = TLS1_AD_UNRECOGNIZED_NAME;
 			goto err;
 		}
 	} else {
 		if (s->session->tlsext_hostname != NULL)
 			goto err;
 		if (!CBS_strdup(&host_name, &s->session->tlsext_hostname)) {
-			*alert = SSL_AD_INTERNAL_ERROR;
+			*alert = TLS1_AD_INTERNAL_ERROR;
 			goto err;
 		}
 	}
@@ -782,7 +783,7 @@ tlsext_sni_server_parse(SSL *s, uint16_t msg_type, CBS *cbs, int *alert)
 	 * therefore we allow only one entry.
 	 */
 	if (CBS_len(&server_name_list) != 0) {
-		*alert = SSL_AD_ILLEGAL_PARAMETER;
+		*alert = SSL3_AD_ILLEGAL_PARAMETER;
 		goto err;
 	}
 	if (CBS_len(cbs) != 0)
@@ -813,18 +814,18 @@ int
 tlsext_sni_client_parse(SSL *s, uint16_t msg_type, CBS *cbs, int *alert)
 {
 	if (s->tlsext_hostname == NULL || CBS_len(cbs) != 0) {
-		*alert = SSL_AD_UNRECOGNIZED_NAME;
+		*alert = TLS1_AD_UNRECOGNIZED_NAME;
 		return 0;
 	}
 
 	if (s->internal->hit) {
 		if (s->session->tlsext_hostname == NULL) {
-			*alert = SSL_AD_UNRECOGNIZED_NAME;
+			*alert = TLS1_AD_UNRECOGNIZED_NAME;
 			return 0;
 		}
 		if (strcmp(s->tlsext_hostname,
 		    s->session->tlsext_hostname) != 0) {
-			*alert = SSL_AD_UNRECOGNIZED_NAME;
+			*alert = TLS1_AD_UNRECOGNIZED_NAME;
 			return 0;
 		}
 	} else {
@@ -834,7 +835,7 @@ tlsext_sni_client_parse(SSL *s, uint16_t msg_type, CBS *cbs, int *alert)
 		}
 		if ((s->session->tlsext_hostname =
 		    strdup(s->tlsext_hostname)) == NULL) {
-			*alert = SSL_AD_INTERNAL_ERROR;
+			*alert = TLS1_AD_INTERNAL_ERROR;
 			return 0;
 		}
 	}
@@ -919,7 +920,7 @@ tlsext_ocsp_server_parse(SSL *s, uint16_t msg_type, CBS *cbs, int *alert)
 		s->tlsext_status_type = -1;
 
 		if (!CBS_skip(cbs, CBS_len(cbs))) {
-			*alert = SSL_AD_INTERNAL_ERROR;
+			*alert = TLS1_AD_INTERNAL_ERROR;
 			return 0;
 		}
 		return 1;
@@ -1053,7 +1054,7 @@ tlsext_ocsp_client_parse(SSL *s, uint16_t msg_type, CBS *cbs, int *alert)
 		}
 	} else {
 		if (s->tlsext_status_type == -1) {
-			*alert = SSL_AD_UNSUPPORTED_EXTENSION;
+			*alert = TLS1_AD_UNSUPPORTED_EXTENSION;
 			return 0;
 		}
 		/* Set flag to expect CertificateStatus message */
@@ -1137,14 +1138,14 @@ tlsext_sessionticket_server_parse(SSL *s, uint16_t msg_type, CBS *cbs,
 		if (!s->internal->tls_session_ticket_ext_cb(s, CBS_data(cbs),
 		    (int)CBS_len(cbs),
 		    s->internal->tls_session_ticket_ext_cb_arg)) {
-			*alert = SSL_AD_INTERNAL_ERROR;
+			*alert = TLS1_AD_INTERNAL_ERROR;
 			return 0;
 		}
 	}
 
 	/* We need to signal that this was processed fully */
 	if (!CBS_skip(cbs, CBS_len(cbs))) {
-		*alert = SSL_AD_INTERNAL_ERROR;
+		*alert = TLS1_AD_INTERNAL_ERROR;
 		return 0;
 	}
 
@@ -1173,13 +1174,13 @@ tlsext_sessionticket_client_parse(SSL *s, uint16_t msg_type, CBS *cbs,
 		if (!s->internal->tls_session_ticket_ext_cb(s, CBS_data(cbs),
 		    (int)CBS_len(cbs),
 		    s->internal->tls_session_ticket_ext_cb_arg)) {
-			*alert = SSL_AD_INTERNAL_ERROR;
+			*alert = TLS1_AD_INTERNAL_ERROR;
 			return 0;
 		}
 	}
 
 	if ((SSL_get_options(s) & SSL_OP_NO_TICKET) != 0 || CBS_len(cbs) > 0) {
-		*alert = SSL_AD_UNSUPPORTED_EXTENSION;
+		*alert = TLS1_AD_UNSUPPORTED_EXTENSION;
 		return 0;
 	}
 
@@ -2099,14 +2100,10 @@ tlsext_parse(SSL *s, int is_server, uint16_t msg_type, CBS *cbs, int *alert)
 			goto err;
 
 		if (s->internal->tlsext_debug_cb != NULL)
-			s->internal->tlsext_debug_cb(s, !is_server, type,
+			s->internal->tlsext_debug_cb(s, is_server, type,
 			    (unsigned char *)CBS_data(&extension_data),
 			    CBS_len(&extension_data),
 			    s->internal->tlsext_debug_arg);
-
-		/* Unknown extensions are ignored. */
-		if ((tlsext = tls_extension_find(type, &idx)) == NULL)
-			continue;
 
 		if (tls_version >= TLS1_3_VERSION && is_server &&
 		    msg_type == SSL_TLSEXT_MSG_CH) {
@@ -2114,6 +2111,10 @@ tlsext_parse(SSL *s, int is_server, uint16_t msg_type, CBS *cbs, int *alert)
 			    &extension_data))
 				goto err;
 		}
+
+		/* Unknown extensions are ignored. */
+		if ((tlsext = tls_extension_find(type, &idx)) == NULL)
+			continue;
 
 		/* RFC 8446 Section 4.2 */
 		if (tls_version >= TLS1_3_VERSION &&

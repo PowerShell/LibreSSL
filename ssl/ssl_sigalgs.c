@@ -1,7 +1,6 @@
-/* $OpenBSD: ssl_sigalgs.c,v 1.37 2021/06/29 19:36:14 jsing Exp $ */
+/* $OpenBSD: ssl_sigalgs.c,v 1.23 2021/03/10 18:27:02 jsing Exp $ */
 /*
  * Copyright (c) 2018-2020 Bob Beck <beck@openbsd.org>
- * Copyright (c) 2021 Joel Sing <jsing@openbsd.org>
  *
  * Permission to use, copy, modify, and/or distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -15,12 +14,10 @@
  * OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-
 #include <string.h>
 #include <stdlib.h>
 
 #include <openssl/evp.h>
-#include <openssl/opensslconf.h>
 
 #include "bytestring.h"
 #include "ssl_locl.h"
@@ -30,101 +27,101 @@
 const struct ssl_sigalg sigalgs[] = {
 	{
 		.value = SIGALG_RSA_PKCS1_SHA512,
-		.key_type = EVP_PKEY_RSA,
 		.md = EVP_sha512,
+		.key_type = EVP_PKEY_RSA,
 	},
 	{
 		.value = SIGALG_ECDSA_SECP521R1_SHA512,
-		.key_type = EVP_PKEY_EC,
 		.md = EVP_sha512,
+		.key_type = EVP_PKEY_EC,
 		.curve_nid = NID_secp521r1,
 	},
 #ifndef OPENSSL_NO_GOST
 	{
 		.value = SIGALG_GOSTR12_512_STREEBOG_512,
-		.key_type = EVP_PKEY_GOSTR12_512,
 		.md = EVP_streebog512,
+		.key_type = EVP_PKEY_GOSTR12_512,
 	},
 #endif
 	{
 		.value = SIGALG_RSA_PKCS1_SHA384,
-		.key_type = EVP_PKEY_RSA,
 		.md = EVP_sha384,
+		.key_type = EVP_PKEY_RSA,
 	},
 	{
 		.value = SIGALG_ECDSA_SECP384R1_SHA384,
-		.key_type = EVP_PKEY_EC,
 		.md = EVP_sha384,
+		.key_type = EVP_PKEY_EC,
 		.curve_nid = NID_secp384r1,
 	},
 	{
 		.value = SIGALG_RSA_PKCS1_SHA256,
-		.key_type = EVP_PKEY_RSA,
 		.md = EVP_sha256,
+		.key_type = EVP_PKEY_RSA,
 	},
 	{
 		.value = SIGALG_ECDSA_SECP256R1_SHA256,
-		.key_type = EVP_PKEY_EC,
 		.md = EVP_sha256,
+		.key_type = EVP_PKEY_EC,
 		.curve_nid = NID_X9_62_prime256v1,
 	},
 #ifndef OPENSSL_NO_GOST
 	{
 		.value = SIGALG_GOSTR12_256_STREEBOG_256,
-		.key_type = EVP_PKEY_GOSTR12_256,
 		.md = EVP_streebog256,
+		.key_type = EVP_PKEY_GOSTR12_256,
 	},
 	{
 		.value = SIGALG_GOSTR01_GOST94,
-		.key_type = EVP_PKEY_GOSTR01,
 		.md = EVP_gostr341194,
+		.key_type = EVP_PKEY_GOSTR01,
 	},
 #endif
 	{
 		.value = SIGALG_RSA_PSS_RSAE_SHA256,
-		.key_type = EVP_PKEY_RSA,
 		.md = EVP_sha256,
+		.key_type = EVP_PKEY_RSA,
 		.flags = SIGALG_FLAG_RSA_PSS,
 	},
 	{
 		.value = SIGALG_RSA_PSS_RSAE_SHA384,
-		.key_type = EVP_PKEY_RSA,
 		.md = EVP_sha384,
+		.key_type = EVP_PKEY_RSA,
 		.flags = SIGALG_FLAG_RSA_PSS,
 	},
 	{
 		.value = SIGALG_RSA_PSS_RSAE_SHA512,
-		.key_type = EVP_PKEY_RSA,
 		.md = EVP_sha512,
+		.key_type = EVP_PKEY_RSA,
 		.flags = SIGALG_FLAG_RSA_PSS,
 	},
 	{
 		.value = SIGALG_RSA_PSS_PSS_SHA256,
-		.key_type = EVP_PKEY_RSA,
 		.md = EVP_sha256,
+		.key_type = EVP_PKEY_RSA,
 		.flags = SIGALG_FLAG_RSA_PSS,
 	},
 	{
 		.value = SIGALG_RSA_PSS_PSS_SHA384,
-		.key_type = EVP_PKEY_RSA,
 		.md = EVP_sha384,
+		.key_type = EVP_PKEY_RSA,
 		.flags = SIGALG_FLAG_RSA_PSS,
 	},
 	{
 		.value = SIGALG_RSA_PSS_PSS_SHA512,
-		.key_type = EVP_PKEY_RSA,
 		.md = EVP_sha512,
+		.key_type = EVP_PKEY_RSA,
 		.flags = SIGALG_FLAG_RSA_PSS,
 	},
 	{
 		.value = SIGALG_RSA_PKCS1_SHA224,
-		.key_type = EVP_PKEY_RSA,
 		.md = EVP_sha224,
+		.key_type = EVP_PKEY_RSA,
 	},
 	{
 		.value = SIGALG_ECDSA_SECP224R1_SHA224,
-		.key_type = EVP_PKEY_EC,
 		.md = EVP_sha224,
+		.key_type = EVP_PKEY_EC,
 	},
 	{
 		.value = SIGALG_RSA_PKCS1_SHA1,
@@ -146,7 +143,7 @@ const struct ssl_sigalg sigalgs[] = {
 	},
 };
 
-/* Sigalgs for TLSv1.3, in preference order. */
+/* Sigalgs for tls 1.3, in preference order, */
 const uint16_t tls13_sigalgs[] = {
 	SIGALG_RSA_PSS_RSAE_SHA512,
 	SIGALG_RSA_PKCS1_SHA512,
@@ -160,7 +157,7 @@ const uint16_t tls13_sigalgs[] = {
 };
 const size_t tls13_sigalgs_len = (sizeof(tls13_sigalgs) / sizeof(tls13_sigalgs[0]));
 
-/* Sigalgs for TLSv1.2, in preference order. */
+/* Sigalgs for tls 1.2, in preference order, */
 const uint16_t tls12_sigalgs[] = {
 	SIGALG_RSA_PSS_RSAE_SHA512,
 	SIGALG_RSA_PKCS1_SHA512,
@@ -176,122 +173,85 @@ const uint16_t tls12_sigalgs[] = {
 };
 const size_t tls12_sigalgs_len = (sizeof(tls12_sigalgs) / sizeof(tls12_sigalgs[0]));
 
-static void
-ssl_sigalgs_for_version(uint16_t tls_version, const uint16_t **out_values,
-    size_t *out_len)
-{
-	if (tls_version >= TLS1_3_VERSION) {
-		*out_values = tls13_sigalgs;
-		*out_len = tls13_sigalgs_len;
-	} else {
-		*out_values = tls12_sigalgs;
-		*out_len = tls12_sigalgs_len;
-	}
-}
-
-static const struct ssl_sigalg *
-ssl_sigalg_lookup(uint16_t value)
+const struct ssl_sigalg *
+ssl_sigalg_lookup(uint16_t sigalg)
 {
 	int i;
 
 	for (i = 0; sigalgs[i].value != SIGALG_NONE; i++) {
-		if (sigalgs[i].value == value)
+		if (sigalgs[i].value == sigalg)
 			return &sigalgs[i];
 	}
 
 	return NULL;
 }
 
-static const struct ssl_sigalg *
-ssl_sigalg_from_value(SSL *s, uint16_t value)
+const struct ssl_sigalg *
+ssl_sigalg(uint16_t sigalg, const uint16_t *values, size_t len)
 {
-	const uint16_t *values;
-	size_t len;
 	int i;
 
-	ssl_sigalgs_for_version(S3I(s)->hs.negotiated_tls_version,
-	    &values, &len);
-
 	for (i = 0; i < len; i++) {
-		if (values[i] == value)
-			return ssl_sigalg_lookup(value);
+		if (values[i] == sigalg)
+			return ssl_sigalg_lookup(sigalg);
 	}
 
 	return NULL;
 }
 
 int
-ssl_sigalgs_build(uint16_t tls_version, CBB *cbb)
+ssl_sigalgs_build(CBB *cbb, const uint16_t *values, size_t len)
 {
-	const uint16_t *values;
-	size_t len;
 	size_t i;
 
-	ssl_sigalgs_for_version(tls_version, &values, &len);
+	for (i = 0; sigalgs[i].value != SIGALG_NONE; i++);
+	if (len > i)
+		return 0;
+
+	/* XXX check for duplicates and other sanity BS? */
 
 	/* Add values in order as long as they are supported. */
 	for (i = 0; i < len; i++) {
-		/* Do not allow the legacy value for < 1.2 to be used. */
+		/* Do not allow the legacy value for < 1.2 to be used */
 		if (values[i] == SIGALG_RSA_PKCS1_MD5_SHA1)
 			return 0;
-		if (ssl_sigalg_lookup(values[i]) == NULL)
-			return 0;
-		if (!CBB_add_u16(cbb, values[i]))
+
+		if (ssl_sigalg_lookup(values[i]) != NULL) {
+			if (!CBB_add_u16(cbb, values[i]))
+				return 0;
+		} else
 			return 0;
 	}
 	return 1;
 }
 
-static const struct ssl_sigalg *
-ssl_sigalg_for_legacy(SSL *s, EVP_PKEY *pkey)
-{
-	/* Default signature algorithms used for TLSv1.2 and earlier. */
-	switch (pkey->type) {
-	case EVP_PKEY_RSA:
-		if (S3I(s)->hs.negotiated_tls_version < TLS1_2_VERSION)
-			return ssl_sigalg_lookup(SIGALG_RSA_PKCS1_MD5_SHA1);
-		return ssl_sigalg_lookup(SIGALG_RSA_PKCS1_SHA1);
-	case EVP_PKEY_EC:
-		return ssl_sigalg_lookup(SIGALG_ECDSA_SHA1);
-#ifndef OPENSSL_NO_GOST
-	case EVP_PKEY_GOSTR01:
-		return ssl_sigalg_lookup(SIGALG_GOSTR01_GOST94);
-#endif
-	}
-	SSLerror(s, SSL_R_UNKNOWN_PKEY_TYPE);
-	return (NULL);
-}
-
-static int
-ssl_sigalg_pkey_ok(SSL *s, const struct ssl_sigalg *sigalg, EVP_PKEY *pkey)
+int
+ssl_sigalg_pkey_ok(const struct ssl_sigalg *sigalg, EVP_PKEY *pkey,
+    int check_curve)
 {
 	if (sigalg == NULL || pkey == NULL)
 		return 0;
 	if (sigalg->key_type != pkey->type)
 		return 0;
 
-	/* RSA PSS must have a sufficiently large RSA key. */
 	if ((sigalg->flags & SIGALG_FLAG_RSA_PSS)) {
+		/*
+		 * RSA PSS Must have an RSA key that needs to be at
+		 * least as big as twice the size of the hash + 2
+		 */
 		if (pkey->type != EVP_PKEY_RSA ||
 		    EVP_PKEY_size(pkey) < (2 * EVP_MD_size(sigalg->md()) + 2))
 			return 0;
 	}
 
-	if (S3I(s)->hs.negotiated_tls_version < TLS1_3_VERSION)
-		return 1;
-
-	/* RSA cannot be used without PSS in TLSv1.3. */
-	if (sigalg->key_type == EVP_PKEY_RSA &&
-	    (sigalg->flags & SIGALG_FLAG_RSA_PSS) == 0)
-		return 0;
-
-	/* Ensure that curve matches for EC keys. */
-	if (pkey->type == EVP_PKEY_EC) {
+	if (pkey->type == EVP_PKEY_EC && check_curve) {
+		/* Curve must match for EC keys. */
 		if (sigalg->curve_nid == 0)
 			return 0;
-		if (EC_GROUP_get_curve_name(EC_KEY_get0_group(
-		    EVP_PKEY_get0_EC_KEY(pkey))) != sigalg->curve_nid)
+		if (EC_GROUP_get_curve_name(EC_KEY_get0_group
+		    (EVP_PKEY_get0_EC_KEY(pkey))) != sigalg->curve_nid) {
 			return 0;
+		}
 	}
 
 	return 1;
@@ -300,56 +260,78 @@ ssl_sigalg_pkey_ok(SSL *s, const struct ssl_sigalg *sigalg, EVP_PKEY *pkey)
 const struct ssl_sigalg *
 ssl_sigalg_select(SSL *s, EVP_PKEY *pkey)
 {
+	const uint16_t *tls_sigalgs = tls12_sigalgs;
+	size_t tls_sigalgs_len = tls12_sigalgs_len;
+	int check_curve = 0;
 	CBS cbs;
 
-	if (!SSL_USE_SIGALGS(s))
-		return ssl_sigalg_for_legacy(s, pkey);
+	if (S3I(s)->hs.negotiated_tls_version >= TLS1_3_VERSION) {
+		tls_sigalgs = tls13_sigalgs;
+		tls_sigalgs_len = tls13_sigalgs_len;
+		check_curve = 1;
+	}
+
+	/* Pre TLS 1.2 defaults */
+	if (!SSL_USE_SIGALGS(s)) {
+		switch (pkey->type) {
+		case EVP_PKEY_RSA:
+			return ssl_sigalg_lookup(SIGALG_RSA_PKCS1_MD5_SHA1);
+		case EVP_PKEY_EC:
+			return ssl_sigalg_lookup(SIGALG_ECDSA_SHA1);
+#ifndef OPENSSL_NO_GOST
+		case EVP_PKEY_GOSTR01:
+			return ssl_sigalg_lookup(SIGALG_GOSTR01_GOST94);
+#endif
+		}
+		SSLerror(s, SSL_R_UNKNOWN_PKEY_TYPE);
+		return (NULL);
+	}
 
 	/*
-	 * RFC 5246 allows a TLS 1.2 client to send no sigalgs extension,
-	 * in which case the server must use the default.
+	 * RFC 5246 allows a TLS 1.2 client to send no sigalgs, in
+	 * which case the server must use the the default.
 	 */
 	if (S3I(s)->hs.negotiated_tls_version < TLS1_3_VERSION &&
-	    S3I(s)->hs.sigalgs == NULL)
-		return ssl_sigalg_for_legacy(s, pkey);
+	    S3I(s)->hs.sigalgs == NULL) {
+		switch (pkey->type) {
+		case EVP_PKEY_RSA:
+			return ssl_sigalg_lookup(SIGALG_RSA_PKCS1_SHA1);
+		case EVP_PKEY_EC:
+			return ssl_sigalg_lookup(SIGALG_ECDSA_SHA1);
+#ifndef OPENSSL_NO_GOST
+		case EVP_PKEY_GOSTR01:
+			return ssl_sigalg_lookup(SIGALG_GOSTR01_GOST94);
+#endif
+		}
+		SSLerror(s, SSL_R_UNKNOWN_PKEY_TYPE);
+		return (NULL);
+	}
 
 	/*
 	 * If we get here, we have client or server sent sigalgs, use one.
 	 */
 	CBS_init(&cbs, S3I(s)->hs.sigalgs, S3I(s)->hs.sigalgs_len);
 	while (CBS_len(&cbs) > 0) {
+		uint16_t sig_alg;
 		const struct ssl_sigalg *sigalg;
-		uint16_t sigalg_value;
 
-		if (!CBS_get_u16(&cbs, &sigalg_value))
+		if (!CBS_get_u16(&cbs, &sig_alg))
 			return 0;
 
-		if ((sigalg = ssl_sigalg_from_value(s, sigalg_value)) == NULL)
+		if ((sigalg = ssl_sigalg(sig_alg, tls_sigalgs,
+		    tls_sigalgs_len)) == NULL)
 			continue;
-		if (ssl_sigalg_pkey_ok(s, sigalg, pkey))
+
+		/* RSA cannot be used without PSS in TLSv1.3. */
+		if (S3I(s)->hs.negotiated_tls_version >= TLS1_3_VERSION &&
+		    sigalg->key_type == EVP_PKEY_RSA &&
+		    (sigalg->flags & SIGALG_FLAG_RSA_PSS) == 0)
+			continue;
+
+		if (ssl_sigalg_pkey_ok(sigalg, pkey, check_curve))
 			return sigalg;
 	}
 
 	SSLerror(s, SSL_R_UNKNOWN_PKEY_TYPE);
 	return NULL;
-}
-
-const struct ssl_sigalg *
-ssl_sigalg_for_peer(SSL *s, EVP_PKEY *pkey, uint16_t sigalg_value)
-{
-	const struct ssl_sigalg *sigalg;
-
-	if (!SSL_USE_SIGALGS(s))
-		return ssl_sigalg_for_legacy(s, pkey);
-
-	if ((sigalg = ssl_sigalg_from_value(s, sigalg_value)) == NULL) {
-		SSLerror(s, SSL_R_UNKNOWN_DIGEST);
-		return (NULL);
-	}
-	if (!ssl_sigalg_pkey_ok(s, sigalg, pkey)) {
-		SSLerror(s, SSL_R_WRONG_SIGNATURE_TYPE);
-		return (NULL);
-	}
-
-	return sigalg;
 }

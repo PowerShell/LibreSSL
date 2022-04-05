@@ -62,12 +62,12 @@
  * [including the GNU Public Licence.]
  */
 
-#define NUM_NID 1016
-#define NUM_SN 1009
-#define NUM_LN 1009
-#define NUM_OBJ 939
+#define NUM_NID 1014
+#define NUM_SN 1007
+#define NUM_LN 1007
+#define NUM_OBJ 937
 
-static const unsigned char lvalues[6618]={
+static const unsigned char lvalues[6599]={
 0x2A,0x86,0x48,0x86,0xF7,0x0D,               /* [  0] OBJ_rsadsi */
 0x2A,0x86,0x48,0x86,0xF7,0x0D,0x01,          /* [  6] OBJ_pkcs */
 0x2A,0x86,0x48,0x86,0xF7,0x0D,0x02,0x02,     /* [ 13] OBJ_md2 */
@@ -999,8 +999,6 @@ static const unsigned char lvalues[6618]={
 0x2B,0x06,0x01,0x05,0x05,0x07,0x30,0x0B,     /* [6571] OBJ_signedObject */
 0x2B,0x06,0x01,0x05,0x05,0x07,0x30,0x0D,     /* [6579] OBJ_rpkiNotify */
 0x2A,0x86,0x48,0x86,0xF7,0x0D,0x01,0x09,0x10,0x01,0x2F,/* [6587] OBJ_id_ct_geofeedCSVwithCRLF */
-0x2A,0x86,0x48,0x86,0xF7,0x0D,0x01,0x09,0x10,0x01,0x30,/* [6598] OBJ_id_ct_signedChecklist */
-0x2B,0x06,0x01,0x05,0x05,0x07,0x03,0x1E,     /* [6609] OBJ_id_kp_bgpsec_router */
 };
 
 static const ASN1_OBJECT nid_objs[NUM_NID]={
@@ -2649,10 +2647,6 @@ static const ASN1_OBJECT nid_objs[NUM_NID]={
 {"rpkiNotify","RPKI Notify",NID_rpkiNotify,8,&(lvalues[6579]),0},
 {"id-ct-geofeedCSVwithCRLF","id-ct-geofeedCSVwithCRLF",
 	NID_id_ct_geofeedCSVwithCRLF,11,&(lvalues[6587]),0},
-{"id-ct-signedChecklist","id-ct-signedChecklist",
-	NID_id_ct_signedChecklist,11,&(lvalues[6598]),0},
-{"id-kp-bgpsec-router","BGPsec Router",NID_id_kp_bgpsec_router,8,
-	&(lvalues[6609]),0},
 };
 
 static const unsigned int sn_objs[NUM_SN]={
@@ -3144,7 +3138,6 @@ static const unsigned int sn_objs[NUM_SN]={
 1001,	/* "id-ct-routeOriginAuthz" */
 1003,	/* "id-ct-rpkiGhostbusters" */
 1002,	/* "id-ct-rpkiManifest" */
-1014,	/* "id-ct-signedChecklist" */
 408,	/* "id-ecPublicKey" */
 508,	/* "id-hex-multipart-message" */
 507,	/* "id-hex-partial-message" */
@@ -3166,7 +3159,6 @@ static const unsigned int sn_objs[NUM_SN]={
 784,	/* "id-it-suppLangTags" */
 304,	/* "id-it-unsupportedOIDs" */
 128,	/* "id-kp" */
-1015,	/* "id-kp-bgpsec-router" */
 280,	/* "id-mod-attribute-cert" */
 274,	/* "id-mod-cmc" */
 277,	/* "id-mod-cmp" */
@@ -3674,7 +3666,6 @@ static const unsigned int ln_objs[NUM_LN]={
 910,	/* "Any Extended Key Usage" */
 664,	/* "Any language" */
 177,	/* "Authority Information Access" */
-1015,	/* "BGPsec Router" */
 365,	/* "Basic OCSP Response" */
 285,	/* "Biometric Info" */
 179,	/* "CA Issuers" */
@@ -4154,7 +4145,6 @@ static const unsigned int ln_objs[NUM_LN]={
 1001,	/* "id-ct-routeOriginAuthz" */
 1003,	/* "id-ct-rpkiGhostbusters" */
 1002,	/* "id-ct-rpkiManifest" */
-1014,	/* "id-ct-signedChecklist" */
 408,	/* "id-ecPublicKey" */
 508,	/* "id-hex-multipart-message" */
 507,	/* "id-hex-partial-message" */
@@ -5224,7 +5214,6 @@ static const unsigned int obj_objs[NUM_OBJ]={
 133,	/* OBJ_time_stamp                   1 3 6 1 5 5 7 3 8 */
 180,	/* OBJ_OCSP_sign                    1 3 6 1 5 5 7 3 9 */
 297,	/* OBJ_dvcs                         1 3 6 1 5 5 7 3 10 */
-1015,	/* OBJ_id_kp_bgpsec_router          1 3 6 1 5 5 7 3 30 */
 298,	/* OBJ_id_it_caProtEncCert          1 3 6 1 5 5 7 4 1 */
 299,	/* OBJ_id_it_signKeyPairTypes       1 3 6 1 5 5 7 4 2 */
 300,	/* OBJ_id_it_encKeyPairTypes        1 3 6 1 5 5 7 4 3 */
@@ -5561,7 +5550,6 @@ static const unsigned int obj_objs[NUM_OBJ]={
 1003,	/* OBJ_id_ct_rpkiGhostbusters       1 2 840 113549 1 9 16 1 35 */
 1004,	/* OBJ_id_ct_resourceTaggedAttest   1 2 840 113549 1 9 16 1 36 */
 1013,	/* OBJ_id_ct_geofeedCSVwithCRLF     1 2 840 113549 1 9 16 1 47 */
-1014,	/* OBJ_id_ct_signedChecklist        1 2 840 113549 1 9 16 1 48 */
 212,	/* OBJ_id_smime_aa_receiptRequest   1 2 840 113549 1 9 16 2 1 */
 213,	/* OBJ_id_smime_aa_securityLabel    1 2 840 113549 1 9 16 2 2 */
 214,	/* OBJ_id_smime_aa_mlExpandHistory  1 2 840 113549 1 9 16 2 3 */

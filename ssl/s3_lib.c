@@ -1,4 +1,4 @@
-/* $OpenBSD: s3_lib.c,v 1.215 2021/09/08 12:56:14 tb Exp $ */
+/* $OpenBSD: s3_lib.c,v 1.206 2021/03/24 18:43:59 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -156,12 +156,9 @@
 #include <openssl/dh.h>
 #include <openssl/md5.h>
 #include <openssl/objects.h>
-#include <openssl/opensslconf.h>
 
-#include "bytestring.h"
-#include "dtls_locl.h"
 #include "ssl_locl.h"
-#include "ssl_sigalgs.h"
+#include "bytestring.h"
 
 #define SSL3_NUM_CIPHERS	(sizeof(ssl3_ciphers) / sizeof(SSL_CIPHER))
 
@@ -1548,7 +1545,7 @@ ssl3_new(SSL *s)
 		return (0);
 	}
 
-	s->method->ssl_clear(s);
+	s->method->internal->ssl_clear(s);
 
 	return (1);
 }
@@ -1573,7 +1570,7 @@ ssl3_free(SSL *s)
 	freezero(S3I(s)->hs.tls13.cookie, S3I(s)->hs.tls13.cookie_len);
 	tls13_clienthello_hash_clear(&S3I(s)->hs.tls13);
 
-	sk_X509_NAME_pop_free(S3I(s)->hs.tls12.ca_names, X509_NAME_free);
+	sk_X509_NAME_pop_free(S3I(s)->tmp.ca_names, X509_NAME_free);
 
 	tls1_transcript_free(s);
 	tls1_transcript_hash_free(s);
@@ -1594,7 +1591,7 @@ ssl3_clear(SSL *s)
 	size_t		 rlen, wlen;
 
 	tls1_cleanup_key_block(s);
-	sk_X509_NAME_pop_free(S3I(s)->hs.tls12.ca_names, X509_NAME_free);
+	sk_X509_NAME_pop_free(S3I(s)->tmp.ca_names, X509_NAME_free);
 
 	DH_free(S3I(s)->tmp.dh);
 	S3I(s)->tmp.dh = NULL;
@@ -1630,7 +1627,6 @@ ssl3_clear(SSL *s)
 
 	free(S3I(s)->alpn_selected);
 	S3I(s)->alpn_selected = NULL;
-	S3I(s)->alpn_selected_len = 0;
 
 	memset(S3I(s), 0, sizeof(*S3I(s)));
 	internal = S3I(s);
@@ -1809,12 +1805,6 @@ _SSL_set_tlsext_debug_arg(SSL *s, void *arg)
 }
 
 static int
-_SSL_get_tlsext_status_type(SSL *s)
-{
-	return s->tlsext_status_type;
-}
-
-static int
 _SSL_set_tlsext_status_type(SSL *s, int type)
 {
 	s->tlsext_status_type = type;
@@ -1936,64 +1926,6 @@ SSL_set1_groups_list(SSL *s, const char *groups)
 	    &s->internal->tlsext_supportedgroups_length, groups);
 }
 
-static int
-_SSL_get_signature_nid(SSL *s, int *nid)
-{
-	const struct ssl_sigalg *sigalg;
-
-	if ((sigalg = S3I(s)->hs.our_sigalg) == NULL)
-		return 0;
-
-	*nid = EVP_MD_type(sigalg->md());
-
-	return 1;
-}
-
-static int
-_SSL_get_peer_signature_nid(SSL *s, int *nid)
-{
-	const struct ssl_sigalg *sigalg;
-
-	if ((sigalg = S3I(s)->hs.peer_sigalg) == NULL)
-		return 0;
-
-	*nid = EVP_MD_type(sigalg->md());
-
-	return 1;
-}
-
-int
-SSL_get_signature_type_nid(const SSL *s, int *nid)
-{
-	const struct ssl_sigalg *sigalg;
-
-	if ((sigalg = S3I(s)->hs.our_sigalg) == NULL)
-		return 0;
-
-	*nid = sigalg->key_type;
-	if (sigalg->key_type == EVP_PKEY_RSA &&
-	    (sigalg->flags & SIGALG_FLAG_RSA_PSS))
-		*nid = EVP_PKEY_RSA_PSS;
-
-	return 1;
-}
-
-int
-SSL_get_peer_signature_type_nid(const SSL *s, int *nid)
-{
-	const struct ssl_sigalg *sigalg;
-
-	if ((sigalg = S3I(s)->hs.peer_sigalg) == NULL)
-		return 0;
-
-	*nid = sigalg->key_type;
-	if (sigalg->key_type == EVP_PKEY_RSA &&
-	    (sigalg->flags & SIGALG_FLAG_RSA_PSS))
-		*nid = EVP_PKEY_RSA_PSS;
-
-	return 1;
-}
-
 long
 ssl3_ctrl(SSL *s, int cmd, long larg, void *parg)
 {
@@ -2039,9 +1971,6 @@ ssl3_ctrl(SSL *s, int cmd, long larg, void *parg)
 
 	case SSL_CTRL_SET_TLSEXT_DEBUG_ARG:
 		return _SSL_set_tlsext_debug_arg(s, parg);
-
-	case SSL_CTRL_GET_TLSEXT_STATUS_REQ_TYPE:
-		return _SSL_get_tlsext_status_type(s);
 
 	case SSL_CTRL_SET_TLSEXT_STATUS_REQ_TYPE:
 		return _SSL_set_tlsext_status_type(s, larg);
@@ -2106,12 +2035,6 @@ ssl3_ctrl(SSL *s, int cmd, long larg, void *parg)
 		if (larg < 0 || larg > UINT16_MAX)
 			return 0;
 		return SSL_set_max_proto_version(s, larg);
-
-	case SSL_CTRL_GET_SIGNATURE_NID:
-		return _SSL_get_signature_nid(s, parg);
-
-	case SSL_CTRL_GET_PEER_SIGNATURE_NID:
-		return _SSL_get_peer_signature_nid(s, parg);
 
 	/*
 	 * Legacy controls that should eventually be removed.
@@ -2493,6 +2416,51 @@ ssl3_ctx_callback_ctrl(SSL_CTX *ctx, int cmd, void (*fp)(void))
 	return 0;
 }
 
+/*
+ * This function needs to check if the ciphers required are actually available.
+ */
+const SSL_CIPHER *
+ssl3_get_cipher_by_char(const unsigned char *p)
+{
+	uint16_t cipher_value;
+	CBS cbs;
+
+	/* We have to assume it is at least 2 bytes due to existing API. */
+	CBS_init(&cbs, p, 2);
+	if (!CBS_get_u16(&cbs, &cipher_value))
+		return NULL;
+
+	return ssl3_get_cipher_by_value(cipher_value);
+}
+
+int
+ssl3_put_cipher_by_char(const SSL_CIPHER *c, unsigned char *p)
+{
+	CBB cbb;
+
+	if (p == NULL)
+		return (2);
+
+	if ((c->id & ~SSL3_CK_VALUE_MASK) != SSL3_CK_ID)
+		return (0);
+
+	memset(&cbb, 0, sizeof(cbb));
+
+	/* We have to assume it is at least 2 bytes due to existing API. */
+	if (!CBB_init_fixed(&cbb, p, 2))
+		goto err;
+	if (!CBB_add_u16(&cbb, ssl3_cipher_get_value(c)))
+		goto err;
+	if (!CBB_finish(&cbb, NULL, NULL))
+		goto err;
+
+	return (2);
+
+ err:
+	CBB_cleanup(&cbb);
+	return (0);
+}
+
 SSL_CIPHER *
 ssl3_choose_cipher(SSL *s, STACK_OF(SSL_CIPHER) *clnt,
     STACK_OF(SSL_CIPHER) *srvr)
@@ -2640,7 +2608,7 @@ ssl3_shutdown(SSL *s)
 			return(-1);	/* return WANT_WRITE */
 	} else if (S3I(s)->alert_dispatch) {
 		/* resend it if not sent */
-		ret = ssl3_dispatch_alert(s);
+		ret = s->method->ssl_dispatch_alert(s);
 		if (ret == -1) {
 			/*
 			 * We only get to return -1 here the 2nd/Nth
@@ -2652,7 +2620,7 @@ ssl3_shutdown(SSL *s)
 		}
 	} else if (!(s->internal->shutdown & SSL_RECEIVED_SHUTDOWN)) {
 		/* If we are waiting for a close from our peer, we are closed */
-		s->method->ssl_read_bytes(s, 0, NULL, 0, 0);
+		s->method->internal->ssl_read_bytes(s, 0, NULL, 0, 0);
 		if (!(s->internal->shutdown & SSL_RECEIVED_SHUTDOWN)) {
 			return(-1);	/* return WANT_READ */
 		}
@@ -2673,8 +2641,8 @@ ssl3_write(SSL *s, const void *buf, int len)
 	if (S3I(s)->renegotiate)
 		ssl3_renegotiate_check(s);
 
-	return s->method->ssl_write_bytes(s, SSL3_RT_APPLICATION_DATA,
-	    buf, len);
+	return s->method->internal->ssl_write_bytes(s,
+	    SSL3_RT_APPLICATION_DATA, buf, len);
 }
 
 static int
@@ -2686,9 +2654,8 @@ ssl3_read_internal(SSL *s, void *buf, int len, int peek)
 	if (S3I(s)->renegotiate)
 		ssl3_renegotiate_check(s);
 	S3I(s)->in_read_app_data = 1;
-
-	ret = s->method->ssl_read_bytes(s, SSL3_RT_APPLICATION_DATA, buf, len,
-	    peek);
+	ret = s->method->internal->ssl_read_bytes(s,
+	    SSL3_RT_APPLICATION_DATA, buf, len, peek);
 	if ((ret == -1) && (S3I(s)->in_read_app_data == 2)) {
 		/*
 		 * ssl3_read_bytes decided to call s->internal->handshake_func,
@@ -2698,8 +2665,8 @@ ssl3_read_internal(SSL *s, void *buf, int len, int peek)
 		 * handshake processing and try to read application data again.
 		 */
 		s->internal->in_handshake++;
-		ret = s->method->ssl_read_bytes(s, SSL3_RT_APPLICATION_DATA,
-		    buf, len, peek);
+		ret = s->method->internal->ssl_read_bytes(s,
+		    SSL3_RT_APPLICATION_DATA, buf, len, peek);
 		s->internal->in_handshake--;
 	} else
 		S3I(s)->in_read_app_data = 0;
