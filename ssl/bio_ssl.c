@@ -1,4 +1,4 @@
-/* $OpenBSD: bio_ssl.c,v 1.31 2021/07/01 17:53:39 jsing Exp $ */
+/* $OpenBSD: bio_ssl.c,v 1.33 2022/01/14 09:12:53 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -66,6 +66,7 @@
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 
+#include "bio_local.h"
 #include "ssl_locl.h"
 
 static int ssl_write(BIO *h, const char *buf, int num);
@@ -74,7 +75,7 @@ static int ssl_puts(BIO *h, const char *str);
 static long ssl_ctrl(BIO *h, int cmd, long arg1, void *arg2);
 static int ssl_new(BIO *h);
 static int ssl_free(BIO *data);
-static long ssl_callback_ctrl(BIO *h, int cmd, bio_info_cb *fp);
+static long ssl_callback_ctrl(BIO *h, int cmd, BIO_info_cb *fp);
 typedef struct bio_ssl_st {
 	SSL *ssl; /* The ssl handle :-) */
 	/* re-negotiate every time the total number of bytes is this size */
@@ -462,7 +463,7 @@ ssl_ctrl(BIO *b, int cmd, long num, void *ptr)
 }
 
 static long
-ssl_callback_ctrl(BIO *b, int cmd, bio_info_cb *fp)
+ssl_callback_ctrl(BIO *b, int cmd, BIO_info_cb *fp)
 {
 	SSL *ssl;
 	BIO_SSL *bs;

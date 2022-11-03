@@ -1,4 +1,4 @@
-/* $OpenBSD: t1_enc.c,v 1.151 2021/07/01 17:53:39 jsing Exp $ */
+/* $OpenBSD: t1_enc.c,v 1.154 2022/02/05 14:54:10 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -149,8 +149,8 @@
 void
 tls1_cleanup_key_block(SSL *s)
 {
-	tls12_key_block_free(S3I(s)->hs.tls12.key_block);
-	S3I(s)->hs.tls12.key_block = NULL;
+	tls12_key_block_free(s->s3->hs.tls12.key_block);
+	s->s3->hs.tls12.key_block = NULL;
 }
 
 /*
@@ -164,8 +164,8 @@ tls1_P_hash(const EVP_MD *md, const unsigned char *secret, size_t secret_len,
 {
 	unsigned char A1[EVP_MAX_MD_SIZE], hmac[EVP_MAX_MD_SIZE];
 	size_t A1_len, hmac_len;
-	EVP_MD_CTX ctx;
-	EVP_PKEY *mac_key;
+	EVP_MD_CTX *ctx = NULL;
+	EVP_PKEY *mac_key = NULL;
 	int ret = 0;
 	int chunk;
 	size_t i;
@@ -173,42 +173,43 @@ tls1_P_hash(const EVP_MD *md, const unsigned char *secret, size_t secret_len,
 	chunk = EVP_MD_size(md);
 	OPENSSL_assert(chunk >= 0);
 
-	EVP_MD_CTX_init(&ctx);
+	if ((ctx = EVP_MD_CTX_new()) == NULL)
+		goto err;
 
 	mac_key = EVP_PKEY_new_mac_key(EVP_PKEY_HMAC, NULL, secret, secret_len);
-	if (!mac_key)
+	if (mac_key == NULL)
 		goto err;
-	if (!EVP_DigestSignInit(&ctx, NULL, md, NULL, mac_key))
+	if (!EVP_DigestSignInit(ctx, NULL, md, NULL, mac_key))
 		goto err;
-	if (seed1 && !EVP_DigestSignUpdate(&ctx, seed1, seed1_len))
+	if (seed1 && !EVP_DigestSignUpdate(ctx, seed1, seed1_len))
 		goto err;
-	if (seed2 && !EVP_DigestSignUpdate(&ctx, seed2, seed2_len))
+	if (seed2 && !EVP_DigestSignUpdate(ctx, seed2, seed2_len))
 		goto err;
-	if (seed3 && !EVP_DigestSignUpdate(&ctx, seed3, seed3_len))
+	if (seed3 && !EVP_DigestSignUpdate(ctx, seed3, seed3_len))
 		goto err;
-	if (seed4 && !EVP_DigestSignUpdate(&ctx, seed4, seed4_len))
+	if (seed4 && !EVP_DigestSignUpdate(ctx, seed4, seed4_len))
 		goto err;
-	if (seed5 && !EVP_DigestSignUpdate(&ctx, seed5, seed5_len))
+	if (seed5 && !EVP_DigestSignUpdate(ctx, seed5, seed5_len))
 		goto err;
-	if (!EVP_DigestSignFinal(&ctx, A1, &A1_len))
+	if (!EVP_DigestSignFinal(ctx, A1, &A1_len))
 		goto err;
 
 	for (;;) {
-		if (!EVP_DigestSignInit(&ctx, NULL, md, NULL, mac_key))
+		if (!EVP_DigestSignInit(ctx, NULL, md, NULL, mac_key))
 			goto err;
-		if (!EVP_DigestSignUpdate(&ctx, A1, A1_len))
+		if (!EVP_DigestSignUpdate(ctx, A1, A1_len))
 			goto err;
-		if (seed1 && !EVP_DigestSignUpdate(&ctx, seed1, seed1_len))
+		if (seed1 && !EVP_DigestSignUpdate(ctx, seed1, seed1_len))
 			goto err;
-		if (seed2 && !EVP_DigestSignUpdate(&ctx, seed2, seed2_len))
+		if (seed2 && !EVP_DigestSignUpdate(ctx, seed2, seed2_len))
 			goto err;
-		if (seed3 && !EVP_DigestSignUpdate(&ctx, seed3, seed3_len))
+		if (seed3 && !EVP_DigestSignUpdate(ctx, seed3, seed3_len))
 			goto err;
-		if (seed4 && !EVP_DigestSignUpdate(&ctx, seed4, seed4_len))
+		if (seed4 && !EVP_DigestSignUpdate(ctx, seed4, seed4_len))
 			goto err;
-		if (seed5 && !EVP_DigestSignUpdate(&ctx, seed5, seed5_len))
+		if (seed5 && !EVP_DigestSignUpdate(ctx, seed5, seed5_len))
 			goto err;
-		if (!EVP_DigestSignFinal(&ctx, hmac, &hmac_len))
+		if (!EVP_DigestSignFinal(ctx, hmac, &hmac_len))
 			goto err;
 
 		if (hmac_len > out_len)
@@ -223,18 +224,18 @@ tls1_P_hash(const EVP_MD *md, const unsigned char *secret, size_t secret_len,
 		if (out_len == 0)
 			break;
 
-		if (!EVP_DigestSignInit(&ctx, NULL, md, NULL, mac_key))
+		if (!EVP_DigestSignInit(ctx, NULL, md, NULL, mac_key))
 			goto err;
-		if (!EVP_DigestSignUpdate(&ctx, A1, A1_len))
+		if (!EVP_DigestSignUpdate(ctx, A1, A1_len))
 			goto err;
-		if (!EVP_DigestSignFinal(&ctx, A1, &A1_len))
+		if (!EVP_DigestSignFinal(ctx, A1, &A1_len))
 			goto err;
 	}
 	ret = 1;
 
  err:
 	EVP_PKEY_free(mac_key);
-	EVP_MD_CTX_cleanup(&ctx);
+	EVP_MD_CTX_free(ctx);
 
 	explicit_bzero(A1, sizeof(A1));
 	explicit_bzero(hmac, sizeof(hmac));
@@ -256,7 +257,7 @@ tls1_PRF(SSL *s, const unsigned char *secret, size_t secret_len,
 	if (!ssl_get_handshake_evp_md(s, &md))
 		return (0);
 
-	if (md->type == NID_md5_sha1) {
+	if (EVP_MD_type(md) == NID_md5_sha1) {
 		/*
 		 * Partition secret between MD5 and SHA1, then XOR result.
 		 * If the secret length is odd, a one byte overlap is used.
@@ -302,10 +303,10 @@ tls1_change_cipher_state(SSL *s, int is_write)
 
 	/* Use client write keys on client write and server read. */
 	if ((!s->server && is_write) || (s->server && !is_write)) {
-		tls12_key_block_client_write(S3I(s)->hs.tls12.key_block,
+		tls12_key_block_client_write(s->s3->hs.tls12.key_block,
 		    &mac_key, &key, &iv);
 	} else {
-		tls12_key_block_server_write(S3I(s)->hs.tls12.key_block,
+		tls12_key_block_server_write(s->s3->hs.tls12.key_block,
 		    &mac_key, &key, &iv);
 	}
 
@@ -315,8 +316,6 @@ tls1_change_cipher_state(SSL *s, int is_write)
 			goto err;
 		if (SSL_is_dtls(s))
 			dtls1_reset_read_seq_numbers(s);
-		tls12_record_layer_read_cipher_hash(s->internal->rl,
-		    &s->enc_read_ctx, &s->read_hash);
 	} else {
 		if (!tls12_record_layer_change_write_cipher_state(s->internal->rl,
 		    &mac_key, &key, &iv))
@@ -355,7 +354,7 @@ tls1_setup_key_block(SSL *s)
 	 * XXX - callers should be changed so that they only call this
 	 * function once.
 	 */
-	if (S3I(s)->hs.tls12.key_block != NULL)
+	if (s->s3->hs.tls12.key_block != NULL)
 		return (1);
 
 	if (s->session->cipher &&
@@ -385,7 +384,7 @@ tls1_setup_key_block(SSL *s)
 	if (!tls12_key_block_generate(key_block, s, aead, cipher, mac_hash))
 		goto err;
 
-	S3I(s)->hs.tls12.key_block = key_block;
+	s->s3->hs.tls12.key_block = key_block;
 	key_block = NULL;
 
 	if (!(s->internal->options & SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS) &&
@@ -394,15 +393,15 @@ tls1_setup_key_block(SSL *s)
 		 * Enable vulnerability countermeasure for CBC ciphers with
 		 * known-IV problem (http://www.openssl.org/~bodo/tls-cbc.txt)
 		 */
-		S3I(s)->need_empty_fragments = 1;
+		s->s3->need_empty_fragments = 1;
 
 		if (s->session->cipher != NULL) {
 			if (s->session->cipher->algorithm_enc == SSL_eNULL)
-				S3I(s)->need_empty_fragments = 0;
+				s->s3->need_empty_fragments = 0;
 
 #ifndef OPENSSL_NO_RC4
 			if (s->session->cipher->algorithm_enc == SSL_RC4)
-				S3I(s)->need_empty_fragments = 0;
+				s->s3->need_empty_fragments = 0;
 #endif
 		}
 	}

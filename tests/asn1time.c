@@ -1,4 +1,4 @@
-/* $OpenBSD: asn1time.c,v 1.8 2015/12/28 14:18:38 bcook Exp $ */
+/* $OpenBSD: asn1time.c,v 1.16 2022/09/05 21:06:31 tb Exp $ */
 /*
  * Copyright (c) 2015 Joel Sing <jsing@openbsd.org>
  *
@@ -66,9 +66,49 @@ struct asn1_time_test asn1_invtime_tests[] = {
 	{
 		.str = "aaaaaaaaaaaaaaZ",
 	},
+	/* utc time with omitted seconds, should fail */
+	{
+		.str = "1609082343Z",
+	},
+};
+
+struct asn1_time_test asn1_invgentime_tests[] = {
+	/* Generalized time with omitted seconds, should fail */
+	{
+		.str = "201612081934Z",
+	},
+	/* Valid UTC time, should fail as a generalized time */
+	{
+		.str = "160908234300Z",
+	},
+};
+
+struct asn1_time_test asn1_goodtime_tests[] = {
+	{
+		.str = "99990908234339Z",
+		.time = 1,
+	},
+	{
+		.str = "201612081934Z",
+		.time = 1,
+	},
+	{
+		.str = "1609082343Z",
+		.time = 0,
+	},
 };
 
 struct asn1_time_test asn1_gentime_tests[] = {
+	{
+		.str = "20161208193400Z",
+		.data = "20161208193400Z",
+		.time = 1481225640,
+		.der = {
+			0x18, 0x0f, 0x32, 0x30, 0x31, 0x36, 0x31, 0x32,
+			0x30, 0x38, 0x31, 0x39, 0x33, 0x34, 0x30, 0x30,
+			0x5a,
+		},
+	},
 	{
 		.str = "19700101000000Z",
 		.data = "19700101000000Z",
@@ -132,6 +172,8 @@ struct asn1_time_test asn1_utctime_tests[] = {
 
 #define N_INVTIME_TESTS \
     (sizeof(asn1_invtime_tests) / sizeof(*asn1_invtime_tests))
+#define N_INVGENTIME_TESTS \
+    (sizeof(asn1_invgentime_tests) / sizeof(*asn1_invgentime_tests))
 #define N_GENTIME_TESTS \
     (sizeof(asn1_gentime_tests) / sizeof(*asn1_gentime_tests))
 #define N_UTCTIME_TESTS \
@@ -153,16 +195,17 @@ asn1_compare_bytes(int test_no, const unsigned char *d1,
     const unsigned char *d2, int len1, int len2)
 {
 	if (len1 != len2) {
-		fprintf(stderr, "FAIL: test %i - byte lengths differ "
-		    "(%i != %i)\n", test_no, len1, len2);
+		fprintf(stderr, "FAIL: test %d - byte lengths differ "
+		    "(%d != %d)\n", test_no, len1, len2);
 		return (1);
 	}
 	if (memcmp(d1, d2, len1) != 0) {
-		fprintf(stderr, "FAIL: test %i - bytes differ\n", test_no);
+		fprintf(stderr, "FAIL: test %d - bytes differ\n", test_no);
 		fprintf(stderr, "Got:\n");
 		hexdump(d1, len1);
 		fprintf(stderr, "Want:\n");
 		hexdump(d2, len2);
+		return (1);
 	}
 	return (0);
 }
@@ -173,12 +216,12 @@ asn1_compare_str(int test_no, struct asn1_string_st *asn1str, const char *str)
 	int length = strlen(str);
 
 	if (asn1str->length != length) {
-		fprintf(stderr, "FAIL: test %i - string lengths differ "
-		    "(%i != %i)\n", test_no, asn1str->length, length);
+		fprintf(stderr, "FAIL: test %d - string lengths differ "
+		    "(%d != %d)\n", test_no, asn1str->length, length);
 		return (1);
 	}
 	if (strncmp(asn1str->data, str, length) != 0) {
-		fprintf(stderr, "FAIL: test %i - strings differ "
+		fprintf(stderr, "FAIL: test %d - strings differ "
 		    "('%s' != '%s')\n", test_no, asn1str->data, str);
 		return (1);
 	}
@@ -187,7 +230,7 @@ asn1_compare_str(int test_no, struct asn1_string_st *asn1str, const char *str)
 }
 
 static int
-asn1_invtime_test(int test_no, struct asn1_time_test *att)
+asn1_invtime_test(int test_no, struct asn1_time_test *att, int gen)
 {
 	ASN1_GENERALIZEDTIME *gt = NULL;
 	ASN1_UTCTIME *ut = NULL;
@@ -202,17 +245,28 @@ asn1_invtime_test(int test_no, struct asn1_time_test *att)
 		goto done;
 
 	if (ASN1_GENERALIZEDTIME_set_string(gt, att->str) != 0) {
-		fprintf(stderr, "FAIL: test %i - successfully set "
+		fprintf(stderr, "FAIL: test %d - successfully set "
 		    "GENERALIZEDTIME string '%s'\n", test_no, att->str);
 		goto done;
 	}
+
+	if (gen)  {
+		failure = 0;
+		goto done;
+	}
+
 	if (ASN1_UTCTIME_set_string(ut, att->str) != 0) {
-		fprintf(stderr, "FAIL: test %i - successfully set UTCTIME "
+		fprintf(stderr, "FAIL: test %d - successfully set UTCTIME "
 		    "string '%s'\n", test_no, att->str);
 		goto done;
 	}
 	if (ASN1_TIME_set_string(t, att->str) != 0) {
-		fprintf(stderr, "FAIL: test %i - successfully set TIME "
+		fprintf(stderr, "FAIL: test %d - successfully set TIME "
+		    "string '%s'\n", test_no, att->str);
+		goto done;
+	}
+	if (ASN1_TIME_set_string_X509(t, att->str) != 0) {
+		fprintf(stderr, "FAIL: test %d - successfully set x509 TIME "
 		    "string '%s'\n", test_no, att->str);
 		goto done;
 	}
@@ -235,9 +289,10 @@ asn1_gentime_test(int test_no, struct asn1_time_test *att)
 	ASN1_GENERALIZEDTIME *gt = NULL;
 	int failure = 1;
 	int len;
+	struct tm tm;
 
 	if (ASN1_GENERALIZEDTIME_set_string(NULL, att->str) != 1) {
-		fprintf(stderr, "FAIL: test %i - failed to set string '%s'\n",
+		fprintf(stderr, "FAIL: test %d - failed to set string '%s'\n",
 		    test_no, att->str);
 		goto done;
 	}
@@ -246,15 +301,30 @@ asn1_gentime_test(int test_no, struct asn1_time_test *att)
 		goto done;
 
 	if (ASN1_GENERALIZEDTIME_set_string(gt, att->str) != 1) {
-		fprintf(stderr, "FAIL: test %i - failed to set string '%s'\n",
+		fprintf(stderr, "FAIL: test %d - failed to set string '%s'\n",
 		    test_no, att->str);
 		goto done;
 	}
 	if (asn1_compare_str(test_no, gt, att->str) != 0)
 		goto done;
 
+	if (ASN1_TIME_to_tm(gt, &tm) == 0)  {
+		fprintf(stderr, "FAIL: test %d - ASN1_time_to_tm failed '%s'\n",
+		    test_no, att->str);
+		goto done;
+	}
+
+	if (timegm(&tm) != att->time) {
+		/* things with crappy time_t should die in fire */
+		int64_t a = timegm(&tm);
+		int64_t b = att->time;
+		fprintf(stderr, "FAIL: test %d - times don't match, expected %lld got %lld\n",
+		    test_no, (long long)b, (long long)a);
+		goto done;
+	}
+
 	if ((len = i2d_ASN1_GENERALIZEDTIME(gt, &p)) <= 0) {
-		fprintf(stderr, "FAIL: test %i - i2d_ASN1_GENERALIZEDTIME "
+		fprintf(stderr, "FAIL: test %d - i2d_ASN1_GENERALIZEDTIME "
 		    "failed\n", test_no);
 		goto done;
 	}
@@ -264,7 +334,7 @@ asn1_gentime_test(int test_no, struct asn1_time_test *att)
 
 	len = strlen(att->der);
 	if (d2i_ASN1_GENERALIZEDTIME(&gt, &der, len) == NULL) {
-		fprintf(stderr, "FAIL: test %i - d2i_ASN1_GENERALIZEDTIME "
+		fprintf(stderr, "FAIL: test %d - d2i_ASN1_GENERALIZEDTIME "
 		    "failed\n", test_no);
 		goto done;
 	}
@@ -274,7 +344,7 @@ asn1_gentime_test(int test_no, struct asn1_time_test *att)
 	ASN1_GENERALIZEDTIME_free(gt);
 
 	if ((gt = ASN1_GENERALIZEDTIME_set(NULL, att->time)) == NULL) {
-		fprintf(stderr, "FAIL: test %i - failed to set time %lli\n",
+		fprintf(stderr, "FAIL: test %d - failed to set time %lld\n",
 		    test_no, (long long)att->time);
 		goto done;
 	}
@@ -300,7 +370,7 @@ asn1_utctime_test(int test_no, struct asn1_time_test *att)
 	int len;
 
 	if (ASN1_UTCTIME_set_string(NULL, att->str) != 1) {
-		fprintf(stderr, "FAIL: test %i - failed to set string '%s'\n",
+		fprintf(stderr, "FAIL: test %d - failed to set string '%s'\n",
 		    test_no, att->str);
 		goto done;
 	}
@@ -309,7 +379,7 @@ asn1_utctime_test(int test_no, struct asn1_time_test *att)
 		goto done;
 
 	if (ASN1_UTCTIME_set_string(ut, att->str) != 1) {
-		fprintf(stderr, "FAIL: test %i - failed to set string '%s'\n",
+		fprintf(stderr, "FAIL: test %d - failed to set string '%s'\n",
 		    test_no, att->str);
 		goto done;
 	}
@@ -317,7 +387,7 @@ asn1_utctime_test(int test_no, struct asn1_time_test *att)
 		goto done;
 
 	if ((len = i2d_ASN1_UTCTIME(ut, &p)) <= 0) {
-		fprintf(stderr, "FAIL: test %i - i2d_ASN1_UTCTIME failed\n",
+		fprintf(stderr, "FAIL: test %d - i2d_ASN1_UTCTIME failed\n",
 		    test_no);
 		goto done;
 	}
@@ -327,7 +397,7 @@ asn1_utctime_test(int test_no, struct asn1_time_test *att)
 
 	len = strlen(att->der);
 	if (d2i_ASN1_UTCTIME(&ut, &der, len) == NULL) {
-		fprintf(stderr, "FAIL: test %i - d2i_ASN1_UTCTIME failed\n",
+		fprintf(stderr, "FAIL: test %d - d2i_ASN1_UTCTIME failed\n",
 		    test_no);
 		goto done;
 	}
@@ -337,7 +407,7 @@ asn1_utctime_test(int test_no, struct asn1_time_test *att)
 	ASN1_UTCTIME_free(ut);
 
 	if ((ut = ASN1_UTCTIME_set(NULL, att->time)) == NULL) {
-		fprintf(stderr, "FAIL: test %i - failed to set time %lli\n",
+		fprintf(stderr, "FAIL: test %d - failed to set time %lld\n",
 		    test_no, (long long)att->time);
 		goto done;
 	}
@@ -356,11 +426,11 @@ asn1_utctime_test(int test_no, struct asn1_time_test *att)
 static int
 asn1_time_test(int test_no, struct asn1_time_test *att, int type)
 {
-	ASN1_TIME *t = NULL;
+	ASN1_TIME *t = NULL, *tx509 = NULL;
 	int failure = 1;
 
 	if (ASN1_TIME_set_string(NULL, att->str) != 1) {
-		fprintf(stderr, "FAIL: test %i - failed to set string '%s'\n",
+		fprintf(stderr, "FAIL: test %d - failed to set string '%s'\n",
 		    test_no, att->str);
 		goto done;
 	}
@@ -368,23 +438,51 @@ asn1_time_test(int test_no, struct asn1_time_test *att, int type)
 	if ((t = ASN1_TIME_new()) == NULL)
 		goto done;
 
+	if ((tx509 = ASN1_TIME_new()) == NULL)
+		goto done;
+
 	if (ASN1_TIME_set_string(t, att->str) != 1) {
-		fprintf(stderr, "FAIL: test %i - failed to set string '%s'\n",
+		fprintf(stderr, "FAIL: test %d - failed to set string '%s'\n",
 		    test_no, att->str);
 		goto done;
 	}
 
 	if (t->type != type) {
-		fprintf(stderr, "FAIL: test %i - got type %i, want %i\n",
+		fprintf(stderr, "FAIL: test %d - got type %d, want %d\n",
 		    test_no, t->type, type);
 		goto done;
 	}
+
+	if (ASN1_TIME_normalize(t) != 1) {
+		fprintf(stderr, "FAIL: test %d - failed to set normalize '%s'\n",
+		    test_no, att->str);
+		goto done;
+	}
+
+	if (ASN1_TIME_set_string_X509(tx509, t->data) != 1) {
+		fprintf(stderr, "FAIL: test %d - failed to set string X509 '%s'\n",
+		    test_no, t->data);
+		goto done;
+	}
+
+	if (t->type != tx509->type) {
+		fprintf(stderr, "FAIL: test %d - type %d, different from %d\n",
+		    test_no, t->type, tx509->type);
+		goto done;
+	}
+
+	if (ASN1_TIME_compare(t, tx509) != 0) {
+		fprintf(stderr, "FAIL: ASN1_TIME values differ!\n");
+		goto done;
+	}
+
 
 	failure = 0;
 
  done:
 
 	ASN1_TIME_free(t);
+	ASN1_TIME_free(tx509);
 
 	return (failure);
 }
@@ -399,7 +497,13 @@ main(int argc, char **argv)
 	fprintf(stderr, "Invalid time tests...\n");
 	for (i = 0; i < N_INVTIME_TESTS; i++) {
 		att = &asn1_invtime_tests[i];
-		failed |= asn1_invtime_test(i, att);
+		failed |= asn1_invtime_test(i, att, 0);
+	}
+
+	fprintf(stderr, "Invalid generalized time tests...\n");
+	for (i = 0; i < N_INVGENTIME_TESTS; i++) {
+		att = &asn1_invgentime_tests[i];
+		failed |= asn1_invtime_test(i, att, 1);
 	}
 
 	fprintf(stderr, "GENERALIZEDTIME tests...\n");

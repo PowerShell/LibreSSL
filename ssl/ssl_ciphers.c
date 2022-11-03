@@ -1,4 +1,4 @@
-/*	$OpenBSD: ssl_ciphers.c,v 1.11 2021/03/11 17:14:46 jsing Exp $ */
+/*	$OpenBSD: ssl_ciphers.c,v 1.15 2022/07/02 16:31:04 tb Exp $ */
 /*
  * Copyright (c) 2015-2017 Doug Hogan <doug@openbsd.org>
  * Copyright (c) 2015-2018, 2020 Joel Sing <jsing@openbsd.org>
@@ -70,6 +70,8 @@ ssl_cipher_list_to_bytes(SSL *s, STACK_OF(SSL_CIPHER) *ciphers, CBB *cbb)
 		if (!ssl_cipher_allowed_in_tls_version_range(cipher, min_vers,
 		    max_vers))
 			continue;
+		if (!ssl_security_cipher_check(s, cipher))
+			continue;
 		if (!CBB_add_u16(cbb, ssl3_cipher_get_value(cipher)))
 			return 0;
 
@@ -96,7 +98,7 @@ ssl_bytes_to_cipher_list(SSL *s, CBS *cbs)
 	uint16_t cipher_value;
 	unsigned long cipher_id;
 
-	S3I(s)->send_connection_binding = 0;
+	s->s3->send_connection_binding = 0;
 
 	if ((ciphers = sk_SSL_CIPHER_new_null()) == NULL) {
 		SSLerror(s, ERR_R_MALLOC_FAILURE);
@@ -123,7 +125,7 @@ ssl_bytes_to_cipher_list(SSL *s, CBS *cbs)
 
 				goto err;
 			}
-			S3I(s)->send_connection_binding = 1;
+			s->s3->send_connection_binding = 1;
 			continue;
 		}
 
@@ -134,8 +136,8 @@ ssl_bytes_to_cipher_list(SSL *s, CBS *cbs)
 			 * Fail if the current version is an unexpected
 			 * downgrade.
 			 */
-			if (S3I(s)->hs.negotiated_tls_version <
-			    S3I(s)->hs.our_max_tls_version) {
+			if (s->s3->hs.negotiated_tls_version <
+			    s->s3->hs.our_max_tls_version) {
 				SSLerror(s, SSL_R_INAPPROPRIATE_FALLBACK);
 				ssl3_send_alert(s, SSL3_AL_FATAL,
 					SSL_AD_INAPPROPRIATE_FALLBACK);
@@ -168,28 +170,28 @@ struct ssl_tls13_ciphersuite {
 
 static const struct ssl_tls13_ciphersuite ssl_tls13_ciphersuites[] = {
 	{
-		.name = TLS1_3_TXT_AES_128_GCM_SHA256,
-		.alias = "TLS_AES_128_GCM_SHA256",
+		.name = TLS1_3_RFC_AES_128_GCM_SHA256,
+		.alias = TLS1_3_TXT_AES_128_GCM_SHA256,
 		.cid = TLS1_3_CK_AES_128_GCM_SHA256,
 	},
 	{
-		.name = TLS1_3_TXT_AES_256_GCM_SHA384,
-		.alias = "TLS_AES_256_GCM_SHA384",
+		.name = TLS1_3_RFC_AES_256_GCM_SHA384,
+		.alias = TLS1_3_TXT_AES_256_GCM_SHA384,
 		.cid = TLS1_3_CK_AES_256_GCM_SHA384,
 	},
 	{
-		.name = TLS1_3_TXT_CHACHA20_POLY1305_SHA256,
-		.alias = "TLS_CHACHA20_POLY1305_SHA256",
+		.name = TLS1_3_RFC_CHACHA20_POLY1305_SHA256,
+		.alias = TLS1_3_TXT_CHACHA20_POLY1305_SHA256,
 		.cid = TLS1_3_CK_CHACHA20_POLY1305_SHA256,
 	},
 	{
-		.name = TLS1_3_TXT_AES_128_CCM_SHA256,
-		.alias = "TLS_AES_128_CCM_SHA256",
+		.name = TLS1_3_RFC_AES_128_CCM_SHA256,
+		.alias = TLS1_3_TXT_AES_128_CCM_SHA256,
 		.cid = TLS1_3_CK_AES_128_CCM_SHA256,
 	},
 	{
-		.name = TLS1_3_TXT_AES_128_CCM_8_SHA256,
-		.alias = "TLS_AES_128_CCM_8_SHA256",
+		.name = TLS1_3_RFC_AES_128_CCM_8_SHA256,
+		.alias = TLS1_3_TXT_AES_128_CCM_8_SHA256,
 		.cid = TLS1_3_CK_AES_128_CCM_8_SHA256,
 	},
 	{

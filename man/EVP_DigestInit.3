@@ -1,4 +1,4 @@
-.\" $OpenBSD: EVP_DigestInit.3,v 1.21 2021/09/10 18:58:43 millert Exp $
+.\" $OpenBSD: EVP_DigestInit.3,v 1.24 2022/08/31 14:27:34 tb Exp $
 .\" full merge up to: OpenSSL 7f572e95 Dec 2 13:57:04 2015 +0000
 .\" selective merge up to: OpenSSL a95d7574 Jul 2 12:16:38 2017 -0400
 .\"
@@ -68,7 +68,7 @@
 .\" ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 .\" OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.Dd $Mdocdate: September 10 2021 $
+.Dd $Mdocdate: August 31 2022 $
 .Dt EVP_DIGESTINIT 3
 .Os
 .Sh NAME
@@ -105,8 +105,6 @@
 .Nm EVP_sha256 ,
 .Nm EVP_sha384 ,
 .Nm EVP_sha512 ,
-.Nm EVP_dss ,
-.Nm EVP_dss1 ,
 .Nm EVP_ripemd160 ,
 .Nm EVP_get_digestbyname ,
 .Nm EVP_get_digestbynid ,
@@ -243,10 +241,6 @@
 .Ft const EVP_MD *
 .Fn EVP_sha512 void
 .Ft const EVP_MD *
-.Fn EVP_dss void
-.Ft const EVP_MD *
-.Fn EVP_dss1 void
-.Ft const EVP_MD *
 .Fn EVP_ripemd160 void
 .Ft const EVP_MD *
 .Fo EVP_get_digestbyname
@@ -273,8 +267,6 @@ cleans up
 and resets it to the state it had after
 .Fn EVP_MD_CTX_new ,
 such that it can be reused.
-It is also suitable for digest contexts on the stack that were
-used and are no longer needed.
 .Pp
 .Fn EVP_MD_CTX_free
 cleans up
@@ -322,11 +314,6 @@ is
 then the default implementation of digest
 .Fa type
 is used.
-If
-.Fa ctx
-points to an unused object on the stack, it must be initialized with
-.Fn EVP_MD_CTX_init
-before calling this function.
 .Pp
 .Fn EVP_DigestUpdate
 hashes
@@ -394,11 +381,6 @@ to
 .Fa out .
 This is useful if large amounts of data are to be hashed which only
 differ in the last few bytes.
-If
-.Fa out
-points to an unused object on the stack, it must be initialized with
-.Fn EVP_MD_CTX_init
-before calling this function.
 .Pp
 .Fn EVP_DigestInit
 is a deprecated function behaving like
@@ -463,7 +445,7 @@ For example
 .Fn EVP_sha1
 is associated with RSA so this will return
 .Dv NID_sha1WithRSAEncryption .
-Since digests and signature algorithms are no longer linked this
+Since digests and signature algorithms are no longer linked, this
 function is only retained for compatibility reasons.
 .Pp
 .Fn EVP_md5 ,
@@ -483,16 +465,6 @@ RIPEMD160 digest algorithms respectively.
 returns an
 .Vt EVP_MD
 structure that provides concatenated MD5 and SHA1 message digests.
-.Pp
-.Fn EVP_dss
-and
-.Fn EVP_dss1
-return
-.Vt EVP_MD
-structures for SHA1 digest algorithms but using DSS (DSA) for the
-signature algorithm.
-Note: there is no need to use these pseudo-digests in OpenSSL 1.0.0 and
-later; they are however retained for compatibility.
 .Pp
 .Fn EVP_md_null
 is a "null" message digest that does nothing:
@@ -604,8 +576,6 @@ is
 .Fn EVP_md5 ,
 .Fn EVP_md5_sha1 ,
 .Fn EVP_sha1 ,
-.Fn EVP_dss ,
-.Fn EVP_dss1 ,
 and
 .Fn EVP_ripemd160
 return pointers to the corresponding
@@ -694,10 +664,6 @@ main(int argc, char *argv[])
 and
 .Fn EVP_sha1
 first appeared in SSLeay 0.5.1.
-.Fn EVP_dss
-and
-.Fn EVP_dss1
-first appeared in SSLeay 0.6.0.
 .Fn EVP_MD_size
 first appeared in SSLeay 0.6.6.
 .Fn EVP_MD_CTX_size ,
@@ -767,6 +733,4 @@ first appeared in OpenSSL 1.1.0 and have been available since
 The link between digests and signing algorithms was fixed in OpenSSL 1.0
 and later, so now
 .Fn EVP_sha1
-can be used with RSA and DSA; there is no need to use
-.Fn EVP_dss1
-any more.
+can be used with RSA and DSA.

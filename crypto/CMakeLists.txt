@@ -1,3 +1,5 @@
+add_definitions(-DLIBRESSL_CRYPTO_INTERNAL)
+
 if(HOST_ASM_ELF_ARMV4)
 	set(
 		ASM_ARMV4_ELF_SRC
@@ -231,6 +233,7 @@ set(
 	malloc-wrapper.c
 	mem_clr.c
 	mem_dbg.c
+	o_fips.c
 	o_init.c
 	o_str.c
 	o_time.c
@@ -242,49 +245,38 @@ set(
 	aes/aes_ofb.c
 	aes/aes_wrap.c
 	asn1/a_bitstr.c
-	asn1/a_bool.c
-	asn1/a_d2i_fp.c
-	asn1/a_digest.c
-	asn1/a_dup.c
 	asn1/a_enum.c
-	asn1/a_i2d_fp.c
 	asn1/a_int.c
 	asn1/a_mbstr.c
 	asn1/a_object.c
 	asn1/a_octet.c
+	asn1/a_pkey.c
 	asn1/a_print.c
-	asn1/a_sign.c
+	asn1/a_pubkey.c
 	asn1/a_strex.c
+	asn1/a_string.c
 	asn1/a_strnid.c
 	asn1/a_time.c
 	asn1/a_time_tm.c
 	asn1/a_type.c
 	asn1/a_utf8.c
-	asn1/a_verify.c
 	asn1/ameth_lib.c
 	asn1/asn1_err.c
 	asn1/asn1_gen.c
+	asn1/asn1_item.c
 	asn1/asn1_lib.c
+	asn1/asn1_old.c
+	asn1/asn1_old_lib.c
 	asn1/asn1_par.c
+	asn1/asn1_types.c
 	asn1/asn_mime.c
 	asn1/asn_moid.c
-	asn1/asn_pack.c
 	asn1/bio_asn1.c
 	asn1/bio_ndef.c
-	asn1/d2i_pr.c
-	asn1/d2i_pu.c
-	asn1/evp_asn1.c
-	asn1/f_enum.c
-	asn1/f_int.c
-	asn1/f_string.c
-	asn1/i2d_pr.c
-	asn1/i2d_pu.c
-	asn1/n_pkey.c
 	asn1/nsseq.c
 	asn1/p5_pbe.c
 	asn1/p5_pbev2.c
 	asn1/p8_pkey.c
-	asn1/t_bitst.c
 	asn1/t_crl.c
 	asn1/t_pkey.c
 	asn1/t_req.c
@@ -306,7 +298,6 @@ set(
 	asn1/x_info.c
 	asn1/x_long.c
 	asn1/x_name.c
-	asn1/x_nx509.c
 	asn1/x_pkey.c
 	asn1/x_pubkey.c
 	asn1/x_req.c
@@ -342,6 +333,7 @@ set(
 	bn/bn_add.c
 	bn/bn_asm.c
 	bn/bn_blind.c
+	bn/bn_bpsw.c
 	bn/bn_const.c
 	bn/bn_ctx.c
 	bn/bn_depr.c
@@ -351,6 +343,7 @@ set(
 	bn/bn_exp2.c
 	bn/bn_gcd.c
 	bn/bn_gf2m.c
+	bn/bn_isqrt.c
 	bn/bn_kron.c
 	bn/bn_lib.c
 	bn/bn_mod.c
@@ -370,6 +363,9 @@ set(
 	buffer/buf_err.c
 	buffer/buf_str.c
 	buffer/buffer.c
+	bytestring/bs_ber.c
+	bytestring/bs_cbb.c
+	bytestring/bs_cbs.c
 	camellia/cmll_cfb.c
 	camellia/cmll_ctr.c
 	camellia/cmll_ecb.c
@@ -409,6 +405,16 @@ set(
 	conf/conf_mall.c
 	conf/conf_mod.c
 	conf/conf_sap.c
+	ct/ct_b64.c
+	ct/ct_err.c
+	ct/ct_log.c
+	ct/ct_oct.c
+	ct/ct_policy.c
+	ct/ct_prn.c
+	ct/ct_sct.c
+	ct/ct_sct_ctx.c
+	ct/ct_vfy.c
+	ct/ct_x509v3.c
 	curve25519/curve25519-generic.c
 	curve25519/curve25519.c
 	des/cbc_cksm.c
@@ -550,9 +556,6 @@ set(
 	evp/evp_lib.c
 	evp/evp_pbe.c
 	evp/evp_pkey.c
-	evp/m_dss.c
-	evp/m_dss1.c
-	evp/m_ecdsa.c
 	evp/m_gost2814789.c
 	evp/m_gostr341194.c
 	evp/m_md4.c
@@ -601,6 +604,8 @@ set(
 	idea/i_ecb.c
 	idea/i_ofb64.c
 	idea/i_skey.c
+	kdf/hkdf_evp.c
+	kdf/kdf_err.c
 	lhash/lh_stats.c
 	lhash/lhash.c
 	md4/md4_dgst.c
@@ -636,7 +641,6 @@ set(
 	pem/pem_oth.c
 	pem/pem_pk8.c
 	pem/pem_pkey.c
-	pem/pem_seal.c
 	pem/pem_sign.c
 	pem/pem_x509.c
 	pem/pem_xaux.c
@@ -654,6 +658,7 @@ set(
 	pkcs12/p12_npas.c
 	pkcs12/p12_p8d.c
 	pkcs12/p12_p8e.c
+	pkcs12/p12_sbag.c
 	pkcs12/p12_utl.c
 	pkcs12/pk12err.c
 	pkcs7/bio_pk7.c
@@ -726,9 +731,11 @@ set(
 	x509/pcy_map.c
 	x509/pcy_node.c
 	x509/pcy_tree.c
+	x509/x509_addr.c
 	x509/x509_akey.c
 	x509/x509_akeya.c
 	x509/x509_alt.c
+	x509/x509_asid.c
 	x509/x509_att.c
 	x509/x509_bcons.c
 	x509/x509_bitst.c
@@ -875,6 +882,11 @@ if(NOT HAVE_STRSEP)
 	set(EXTRA_EXPORT ${EXTRA_EXPORT} strsep)
 endif()
 
+if(NOT HAVE_STRTONUM)
+	set(CRYPTO_SRC ${CRYPTO_SRC} compat/strtonum.c)
+	set(EXTRA_EXPORT ${EXTRA_EXPORT} strtonum)
+endif()
+
 if(NOT HAVE_SYSLOG_R)
 	set(CRYPTO_SRC ${CRYPTO_SRC} compat/syslog_r.c)
 endif()
@@ -975,32 +987,26 @@ target_include_directories(crypto_obj
 	PRIVATE
 		.
 		asn1
+		bio
 		bn
+		bytestring
+		dh
 		dsa
 		ec
 		ecdh
 		ecdsa
 		evp
+		hmac
 		modes
+		ocsp
+		pkcs12
+		rsa
+		x509
 		../include/compat
 	PUBLIC
 		../include)
 
 add_library(crypto $<TARGET_OBJECTS:crypto_obj>)
-target_include_directories(crypto
-	PRIVATE
-		.
-		asn1
-		bn
-		dsa
-		ec
-		ecdh
-		ecdsa
-		evp
-		modes
-		../include/compat
-	PUBLIC
-		../include)
 
 export_symbol(crypto ${CMAKE_CURRENT_BINARY_DIR}/crypto_p.sym)
 target_link_libraries(crypto ${PLATFORM_LIBS})
@@ -1021,3 +1027,10 @@ if(ENABLE_LIBRESSL_INSTALL)
 		RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 	)
 endif(ENABLE_LIBRESSL_INSTALL)
+
+# build static library for regression test
+if(BUILD_SHARED_LIBS)
+	add_library(crypto-static STATIC $<TARGET_OBJECTS:crypto_obj>)
+	target_link_libraries(crypto-static ${PLATFORM_LIBS})
+endif()
+

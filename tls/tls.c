@@ -1,4 +1,4 @@
-/* $OpenBSD: tls.c,v 1.89 2021/02/01 15:35:41 tb Exp $ */
+/* $OpenBSD: tls.c,v 1.94 2022/02/08 19:13:50 tb Exp $ */
 /*
  * Copyright (c) 2014 Joel Sing <jsing@openbsd.org>
  *
@@ -387,6 +387,8 @@ tls_keypair_to_pkey(struct tls *ctx, struct tls_keypair *keypair, EVP_PKEY **pke
 static int
 tls_keypair_setup_pkey(struct tls *ctx, struct tls_keypair *keypair, EVP_PKEY *pkey)
 {
+	RSA_METHOD *rsa_method;
+	ECDSA_METHOD *ecdsa_method;
 	RSA *rsa = NULL;
 	EC_KEY *eckey = NULL;
 	int ret = -1;
@@ -407,11 +409,27 @@ tls_keypair_setup_pkey(struct tls *ctx, struct tls_keypair *keypair, EVP_PKEY *p
 			tls_set_errorx(ctx, "RSA key setup failure");
 			goto err;
 		}
+		if (ctx->config->sign_cb == NULL)
+			break;
+		if ((rsa_method = tls_signer_rsa_method()) == NULL ||
+		    RSA_set_ex_data(rsa, 1, ctx->config) == 0 ||
+		    RSA_set_method(rsa, rsa_method) == 0) {
+			tls_set_errorx(ctx, "failed to setup RSA key");
+			goto err;
+		}
 		break;
 	case EVP_PKEY_EC:
 		if ((eckey = EVP_PKEY_get1_EC_KEY(pkey)) == NULL ||
 		    ECDSA_set_ex_data(eckey, 0, keypair->pubkey_hash) == 0) {
 			tls_set_errorx(ctx, "EC key setup failure");
+			goto err;
+		}
+		if (ctx->config->sign_cb == NULL)
+			break;
+		if ((ecdsa_method = tls_signer_ecdsa_method()) == NULL ||
+		    ECDSA_set_ex_data(eckey, 1, ctx->config) == 0 ||
+		    ECDSA_set_method(eckey, ecdsa_method) == 0) {
+			tls_set_errorx(ctx, "failed to setup EC key");
 			goto err;
 		}
 		break;
@@ -521,7 +539,7 @@ tls_configure_ssl(struct tls *ctx, SSL_CTX *ssl_ctx)
 	}
 
 	if (ctx->config->verify_time == 0) {
-		X509_VERIFY_PARAM_set_flags(ssl_ctx->param,
+		X509_VERIFY_PARAM_set_flags(SSL_CTX_get0_param(ssl_ctx),
 		    X509_V_FLAG_NO_CHECK_TIME);
 	}
 
@@ -629,9 +647,8 @@ tls_configure_ssl_verify(struct tls *ctx, SSL_CTX *ssl_ctx, int verify)
 				tls_set_error(ctx, "failed to add crl");
 				goto err;
 			}
-			xi->crl = NULL;
 		}
-		X509_VERIFY_PARAM_set_flags(store->param,
+		X509_STORE_set_flags(store,
 		    X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
 	}
 
@@ -747,7 +764,7 @@ tls_ssl_error(struct tls *ctx, SSL *ssl_conn, int ssl_ret, const char *prefix)
 	case SSL_ERROR_WANT_ACCEPT:
 	case SSL_ERROR_WANT_X509_LOOKUP:
 	default:
-		tls_set_ssl_errorx(ctx, "%s failed (%i)", prefix, ssl_err);
+		tls_set_ssl_errorx(ctx, "%s failed (%d)", prefix, ssl_err);
 		return (-1);
 	}
 }

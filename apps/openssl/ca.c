@@ -1,4 +1,4 @@
-/* $OpenBSD: ca.c,v 1.49 2021/09/05 04:05:14 inoguchi Exp $ */
+/* $OpenBSD: ca.c,v 1.53 2022/02/03 17:44:04 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -1082,7 +1082,7 @@ ca_main(int argc, char **argv)
 		}
 		if (ca_config.verbose)
 			BIO_printf(bio_err, "message digest is %s\n",
-			    OBJ_nid2ln(dgst->type));
+			    OBJ_nid2ln(EVP_MD_type(dgst)));
 		if ((ca_config.policy == NULL) &&
 		    ((ca_config.policy = NCONF_get_string(conf,
 		    ca_config.section, ENV_POLICY)) == NULL)) {
@@ -1633,12 +1633,11 @@ certify(X509 **xret, char *infile, EVP_PKEY *pkey, X509 *x509,
 		ok = 0;
 		goto err;
 	}
-	if ((pktmp = X509_REQ_get_pubkey(req)) == NULL) {
+	if ((pktmp = X509_REQ_get0_pubkey(req)) == NULL) {
 		BIO_printf(bio_err, "error unpacking public key\n");
 		goto err;
 	}
 	i = X509_REQ_verify(req, pktmp);
-	EVP_PKEY_free(pktmp);
 	if (i < 0) {
 		ok = 0;
 		BIO_printf(bio_err, "Signature verification problems....\n");
@@ -1688,12 +1687,11 @@ certify_cert(X509 **xret, char *infile, EVP_PKEY *pkey, X509 *x509,
 
 	BIO_printf(bio_err, "Check that the request matches the signature\n");
 
-	if ((pktmp = X509_get_pubkey(req)) == NULL) {
+	if ((pktmp = X509_get0_pubkey(req)) == NULL) {
 		BIO_printf(bio_err, "error unpacking public key\n");
 		goto err;
 	}
 	i = X509_verify(req, pktmp);
-	EVP_PKEY_free(pktmp);
 	if (i < 0) {
 		ok = 0;
 		BIO_printf(bio_err, "Signature verification problems....\n");
@@ -1764,7 +1762,6 @@ do_body(X509 **xret, EVP_PKEY *pkey, X509 *x509, const EVP_MD *dgst,
 			X509_NAME_free(n);
 			goto err;
 		}
-		req->req_info->enc.modified = 1;
 		X509_NAME_free(n);
 	}
 	if (default_op)
@@ -1785,7 +1782,7 @@ do_body(X509 **xret, EVP_PKEY *pkey, X509 *x509, const EVP_MD *dgst,
 
 		if (ca_config.msie_hack) {
 			/* assume all type should be strings */
-			nid = OBJ_obj2nid(ne->object);
+			nid = OBJ_obj2nid(X509_NAME_ENTRY_get_object(ne));
 			if (nid == NID_undef)
 				goto err;
 
@@ -1998,13 +1995,10 @@ do_body(X509 **xret, EVP_PKEY *pkey, X509 *x509, const EVP_MD *dgst,
 	if (!X509_set_subject_name(ret, subject))
 		goto err;
 
-	pktmp = X509_REQ_get_pubkey(req);
-	if (pktmp == NULL)
+	if ((pktmp = X509_REQ_get0_pubkey(req)) == NULL)
 		goto err;
 
-	i = X509_set_pubkey(ret, pktmp);
-	EVP_PKEY_free(pktmp);
-	if (!i)
+	if (!X509_set_pubkey(ret, pktmp))
 		goto err;
 
 	/* Lets add the extensions, if there are any */
@@ -2227,18 +2221,15 @@ do_body(X509 **xret, EVP_PKEY *pkey, X509 *x509, const EVP_MD *dgst,
 		}
 	}
 
-	pktmp = X509_get_pubkey(ret);
-	if (pktmp == NULL)
+	if ((pktmp = X509_get0_pubkey(ret)) == NULL)
 		goto err;
 
 	if (EVP_PKEY_missing_parameters(pktmp) &&
 	    !EVP_PKEY_missing_parameters(pkey)) {
 		if (!EVP_PKEY_copy_parameters(pktmp, pkey)) {
-			EVP_PKEY_free(pktmp);
 			goto err;
 		}
 	}
-	EVP_PKEY_free(pktmp);
 
 	if (!do_X509_sign(bio_err, ret, pkey, dgst, sigopts))
 		goto err;
@@ -2329,7 +2320,6 @@ certify_spkac(X509 **xret, char *infile, EVP_PKEY *pkey, X509 *x509,
 	X509_REQ *req = NULL;
 	CONF_VALUE *cv = NULL;
 	NETSCAPE_SPKI *spki = NULL;
-	X509_REQ_INFO *ri;
 	char *type, *buf;
 	EVP_PKEY *pktmp = NULL;
 	X509_NAME *n = NULL;
@@ -2371,8 +2361,7 @@ certify_spkac(X509 **xret, char *infile, EVP_PKEY *pkey, X509 *x509,
 	/*
 	 * Build up the subject name set.
 	 */
-	ri = req->req_info;
-	n = ri->subject;
+	n = X509_REQ_get_subject_name(req);
 
 	for (i = 0;; i++) {
 		if (sk_CONF_VALUE_num(sk) <= i)

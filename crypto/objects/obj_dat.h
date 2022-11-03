@@ -62,12 +62,12 @@
  * [including the GNU Public Licence.]
  */
 
-#define NUM_NID 1016
-#define NUM_SN 1009
-#define NUM_LN 1009
-#define NUM_OBJ 939
+#define NUM_NID 1025
+#define NUM_SN 1018
+#define NUM_LN 1018
+#define NUM_OBJ 947
 
-static const unsigned char lvalues[6618]={
+static const unsigned char lvalues[6699]={
 0x2A,0x86,0x48,0x86,0xF7,0x0D,               /* [  0] OBJ_rsadsi */
 0x2A,0x86,0x48,0x86,0xF7,0x0D,0x01,          /* [  6] OBJ_pkcs */
 0x2A,0x86,0x48,0x86,0xF7,0x0D,0x02,0x02,     /* [ 13] OBJ_md2 */
@@ -1001,6 +1001,14 @@ static const unsigned char lvalues[6618]={
 0x2A,0x86,0x48,0x86,0xF7,0x0D,0x01,0x09,0x10,0x01,0x2F,/* [6587] OBJ_id_ct_geofeedCSVwithCRLF */
 0x2A,0x86,0x48,0x86,0xF7,0x0D,0x01,0x09,0x10,0x01,0x30,/* [6598] OBJ_id_ct_signedChecklist */
 0x2B,0x06,0x01,0x05,0x05,0x07,0x03,0x1E,     /* [6609] OBJ_id_kp_bgpsec_router */
+0x2B,0x06,0x01,0x05,0x05,0x07,0x01,0x18,     /* [6617] OBJ_tlsfeature */
+0x2A,0x86,0x48,0x86,0xF7,0x0D,0x01,0x09,0x10,0x01,0x31,/* [6625] OBJ_id_ct_ASPA */
+0x2B,0x06,0x01,0x04,0x01,0xD6,0x79,0x02,0x04,0x02,/* [6636] OBJ_ct_precert_scts */
+0x2B,0x06,0x01,0x04,0x01,0xD6,0x79,0x02,0x04,0x03,/* [6646] OBJ_ct_precert_poison */
+0x2B,0x06,0x01,0x04,0x01,0xD6,0x79,0x02,0x04,0x04,/* [6656] OBJ_ct_precert_signer */
+0x2B,0x06,0x01,0x04,0x01,0xD6,0x79,0x02,0x04,0x05,/* [6666] OBJ_ct_cert_scts */
+0x2A,0x86,0x48,0x86,0xF7,0x0D,0x01,0x09,0x10,0x02,0x2F,/* [6676] OBJ_id_smime_aa_signingCertificateV2 */
+0x2A,0x86,0x48,0x86,0xF7,0x0D,0x01,0x09,0x10,0x01,0x32,/* [6687] OBJ_id_ct_signedTAL */
 };
 
 static const ASN1_OBJECT nid_objs[NUM_NID]={
@@ -2653,6 +2661,22 @@ static const ASN1_OBJECT nid_objs[NUM_NID]={
 	NID_id_ct_signedChecklist,11,&(lvalues[6598]),0},
 {"id-kp-bgpsec-router","BGPsec Router",NID_id_kp_bgpsec_router,8,
 	&(lvalues[6609]),0},
+{"tlsfeature","TLS Feature",NID_tlsfeature,8,&(lvalues[6617]),0},
+{"id-ct-ASPA","id-ct-ASPA",NID_id_ct_ASPA,11,&(lvalues[6625]),0},
+{"ct_precert_scts","CT Precertificate SCTs",NID_ct_precert_scts,10,
+	&(lvalues[6636]),0},
+{"ct_precert_poison","CT Precertificate Poison",NID_ct_precert_poison,
+	10,&(lvalues[6646]),0},
+{"ct_precert_signer","CT Precertificate Signer",NID_ct_precert_signer,
+	10,&(lvalues[6656]),0},
+{"ct_cert_scts","CT Certificate SCTs",NID_ct_cert_scts,10,
+	&(lvalues[6666]),0},
+{"HKDF","hkdf",NID_hkdf,0,NULL,0},
+{"id-smime-aa-signingCertificateV2",
+	"id-smime-aa-signingCertificateV2",
+	NID_id_smime_aa_signingCertificateV2,11,&(lvalues[6676]),0},
+{"id-ct-signedTAL","id-ct-signedTAL",NID_id_ct_signedTAL,11,
+	&(lvalues[6687]),0},
 };
 
 static const unsigned int sn_objs[NUM_SN]={
@@ -2753,6 +2777,7 @@ static const unsigned int sn_objs[NUM_SN]={
 955,	/* "Ed448ph" */
 936,	/* "FRP256v1" */
 99,	/* "GN" */
+1022,	/* "HKDF" */
 855,	/* "HMAC" */
 780,	/* "HMAC-MD5" */
 781,	/* "HMAC-SHA1" */
@@ -2955,6 +2980,10 @@ static const unsigned int sn_objs[NUM_SN]={
 884,	/* "crossCertificatePair" */
 806,	/* "cryptocom" */
 805,	/* "cryptopro" */
+1021,	/* "ct_cert_scts" */
+1019,	/* "ct_precert_poison" */
+1018,	/* "ct_precert_scts" */
+1020,	/* "ct_precert_signer" */
 500,	/* "dITRedirect" */
 451,	/* "dNSDomain" */
 495,	/* "dSAQuality" */
@@ -3138,6 +3167,7 @@ static const unsigned int sn_objs[NUM_SN]={
 327,	/* "id-cmc-statusInfo" */
 331,	/* "id-cmc-transactionId" */
 1005,	/* "id-cp" */
+1017,	/* "id-ct-ASPA" */
 787,	/* "id-ct-asciiTextWithCRLF" */
 1013,	/* "id-ct-geofeedCSVwithCRLF" */
 1004,	/* "id-ct-resourceTaggedAttest" */
@@ -3145,6 +3175,7 @@ static const unsigned int sn_objs[NUM_SN]={
 1003,	/* "id-ct-rpkiGhostbusters" */
 1002,	/* "id-ct-rpkiManifest" */
 1014,	/* "id-ct-signedChecklist" */
+1024,	/* "id-ct-signedTAL" */
 408,	/* "id-ecPublicKey" */
 508,	/* "id-hex-multipart-message" */
 507,	/* "id-hex-partial-message" */
@@ -3243,6 +3274,7 @@ static const unsigned int sn_objs[NUM_SN]={
 213,	/* "id-smime-aa-securityLabel" */
 239,	/* "id-smime-aa-signatureType" */
 223,	/* "id-smime-aa-signingCertificate" */
+1023,	/* "id-smime-aa-signingCertificateV2" */
 224,	/* "id-smime-aa-smimeEncryptCerts" */
 225,	/* "id-smime-aa-timeStampToken" */
 192,	/* "id-smime-alg" */
@@ -3637,6 +3669,7 @@ static const unsigned int sn_objs[NUM_SN]={
 293,	/* "textNotice" */
 133,	/* "timeStamping" */
 106,	/* "title" */
+1016,	/* "tlsfeature" */
 682,	/* "tpBasis" */
 375,	/* "trustRoot" */
 436,	/* "ucl" */
@@ -3679,6 +3712,10 @@ static const unsigned int ln_objs[NUM_LN]={
 285,	/* "Biometric Info" */
 179,	/* "CA Issuers" */
 785,	/* "CA Repository" */
+1021,	/* "CT Certificate SCTs" */
+1019,	/* "CT Precertificate Poison" */
+1018,	/* "CT Precertificate SCTs" */
+1020,	/* "CT Precertificate Signer" */
 131,	/* "Code Signing" */
 783,	/* "Diffie-Hellman based MAC" */
 382,	/* "Directory" */
@@ -3798,6 +3835,7 @@ static const unsigned int ln_objs[NUM_LN]={
 1011,	/* "Signed Object" */
 143,	/* "Strong Extranet ID" */
 398,	/* "Subject Information Access" */
+1016,	/* "TLS Feature" */
 130,	/* "TLS Web Client Authentication" */
 129,	/* "TLS Web Server Authentication" */
 133,	/* "Time Stamping" */
@@ -4052,6 +4090,7 @@ static const unsigned int ln_objs[NUM_LN]={
 939,	/* "gost89-cbc" */
 814,	/* "gost89-cnt" */
 938,	/* "gost89-ecb" */
+1022,	/* "hkdf" */
 855,	/* "hmac" */
 780,	/* "hmac-md5" */
 781,	/* "hmac-sha1" */
@@ -4148,6 +4187,7 @@ static const unsigned int ln_objs[NUM_LN]={
 327,	/* "id-cmc-statusInfo" */
 331,	/* "id-cmc-transactionId" */
 1005,	/* "id-cp" */
+1017,	/* "id-ct-ASPA" */
 787,	/* "id-ct-asciiTextWithCRLF" */
 1013,	/* "id-ct-geofeedCSVwithCRLF" */
 1004,	/* "id-ct-resourceTaggedAttest" */
@@ -4155,6 +4195,7 @@ static const unsigned int ln_objs[NUM_LN]={
 1003,	/* "id-ct-rpkiGhostbusters" */
 1002,	/* "id-ct-rpkiManifest" */
 1014,	/* "id-ct-signedChecklist" */
+1024,	/* "id-ct-signedTAL" */
 408,	/* "id-ecPublicKey" */
 508,	/* "id-hex-multipart-message" */
 507,	/* "id-hex-partial-message" */
@@ -4245,6 +4286,7 @@ static const unsigned int ln_objs[NUM_LN]={
 213,	/* "id-smime-aa-securityLabel" */
 239,	/* "id-smime-aa-signatureType" */
 223,	/* "id-smime-aa-signingCertificate" */
+1023,	/* "id-smime-aa-signingCertificateV2" */
 224,	/* "id-smime-aa-smimeEncryptCerts" */
 225,	/* "id-smime-aa-timeStampToken" */
 192,	/* "id-smime-alg" */
@@ -5209,6 +5251,7 @@ static const unsigned int obj_objs[NUM_OBJ]={
 397,	/* OBJ_ac_proxying                  1 3 6 1 5 5 7 1 10 */
 398,	/* OBJ_sinfo_access                 1 3 6 1 5 5 7 1 11 */
 663,	/* OBJ_proxyCertInfo                1 3 6 1 5 5 7 1 14 */
+1016,	/* OBJ_tlsfeature                   1 3 6 1 5 5 7 1 24 */
 1006,	/* OBJ_sbgp_ipAddrBlockv2           1 3 6 1 5 5 7 1 28 */
 1007,	/* OBJ_sbgp_autonomousSysNumv2      1 3 6 1 5 5 7 1 29 */
 164,	/* OBJ_id_qt_cps                    1 3 6 1 5 5 7 2 1 */
@@ -5532,6 +5575,10 @@ static const unsigned int obj_objs[NUM_OBJ]={
 138,	/* OBJ_ms_efs                       1 3 6 1 4 1 311 10 3 4 */
 648,	/* OBJ_ms_smartcard_login           1 3 6 1 4 1 311 20 2 2 */
 649,	/* OBJ_ms_upn                       1 3 6 1 4 1 311 20 2 3 */
+1018,	/* OBJ_ct_precert_scts              1 3 6 1 4 1 11129 2 4 2 */
+1019,	/* OBJ_ct_precert_poison            1 3 6 1 4 1 11129 2 4 3 */
+1020,	/* OBJ_ct_precert_signer            1 3 6 1 4 1 11129 2 4 4 */
+1021,	/* OBJ_ct_cert_scts                 1 3 6 1 4 1 11129 2 4 5 */
 751,	/* OBJ_camellia_128_cbc             1 2 392 200011 61 1 1 1 2 */
 752,	/* OBJ_camellia_192_cbc             1 2 392 200011 61 1 1 1 3 */
 753,	/* OBJ_camellia_256_cbc             1 2 392 200011 61 1 1 1 4 */
@@ -5562,6 +5609,8 @@ static const unsigned int obj_objs[NUM_OBJ]={
 1004,	/* OBJ_id_ct_resourceTaggedAttest   1 2 840 113549 1 9 16 1 36 */
 1013,	/* OBJ_id_ct_geofeedCSVwithCRLF     1 2 840 113549 1 9 16 1 47 */
 1014,	/* OBJ_id_ct_signedChecklist        1 2 840 113549 1 9 16 1 48 */
+1017,	/* OBJ_id_ct_ASPA                   1 2 840 113549 1 9 16 1 49 */
+1024,	/* OBJ_id_ct_signedTAL              1 2 840 113549 1 9 16 1 50 */
 212,	/* OBJ_id_smime_aa_receiptRequest   1 2 840 113549 1 9 16 2 1 */
 213,	/* OBJ_id_smime_aa_securityLabel    1 2 840 113549 1 9 16 2 2 */
 214,	/* OBJ_id_smime_aa_mlExpandHistory  1 2 840 113549 1 9 16 2 3 */
@@ -5591,6 +5640,7 @@ static const unsigned int obj_objs[NUM_OBJ]={
 238,	/* OBJ_id_smime_aa_ets_archiveTimeStamp 1 2 840 113549 1 9 16 2 27 */
 239,	/* OBJ_id_smime_aa_signatureType    1 2 840 113549 1 9 16 2 28 */
 240,	/* OBJ_id_smime_aa_dvcs_dvc         1 2 840 113549 1 9 16 2 29 */
+1023,	/* OBJ_id_smime_aa_signingCertificateV2 1 2 840 113549 1 9 16 2 47 */
 241,	/* OBJ_id_smime_alg_ESDHwith3DES    1 2 840 113549 1 9 16 3 1 */
 242,	/* OBJ_id_smime_alg_ESDHwithRC2     1 2 840 113549 1 9 16 3 2 */
 243,	/* OBJ_id_smime_alg_3DESwrap        1 2 840 113549 1 9 16 3 3 */

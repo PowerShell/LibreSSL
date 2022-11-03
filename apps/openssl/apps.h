@@ -1,4 +1,4 @@
-/* $OpenBSD: apps.h,v 1.28 2021/09/02 11:30:15 inoguchi Exp $ */
+/* $OpenBSD: apps.h,v 1.31 2022/01/10 12:17:49 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -255,22 +255,18 @@ unsigned char *next_protos_parse(unsigned short *outlen, const char *in);
 #define FORMAT_ASN1     1
 #define FORMAT_TEXT     2
 #define FORMAT_PEM      3
-#define FORMAT_NETSCAPE 4
+
 #define FORMAT_PKCS12   5
 #define FORMAT_SMIME    6
 
-#define FORMAT_IISSGC	8	/* XXX this stupid macro helps us to avoid
-				 * adding yet another param to load_*key() */
-#define FORMAT_PEMRSA	9	/* PEM RSAPubicKey format */
-#define FORMAT_ASN1RSA	10	/* DER RSAPubicKey format */
+#define FORMAT_PEMRSA	9	/* PEM RSAPublicKey format */
+#define FORMAT_ASN1RSA	10	/* DER RSAPublicKey format */
 #define FORMAT_MSBLOB	11	/* MS Key blob format */
 #define FORMAT_PVK	12	/* MS PVK file format */
 
 #define EXT_COPY_NONE	0
 #define EXT_COPY_ADD	1
 #define EXT_COPY_ALL	2
-
-#define NETSCAPE_CERT_HDR	"certificate"
 
 #define APP_PASS_LEN	1024
 
@@ -330,4 +326,6 @@ int options_parse(int argc, char **argv, const struct option *opts,
 
 void show_cipher(const OBJ_NAME *name, void *arg);
 
+int pkey_check(BIO *out, EVP_PKEY *pkey, int (check_fn)(EVP_PKEY_CTX *),
+    const char *desc);
 #endif
