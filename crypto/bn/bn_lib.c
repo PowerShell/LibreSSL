@@ -1,4 +1,4 @@
-/* $OpenBSD: bn_lib.c,v 1.48 2021/09/08 12:19:17 tb Exp $ */
+/* $OpenBSD: bn_lib.c,v 1.54 2022/06/27 12:25:49 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -92,6 +92,63 @@ static int bn_limit_num_high = 8;   /* (1<<bn_limit_bits_high) */
 static int bn_limit_bits_mont = 0;
 static int bn_limit_num_mont = 8;   /* (1<<bn_limit_bits_mont) */
 
+BIGNUM *
+BN_new(void)
+{
+	BIGNUM *ret;
+
+	if ((ret = malloc(sizeof(BIGNUM))) == NULL) {
+		BNerror(ERR_R_MALLOC_FAILURE);
+		return (NULL);
+	}
+	ret->flags = BN_FLG_MALLOCED;
+	ret->top = 0;
+	ret->neg = 0;
+	ret->dmax = 0;
+	ret->d = NULL;
+	bn_check_top(ret);
+	return (ret);
+}
+
+void
+BN_init(BIGNUM *a)
+{
+	memset(a, 0, sizeof(BIGNUM));
+	bn_check_top(a);
+}
+
+void
+BN_clear(BIGNUM *a)
+{
+	bn_check_top(a);
+	if (a->d != NULL)
+		explicit_bzero(a->d, a->dmax * sizeof(a->d[0]));
+	a->top = 0;
+	a->neg = 0;
+}
+
+void
+BN_clear_free(BIGNUM *a)
+{
+	int i;
+
+	if (a == NULL)
+		return;
+	bn_check_top(a);
+	if (a->d != NULL && !(BN_get_flags(a, BN_FLG_STATIC_DATA)))
+		freezero(a->d, a->dmax * sizeof(a->d[0]));
+	i = BN_get_flags(a, BN_FLG_MALLOCED);
+	explicit_bzero(a, sizeof(BIGNUM));
+	if (i)
+		free(a);
+}
+
+void
+BN_free(BIGNUM *a)
+{
+	BN_clear_free(a);
+}
+
 void
 BN_set_params(int mult, int high, int low, int mont)
 {
@@ -137,6 +194,30 @@ BN_get_params(int which)
 }
 #endif
 
+void
+BN_set_flags(BIGNUM *b, int n)
+{
+	b->flags |= n;
+}
+
+int
+BN_get_flags(const BIGNUM *b, int n)
+{
+	return b->flags & n;
+}
+
+void
+BN_with_flags(BIGNUM *dest, const BIGNUM *b, int flags)
+{
+	int dest_flags;
+
+	dest_flags = (dest->flags & BN_FLG_MALLOCED) |
+	    (b->flags & ~BN_FLG_MALLOCED) | BN_FLG_STATIC_DATA | flags;
+
+	*dest = *b;
+	dest->flags = dest_flags;
+}
+
 const BIGNUM *
 BN_value_one(void)
 {
@@ -180,53 +261,6 @@ BN_num_bits(const BIGNUM *a)
 	if (BN_is_zero(a))
 		return 0;
 	return ((i * BN_BITS2) + BN_num_bits_word(a->d[i]));
-}
-
-void
-BN_clear_free(BIGNUM *a)
-{
-	int i;
-
-	if (a == NULL)
-		return;
-	bn_check_top(a);
-	if (a->d != NULL && !(BN_get_flags(a, BN_FLG_STATIC_DATA)))
-		freezero(a->d, a->dmax * sizeof(a->d[0]));
-	i = BN_get_flags(a, BN_FLG_MALLOCED);
-	explicit_bzero(a, sizeof(BIGNUM));
-	if (i)
-		free(a);
-}
-
-void
-BN_free(BIGNUM *a)
-{
-	BN_clear_free(a);
-}
-
-void
-BN_init(BIGNUM *a)
-{
-	memset(a, 0, sizeof(BIGNUM));
-	bn_check_top(a);
-}
-
-BIGNUM *
-BN_new(void)
-{
-	BIGNUM *ret;
-
-	if ((ret = malloc(sizeof(BIGNUM))) == NULL) {
-		BNerror(ERR_R_MALLOC_FAILURE);
-		return (NULL);
-	}
-	ret->flags = BN_FLG_MALLOCED;
-	ret->top = 0;
-	ret->neg = 0;
-	ret->dmax = 0;
-	ret->d = NULL;
-	bn_check_top(ret);
-	return (ret);
 }
 
 /* This is used both by bn_expand2() and bn_dup_expand() */
@@ -492,16 +526,6 @@ BN_swap(BIGNUM *a, BIGNUM *b)
 	    (flags_old_a & BN_FLG_STATIC_DATA);
 	bn_check_top(a);
 	bn_check_top(b);
-}
-
-void
-BN_clear(BIGNUM *a)
-{
-	bn_check_top(a);
-	if (a->d != NULL)
-		explicit_bzero(a->d, a->dmax * sizeof(a->d[0]));
-	a->top = 0;
-	a->neg = 0;
 }
 
 BN_ULONG
@@ -1037,6 +1061,81 @@ BN_swap_ct(BN_ULONG condition, BIGNUM *a, BIGNUM *b, size_t nwords)
 	return 1;
 }
 
+void
+BN_zero_ex(BIGNUM *a)
+{
+	a->neg = 0;
+	a->top = 0;
+	/* XXX: a->flags &= ~BN_FIXED_TOP */
+}
+
+int
+BN_abs_is_word(const BIGNUM *a, const BN_ULONG w)
+{
+	return (a->top == 1 && a->d[0] == w) || (w == 0 && a->top == 0);
+}
+
+int
+BN_is_zero(const BIGNUM *a)
+{
+	return a->top == 0;
+}
+
+int
+BN_is_one(const BIGNUM *a)
+{
+	return BN_abs_is_word(a, 1) && !a->neg;
+}
+
+int
+BN_is_word(const BIGNUM *a, const BN_ULONG w)
+{
+	return BN_abs_is_word(a, w) && (w == 0 || !a->neg);
+}
+
+int
+BN_is_odd(const BIGNUM *a)
+{
+	return a->top > 0 && (a->d[0] & 1);
+}
+
+int
+BN_is_negative(const BIGNUM *a)
+{
+	return a->neg != 0;
+}
+
+/*
+ * Bits of security, see SP800-57, section 5.6.11, table 2.
+ */
+int
+BN_security_bits(int L, int N)
+{
+	int secbits, bits;
+
+	if (L >= 15360)
+		secbits = 256;
+	else if (L >= 7680)
+		secbits = 192;
+	else if (L >= 3072)
+		secbits = 128;
+	else if (L >= 2048)
+		secbits = 112;
+	else if (L >= 1024)
+		secbits = 80;
+	else
+		return 0;
+
+	if (N == -1)
+		return secbits;
+
+	bits = N / 2;
+	if (bits < 80)
+		return 0;
+
+	return bits >= secbits ? secbits : bits;
+}
+
 BN_GENCB *
 BN_GENCB_new(void)
 {
@@ -1054,6 +1153,24 @@ BN_GENCB_free(BN_GENCB *cb)
 	if (cb == NULL)
 		return;
 	free(cb);
+}
+
+/* Populate a BN_GENCB structure with an "old"-style callback */
+void
+BN_GENCB_set_old(BN_GENCB *gencb, void (*cb)(int, int, void *), void *cb_arg)
+{
+	gencb->ver = 1;
+	gencb->cb.cb_1 = cb;
+	gencb->arg = cb_arg;
+}
+
+/* Populate a BN_GENCB structure with a "new"-style callback */
+void
+BN_GENCB_set(BN_GENCB *gencb, int (*cb)(int, int, BN_GENCB *), void *cb_arg)
+{
+	gencb->ver = 2;
+	gencb->cb.cb_2 = cb;
+	gencb->arg = cb_arg;
 }
 
 void *

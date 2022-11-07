@@ -331,9 +331,11 @@ test_invalid_domain_constraints(void)
 }
 
 static int
-test_invalid_uri(void) {
+test_invalid_uri(void)
+{
 	int j, failure=0;
-	char *hostpart;
+	char *hostpart = NULL;
+
 	for (j = 0; invaliduri[j] != NULL; j++) {
 		if (x509_constraints_uri_host(invaliduri[j],
 			strlen(invaliduri[j]), &hostpart) != 0) {
@@ -342,7 +344,10 @@ test_invalid_uri(void) {
 			failure = 1;
 			goto done;
 		}
+		free(hostpart);
+		hostpart = NULL;
 	}
+
  done:
 	return failure;
 }
@@ -392,6 +397,10 @@ test_constraints1(void)
 		"",
 		NULL,
 	};
+	unsigned char *noauthority[] = {
+		"urn:open62541.server.application",
+		NULL,
+	};
 	for (i = 0; constraints[i] != NULL; i++) {
 		char *constraint = constraints[i];
 		size_t clen = strlen(constraints[i]);
@@ -430,6 +439,28 @@ test_constraints1(void)
 			error = 0;
 			if (x509_constraints_uri(failinguri[j],
 			    strlen(failinguri[j]), constraint, clen, &error)) {
+				FAIL("constraint '%s' should not have matched URI"
+				    " '%s' (error %d)\n",
+				    constraint, failinguri[j], error);
+				failure = 1;
+				goto done;
+			}
+		}
+		for (j = 0; noauthority[j] != NULL; j++) {
+			error = 0;
+			char *hostpart = NULL;
+			if (!x509_constraints_uri_host(noauthority[j],
+				strlen(noauthority[j]), &hostpart)) {
+				FAIL("name '%s' should parse as a URI",
+				    noauthority[j]);
+				failure = 1;
+				free(hostpart);
+				goto done;
+			}
+			free(hostpart);
+
+			if (x509_constraints_uri(noauthority[j],
+			    strlen(noauthority[j]), constraint, clen, &error)) {
 				FAIL("constraint '%s' should not have matched URI"
 				    " '%s' (error %d)\n",
 				    constraint, failinguri[j], error);

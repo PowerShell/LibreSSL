@@ -1,4 +1,4 @@
-.\" $OpenBSD: EVP_EncryptInit.3,v 1.41 2021/01/05 06:51:31 jmc Exp $
+.\" $OpenBSD: EVP_EncryptInit.3,v 1.44 2022/08/31 14:27:34 tb Exp $
 .\" full merge up to: OpenSSL 5211e094 Nov 11 14:39:11 2014 -0800
 .\"   EVP_bf_cbc.pod EVP_cast5_cbc.pod EVP_idea_cbc.pod EVP_rc2_cbc.pod
 .\"   7c6d372a Nov 20 13:20:01 2018 +0000
@@ -71,7 +71,7 @@
 .\" ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 .\" OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.Dd $Mdocdate: January 5 2021 $
+.Dd $Mdocdate: August 31 2022 $
 .Dt EVP_ENCRYPTINIT 3
 .Os
 .Sh NAME
@@ -386,13 +386,13 @@
 .Ft int
 .Fo EVP_CIPHER_CTX_get_iv
 .Fa "const EVP_CIPHER_CTX *ctx"
-.Fa "u_char *iv"
+.Fa "unsigned char *iv"
 .Fa "size_t len"
 .Fc
 .Ft int
 .Fo EVP_CIPHER_CTX_set_iv
 .Fa "EVP_CIPHER_CTX *ctx"
-.Fa "const u_char *iv"
+.Fa "const unsigned char *iv"
 .Fa "size_t len"
 .Fc
 .Ft void *
@@ -443,8 +443,6 @@ object itself, such that it can be reused for another series of calls to
 .Fn EVP_CipherUpdate ,
 and
 .Fn EVP_CipherFinal .
-It is also suitable for cipher contexts on the stack that were used
-and are no longer needed.
 .Fn EVP_CIPHER_CTX_cleanup
 is a deprecated alias for
 .Fn EVP_CIPHER_CTX_reset .
@@ -478,11 +476,6 @@ for encryption with cipher
 from
 .Vt ENGINE
 .Fa impl .
-If
-.Fa ctx
-points to an unused object on the stack, it must be initialized with
-.Fn EVP_MD_CTX_init
-before calling this function.
 .Fa type
 is normally supplied by a function such as
 .Xr EVP_aes_256_cbc 3 .
@@ -535,7 +528,7 @@ The encrypted final data is written to
 which should have sufficient space for one cipher block.
 The number of bytes written is placed in
 .Fa outl .
-After this function is called the encryption operation is finished and
+After this function is called, the encryption operation is finished and
 no further calls to
 .Fn EVP_EncryptUpdate
 should be made.
@@ -754,7 +747,7 @@ This "type" is the actual NID of the cipher OBJECT IDENTIFIER as such it
 ignores the cipher parameters and 40-bit RC2 and 128-bit RC2 have the
 same NID.
 If the cipher does not have an object identifier or does not
-have ASN.1 support this function will return
+have ASN.1 support, this function will return
 .Dv NID_undef .
 .Pp
 .Fn EVP_CIPHER_CTX_cipher
@@ -842,7 +835,7 @@ block size n will equal the block size.
 For example if the block size is 8 and 11 bytes are to be encrypted then
 5 padding bytes of value 5 will be added.
 .Pp
-When decrypting the final block is checked to see if it has the correct
+When decrypting, the final block is checked to see if it has the correct
 form.
 .Pp
 Although the decryption operation can produce an error if padding is
@@ -1374,7 +1367,7 @@ first appeared in LibreSSL 2.8.1 and has been available since
 and
 .Dv EVP_MAX_IV_LENGTH
 only refer to the internal ciphers with default key lengths.
-If custom ciphers exceed these values the results are unpredictable.
+If custom ciphers exceed these values, the results are unpredictable.
 This is because it has become standard practice to define a generic key
 as a fixed unsigned char array containing
 .Dv EVP_MAX_KEY_LENGTH

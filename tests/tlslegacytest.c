@@ -1,4 +1,4 @@
-/* $OpenBSD: tlslegacytest.c,v 1.4 2021/08/30 17:34:02 tb Exp $ */
+/* $OpenBSD: tlslegacytest.c,v 1.6 2022/06/10 22:00:15 tb Exp $ */
 /*
  * Copyright (c) 2015, 2016, 2017, 2020 Joel Sing <jsing@openbsd.org>
  *
@@ -567,7 +567,7 @@ tlslegacy_client_test(int testno, struct tlslegacy_client_test *tct)
 	SSL *ssl = NULL;
 	int ret = 1;
 
-	fprintf(stderr, "Test %i - %s\n", testno, tct->desc);
+	fprintf(stderr, "Test %d - %s\n", testno, tct->desc);
 
 	if ((rbio = BIO_new_mem_buf(tct->server_response,
 	    tct->server_response_len)) == NULL) {
@@ -589,9 +589,8 @@ tlslegacy_client_test(int testno, struct tlslegacy_client_test *tct)
 		goto failure;
 	}
 
-	rbio->references = 2;
-	wbio->references = 2;
-
+	BIO_up_ref(rbio);
+	BIO_up_ref(wbio);
 	SSL_set_bio(ssl, rbio, wbio);
 
 	if (SSL_connect(ssl) == 1) {
@@ -610,9 +609,6 @@ tlslegacy_client_test(int testno, struct tlslegacy_client_test *tct)
  failure:
 	SSL_CTX_free(ssl_ctx);
 	SSL_free(ssl);
-
-	rbio->references = 1;
-	wbio->references = 1;
 
 	BIO_free(rbio);
 	BIO_free(wbio);

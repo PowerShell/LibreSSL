@@ -1,4 +1,4 @@
-/* $OpenBSD: ec_lcl.h,v 1.18 2021/09/08 17:29:21 tb Exp $ */
+/* $OpenBSD: ec_lcl.h,v 1.20 2022/06/30 11:14:47 tb Exp $ */
 /*
  * Originally written by Bodo Moeller for the OpenSSL project.
  */
@@ -71,10 +71,12 @@
 
 #include <stdlib.h>
 
-#include <openssl/obj_mac.h>
+#include <openssl/bn.h>
 #include <openssl/ec.h>
 #include <openssl/ecdsa.h>
-#include <openssl/bn.h>
+#include <openssl/objects.h>
+
+#include "bn_lcl.h"
 
 __BEGIN_HIDDEN_DECLS
 

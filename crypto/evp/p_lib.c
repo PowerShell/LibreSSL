@@ -1,4 +1,4 @@
-/* $OpenBSD: p_lib.c,v 1.26 2021/03/29 15:57:23 tb Exp $ */
+/* $OpenBSD: p_lib.c,v 1.29 2022/06/27 12:36:05 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -82,6 +82,7 @@
 #endif
 
 #include "asn1_locl.h"
+#include "evp_locl.h"
 
 static void EVP_PKEY_free_it(EVP_PKEY *x);
 
@@ -91,6 +92,17 @@ EVP_PKEY_bits(const EVP_PKEY *pkey)
 	if (pkey && pkey->ameth && pkey->ameth->pkey_bits)
 		return pkey->ameth->pkey_bits(pkey);
 	return 0;
+}
+
+int
+EVP_PKEY_security_bits(const EVP_PKEY *pkey)
+{
+	if (pkey == NULL)
+		return 0;
+	if (pkey->ameth == NULL || pkey->ameth->pkey_security_bits == NULL)
+		return -2;
+
+	return pkey->ameth->pkey_security_bits(pkey);
 }
 
 int
@@ -525,7 +537,8 @@ EVP_PKEY_free_it(EVP_PKEY *x)
 static int
 unsup_alg(BIO *out, const EVP_PKEY *pkey, int indent, const char *kstr)
 {
-	BIO_indent(out, indent, 128);
+	if (!BIO_indent(out, indent, 128))
+		return 0;
 	BIO_printf(out, "%s algorithm \"%s\" unsupported\n",
 	    kstr, OBJ_nid2ln(pkey->type));
 	return 1;

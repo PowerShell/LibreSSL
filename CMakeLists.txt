@@ -98,7 +98,7 @@ if(CMAKE_SYSTEM_NAME MATCHES "SunOS")
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_XOPEN_SOURCE=600")
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DBSD_COMP")
 	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fpic")
-	set(PLATFORM_LIBS ${PLATFORM_LIBS} nsl socket)
+	set(PLATFORM_LIBS ${PLATFORM_LIBS} dl md nsl socket)
 endif()
 
 add_definitions(-DLIBRESSL_INTERNAL)
@@ -286,9 +286,24 @@ if(HAVE_MEMMEM)
 	add_definitions(-DHAVE_MEMMEM)
 endif()
 
+check_include_files(endian.h HAVE_ENDIAN_H)
+if(HAVE_ENDIAN_H)
+	add_definitions(-DHAVE_ENDIAN_H)
+endif()
+
+check_include_files(machine/endian.h HAVE_MACHINE_ENDIAN_H)
+if(HAVE_MACHINE_ENDIAN_H)
+	add_definitions(-DHAVE_MACHINE_ENDIAN_H)
+endif()
+
 check_include_files(err.h HAVE_ERR_H)
 if(HAVE_ERR_H)
 	add_definitions(-DHAVE_ERR_H)
+endif()
+
+check_include_files("sys/types.h;arpa/inet.h;netinet/ip.h" HAVE_NETINET_IP_H)
+if(HAVE_NETINET_IP_H)
+	add_definitions(-DHAVE_NETINET_IP_H)
 endif()
 
 if(ENABLE_ASM)
@@ -337,6 +352,15 @@ add_definitions(-DSIZEOF_TIME_T=${SIZEOF_TIME_T})
 set(OPENSSL_LIBS ssl crypto ${PLATFORM_LIBS})
 set(LIBTLS_LIBS tls ${PLATFORM_LIBS})
 
+# libraries for regression test
+if(BUILD_SHARED_LIBS)
+	set(OPENSSL_TEST_LIBS ssl-static crypto-static ${PLATFORM_LIBS})
+	set(LIBTLS_TEST_LIBS tls-static ${PLATFORM_LIBS})
+else()
+	set(OPENSSL_TEST_LIBS ssl crypto ${PLATFORM_LIBS})
+	set(LIBTLS_TEST_LIBS tls ${PLATFORM_LIBS})
+endif()
+
 add_subdirectory(crypto)
 add_subdirectory(ssl)
 if(LIBRESSL_APPS)
@@ -352,25 +376,40 @@ if(LIBRESSL_APPS AND LIBRESSL_TESTS)
 	add_subdirectory(tests)
 endif()
 
-if(NOT MSVC)
-	# Create pkgconfig files.
-	set(prefix      ${CMAKE_INSTALL_PREFIX})
-	set(exec_prefix \${prefix})
-	set(libdir      \${exec_prefix}/${CMAKE_INSTALL_LIBDIR})
-	set(includedir  \${prefix}/include)
-	if(PLATFORM_LIBS)
-		string(REGEX REPLACE ";" " -l" PLATFORM_LDADD ";${PLATFORM_LIBS}")
+if (BUILD_APPLE_XCFRAMEWORK)
+	# Create the super library from object libraries
+	add_library(LibreSSL_xcframework
+			$<TARGET_OBJECTS:crypto_obj> $<TARGET_OBJECTS:tls_obj> $<TARGET_OBJECTS:ssl_obj>)
+	set_target_properties(LibreSSL_xcframework PROPERTIES
+			OUTPUT_NAME ressl)
+
+	if(ENABLE_LIBRESSL_INSTALL)
+		install(TARGETS LibreSSL_xcframework
+				LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR})
+	endif(ENABLE_LIBRESSL_INSTALL)
+endif(BUILD_APPLE_XCFRAMEWORK)
+
+if(ENABLE_LIBRESSL_INSTALL)
+	if(NOT MSVC)
+		# Create pkgconfig files.
+		set(prefix      ${CMAKE_INSTALL_PREFIX})
+		set(exec_prefix \${prefix})
+		set(libdir      \${exec_prefix}/${CMAKE_INSTALL_LIBDIR})
+		set(includedir  \${prefix}/include)
+		if(PLATFORM_LIBS)
+			string(REGEX REPLACE ";" " -l" PLATFORM_LDADD ";${PLATFORM_LIBS}")
+		endif()
+		file(STRINGS    "VERSION" VERSION LIMIT_COUNT 1)
+		file(GLOB       OPENSSL_PKGCONFIGS "*.pc.in")
+		foreach(file ${OPENSSL_PKGCONFIGS})
+			get_filename_component(filename ${file} NAME)
+			string(REPLACE ".in" "" new_file "${filename}")
+			configure_file(${filename} pkgconfig/${new_file} @ONLY)
+		endforeach()
+		install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/pkgconfig
+			DESTINATION ${CMAKE_INSTALL_LIBDIR})
 	endif()
-	file(STRINGS    "VERSION" VERSION LIMIT_COUNT 1)
-	file(GLOB       OPENSSL_PKGCONFIGS "*.pc.in")
-	foreach(file ${OPENSSL_PKGCONFIGS})
-		get_filename_component(filename ${file} NAME)
-		string(REPLACE ".in" "" new_file "${filename}")
-		configure_file(${filename} pkgconfig/${new_file} @ONLY)
-	endforeach()
-	install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/pkgconfig
-		DESTINATION ${CMAKE_INSTALL_LIBDIR})
-endif()
+endif(ENABLE_LIBRESSL_INSTALL)
 
 if(NOT "${OPENSSLDIR}" STREQUAL "")
 	set(CONF_DIR "${OPENSSLDIR}")

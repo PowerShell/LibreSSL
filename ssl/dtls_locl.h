@@ -1,4 +1,4 @@
-/* $OpenBSD: dtls_locl.h,v 1.7 2021/09/04 14:24:28 jsing Exp $ */
+/* $OpenBSD: dtls_locl.h,v 1.10 2021/10/23 13:45:44 jsing Exp $ */
 /*
  * DTLS implementation written by Nagendra Modadugu
  * (nagendra@cs.stanford.edu) for the OpenSSL project 2005.
@@ -77,8 +77,6 @@ typedef struct dtls1_bitmap_st {
 } DTLS1_BITMAP;
 
 struct dtls1_retransmit_state {
-	EVP_CIPHER_CTX *enc_write_ctx;	/* cryptographic state */
-	EVP_MD_CTX *write_hash;		/* used for mac generation */
 	SSL_SESSION *session;
 	unsigned short epoch;
 };
@@ -124,9 +122,16 @@ typedef struct dtls1_record_data_internal_st {
 	SSL3_RECORD_INTERNAL rrec;
 } DTLS1_RECORD_DATA_INTERNAL;
 
-struct dtls1_state_internal_st;
+struct dtls1_state_st {
+	/* Buffered (sent) handshake records */
+	struct _pqueue *sent_messages;
 
-typedef struct dtls1_state_internal_st {
+	/* Indicates when the last handshake msg or heartbeat sent will timeout */
+	struct timeval next_timeout;
+
+	/* Timeout duration */
+	unsigned short timeout_duration;
+
 	unsigned int send_cookie;
 	unsigned char cookie[DTLS1_COOKIE_LENGTH];
 	unsigned char rcvd_cookie[DTLS1_COOKIE_LENGTH];
@@ -169,21 +174,7 @@ typedef struct dtls1_state_internal_st {
 
 	unsigned int retransmitting;
 	unsigned int change_cipher_spec_ok;
-} DTLS1_STATE_INTERNAL;
-#define D1I(s) (s->d1->internal)
-
-typedef struct dtls1_state_st {
-	/* Buffered (sent) handshake records */
-	struct _pqueue *sent_messages;
-
-	/* Indicates when the last handshake msg or heartbeat sent will timeout */
-	struct timeval next_timeout;
-
-	/* Timeout duration */
-	unsigned short timeout_duration;
-
-	struct dtls1_state_internal_st *internal;
-} DTLS1_STATE;
+};
 
 int dtls1_do_write(SSL *s, int type);
 int dtls1_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek);
@@ -223,7 +214,7 @@ void dtls1_free(SSL *s);
 void dtls1_clear(SSL *s);
 long dtls1_ctrl(SSL *s, int cmd, long larg, void *parg);
 
-long dtls1_get_message(SSL *s, int st1, int stn, int mt, long max, int *ok);
+int dtls1_get_message(SSL *s, int st1, int stn, int mt, long max);
 int dtls1_get_record(SSL *s);
 
 __END_HIDDEN_DECLS

@@ -1,4 +1,4 @@
-/* $OpenBSD: x509.c,v 1.24 2021/08/29 19:56:40 schwarze Exp $ */
+/* $OpenBSD: x509.c,v 1.29 2021/12/12 20:34:04 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -846,22 +846,11 @@ x509_main(int argc, char **argv)
 			ERR_print_errors(bio_err);
 			goto end;
 		}
-		if ((req->req_info == NULL) ||
-		    (req->req_info->pubkey == NULL) ||
-		    (req->req_info->pubkey->public_key == NULL) ||
-		    (req->req_info->pubkey->public_key->data == NULL)) {
-			BIO_printf(bio_err,
-			    "The certificate request appears to corrupted\n");
-			BIO_printf(bio_err,
-			    "It does not contain a public key\n");
-			goto end;
-		}
-		if ((pkey = X509_REQ_get_pubkey(req)) == NULL) {
+		if ((pkey = X509_REQ_get0_pubkey(req)) == NULL) {
 			BIO_printf(bio_err, "error unpacking public key\n");
 			goto end;
 		}
 		i = X509_REQ_verify(req, pkey);
-		EVP_PKEY_free(pkey);
 		if (i < 0) {
 			BIO_printf(bio_err, "Signature verification error\n");
 			ERR_print_errors(bio_err);
@@ -892,9 +881,9 @@ x509_main(int argc, char **argv)
 		} else if (!X509_set_serialNumber(x, x509_config.sno))
 			goto end;
 
-		if (!X509_set_issuer_name(x, req->req_info->subject))
+		if (!X509_set_issuer_name(x, X509_REQ_get_subject_name(req)))
 			goto end;
-		if (!X509_set_subject_name(x, req->req_info->subject))
+		if (!X509_set_subject_name(x, X509_REQ_get_subject_name(req)))
 			goto end;
 
 		if (X509_gmtime_adj(X509_get_notBefore(x), 0) == NULL)
@@ -903,13 +892,12 @@ x509_main(int argc, char **argv)
 		    NULL) == NULL)
 			goto end;
 
-		if ((pkey = X509_REQ_get_pubkey(req)) == NULL)
+		if ((pkey = X509_REQ_get0_pubkey(req)) == NULL)
 			goto end;
 		if (!X509_set_pubkey(x, pkey)) {
 			EVP_PKEY_free(pkey);
 			goto end;
 		}
-		EVP_PKEY_free(pkey);
 	} else {
 		x = load_cert(bio_err, x509_config.infile, x509_config.informat,
 		    NULL, "Certificate");
@@ -1055,7 +1043,7 @@ x509_main(int argc, char **argv)
 			} else if (x509_config.modulus == i) {
 				EVP_PKEY *pkey;
 
-				pkey = X509_get_pubkey(x);
+				pkey = X509_get0_pubkey(x);
 				if (pkey == NULL) {
 					BIO_printf(bio_err,
 					    "Modulus=unavailable\n");
@@ -1063,20 +1051,27 @@ x509_main(int argc, char **argv)
 					goto end;
 				}
 				BIO_printf(STDout, "Modulus=");
-				if (pkey->type == EVP_PKEY_RSA)
-					BN_print(STDout, pkey->pkey.rsa->n);
-				else if (pkey->type == EVP_PKEY_DSA)
-					BN_print(STDout,
-					    pkey->pkey.dsa->pub_key);
-				else
+				if (EVP_PKEY_id(pkey) == EVP_PKEY_RSA) {
+					RSA *rsa = EVP_PKEY_get0_RSA(pkey);
+					const BIGNUM *n = NULL;
+
+					RSA_get0_key(rsa, &n, NULL, NULL);
+					BN_print(STDout, n);
+				} else if (EVP_PKEY_id(pkey) == EVP_PKEY_DSA) {
+					DSA *dsa = EVP_PKEY_get0_DSA(pkey);
+					const BIGNUM *pub_key = NULL;
+
+					DSA_get0_key(dsa, &pub_key, NULL);
+
+					BN_print(STDout, pub_key);
+				} else
 					BIO_printf(STDout,
 					    "Wrong Algorithm type");
 				BIO_printf(STDout, "\n");
-				EVP_PKEY_free(pkey);
 			} else if (x509_config.pubkey == i) {
 				EVP_PKEY *pkey;
 
-				pkey = X509_get_pubkey(x);
+				pkey = X509_get0_pubkey(x);
 				if (pkey == NULL) {
 					BIO_printf(bio_err,
 					    "Error getting public key\n");
@@ -1084,7 +1079,6 @@ x509_main(int argc, char **argv)
 					goto end;
 				}
 				PEM_write_bio_PUBKEY(STDout, pkey);
-				EVP_PKEY_free(pkey);
 			} else if (x509_config.C == i) {
 				unsigned char *d;
 				char *m;
@@ -1308,16 +1302,6 @@ x509_main(int argc, char **argv)
 			i = PEM_write_bio_X509_AUX(out, x);
 		else
 			i = PEM_write_bio_X509(out, x);
-	} else if (x509_config.outformat == FORMAT_NETSCAPE) {
-		NETSCAPE_X509 nx;
-		ASN1_OCTET_STRING hdr;
-
-		hdr.data = (unsigned char *) NETSCAPE_CERT_HDR;
-		hdr.length = strlen(NETSCAPE_CERT_HDR);
-		nx.header = &hdr;
-		nx.cert = x;
-
-		i = ASN1_item_i2d_bio(&NETSCAPE_X509_it, out, &nx);
 	} else {
 		BIO_printf(bio_err,
 		    "bad output format specified for outfile\n");
@@ -1403,16 +1387,17 @@ x509_certify(X509_STORE *ctx, char *CAfile, const EVP_MD *digest, X509 *x,
 {
 	int ret = 0;
 	ASN1_INTEGER *bs = NULL;
-	X509_STORE_CTX xsc;
+	X509_STORE_CTX *xsc = NULL;
 	EVP_PKEY *upkey;
 
-	upkey = X509_get_pubkey(xca);
+	upkey = X509_get0_pubkey(xca);
 	if (upkey == NULL)
 		goto end;
 	EVP_PKEY_copy_parameters(upkey, pkey);
-	EVP_PKEY_free(upkey);
 
-	if (!X509_STORE_CTX_init(&xsc, ctx, x, NULL)) {
+	if ((xsc = X509_STORE_CTX_new()) == NULL)
+		goto end;
+	if (!X509_STORE_CTX_init(xsc, ctx, x, NULL)) {
 		BIO_printf(bio_err, "Error initialising X509 store\n");
 		goto end;
 	}
@@ -1427,9 +1412,9 @@ x509_certify(X509_STORE *ctx, char *CAfile, const EVP_MD *digest, X509 *x,
 	 * NOTE: this certificate can/should be self signed, unless it was a
 	 * certificate request in which case it is not.
 	 */
-	X509_STORE_CTX_set_cert(&xsc, x);
-	X509_STORE_CTX_set_flags(&xsc, X509_V_FLAG_CHECK_SS_SIGNATURE);
-	if (!x509_config.reqfile && X509_verify_cert(&xsc) <= 0)
+	X509_STORE_CTX_set_cert(xsc, x);
+	X509_STORE_CTX_set_flags(xsc, X509_V_FLAG_CHECK_SS_SIGNATURE);
+	if (!x509_config.reqfile && X509_verify_cert(xsc) <= 0)
 		goto end;
 
 	if (!X509_check_private_key(xca, pkey)) {
@@ -1469,7 +1454,7 @@ x509_certify(X509_STORE *ctx, char *CAfile, const EVP_MD *digest, X509 *x,
 
 	ret = 1;
  end:
-	X509_STORE_CTX_cleanup(&xsc);
+	X509_STORE_CTX_free(xsc);
 	if (!ret)
 		ERR_print_errors(bio_err);
 	if (sno == NULL)
@@ -1519,12 +1504,11 @@ sign(X509 *x, EVP_PKEY *pkey, int days, int clrext, const EVP_MD *digest,
 {
 	EVP_PKEY *pktmp;
 
-	pktmp = X509_get_pubkey(x);
+	pktmp = X509_get0_pubkey(x);
 	if (pktmp == NULL)
 		goto err;
 	EVP_PKEY_copy_parameters(pktmp, pkey);
 	EVP_PKEY_save_parameters(pktmp, 1);
-	EVP_PKEY_free(pktmp);
 
 	if (!X509_set_issuer_name(x, X509_get_subject_name(x)))
 		goto err;

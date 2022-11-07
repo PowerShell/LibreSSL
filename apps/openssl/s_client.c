@@ -1,4 +1,4 @@
-/* $OpenBSD: s_client.c,v 1.54 2021/03/17 18:11:01 jsing Exp $ */
+/* $OpenBSD: s_client.c,v 1.58 2022/02/03 17:44:04 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -219,6 +219,7 @@ static struct {
 	int msg;
 	int nbio;
 	int nbio_test;
+	int no_servername;
 	char *npn_in;
 	unsigned int off;
 	char *passarg;
@@ -634,6 +635,12 @@ static const struct option s_client_options[] = {
 		.value = SSL_OP_LEGACY_SERVER_CONNECT,
 	},
 	{
+		.name = "no_servername",
+		.desc = "Do not send a Server Name Indication (SNI) extension",
+		.type = OPTION_FLAG,
+		.opt.value = &s_client_config.no_servername,
+	},
+	{
 		.name = "no_ssl2",
 		.type = OPTION_VALUE_OR,
 		.opt.value = &s_client_config.off,
@@ -679,6 +686,11 @@ static const struct option s_client_options[] = {
 		.type = OPTION_VALUE_OR,
 		.opt.value = &s_client_config.off,
 		.value = SSL_OP_NO_TLSv1_3,
+	},
+	{
+		.name = "noservername",
+		.type = OPTION_FLAG,
+		.opt.value = &s_client_config.no_servername,
 	},
 	{
 		.name = "pass",
@@ -894,8 +906,8 @@ s_client_main(int argc, char **argv)
 	char *cbuf = NULL, *sbuf = NULL, *mbuf = NULL, *pbuf = NULL;
 	int cbuf_len, cbuf_off;
 	int sbuf_len, sbuf_off;
-	int pbuf_len, pbuf_off;
 	int full_log = 1;
+	const char *servername;
 	char *pass = NULL;
 	X509 *cert = NULL;
 	EVP_PKEY *key = NULL;
@@ -1067,12 +1079,6 @@ s_client_main(int argc, char **argv)
 	if (!SSL_CTX_set_default_verify_paths(ctx))
 		ERR_print_errors(bio_err);
 
-	if (s_client_config.servername != NULL) {
-		tlsextcbp.biodebug = bio_err;
-		SSL_CTX_set_tlsext_servername_callback(ctx, ssl_servername_cb);
-		SSL_CTX_set_tlsext_servername_arg(ctx, &tlsextcbp);
-	}
-
 	con = SSL_new(ctx);
 	if (s_client_config.sess_in) {
 		SSL_SESSION *sess;
@@ -1094,15 +1100,32 @@ s_client_main(int argc, char **argv)
 		SSL_set_session(con, sess);
 		SSL_SESSION_free(sess);
 	}
-	if (s_client_config.servername != NULL) {
-		if (!SSL_set_tlsext_host_name(con, s_client_config.servername)) {
+
+	/* Attempt to opportunistically use the host name for SNI. */
+	servername = s_client_config.servername;
+	if (servername == NULL)
+		servername = s_client_config.host;
+
+	if (!s_client_config.no_servername && servername != NULL &&
+	    !SSL_set_tlsext_host_name(con, servername)) {
+		long ssl_err = ERR_peek_error();
+
+		if (s_client_config.servername != NULL ||
+		    ERR_GET_LIB(ssl_err) != ERR_LIB_SSL ||
+		    ERR_GET_REASON(ssl_err) != SSL_R_SSL3_EXT_INVALID_SERVERNAME) {
 			BIO_printf(bio_err,
 			    "Unable to set TLS servername extension.\n");
 			ERR_print_errors(bio_err);
 			goto end;
 		}
+		servername = NULL;
+		ERR_clear_error();
 	}
-/*	SSL_set_cipher_list(con,"RC4-MD5"); */
+	if (!s_client_config.no_servername && servername != NULL) {
+		tlsextcbp.biodebug = bio_err;
+		SSL_CTX_set_tlsext_servername_callback(ctx, ssl_servername_cb);
+		SSL_CTX_set_tlsext_servername_arg(ctx, &tlsextcbp);
+	}
 
  re_start:
 
@@ -1195,8 +1218,6 @@ s_client_main(int argc, char **argv)
 	cbuf_off = 0;
 	sbuf_len = 0;
 	sbuf_off = 0;
-	pbuf_len = 0;
-	pbuf_off = 0;
 
 	/* This is an ugly hack that does a lot of assumptions */
 	/*
@@ -1503,8 +1524,6 @@ s_client_main(int argc, char **argv)
 				if (SSL_get_error(con, p) == SSL_ERROR_NONE) {
 					if (p <= 0)
 						goto end;
-					pbuf_off = 0;
-					pbuf_len = p;
 
 					k = SSL_read(con, sbuf, p);
 				}
@@ -1753,10 +1772,10 @@ print_stuff(BIO *bio, SSL *s, int full)
 	    SSL_CIPHER_get_name(c));
 	if (peer != NULL) {
 		EVP_PKEY *pktmp;
-		pktmp = X509_get_pubkey(peer);
+
+		pktmp = X509_get0_pubkey(peer);
 		BIO_printf(bio, "Server public key is %d bit\n",
 		    EVP_PKEY_bits(pktmp));
-		EVP_PKEY_free(pktmp);
 	}
 	BIO_printf(bio, "Secure Renegotiation IS%s supported\n",
 	    SSL_get_secure_renegotiation_support(s) ? "" : " NOT");

@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_purp.c,v 1.7 2021/09/13 15:26:53 claudio Exp $ */
+/* $OpenBSD: x509_purp.c,v 1.16 2022/05/10 19:42:52 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2001.
  */
@@ -64,6 +64,9 @@
 #include <openssl/err.h>
 #include <openssl/x509v3.h>
 #include <openssl/x509_vfy.h>
+
+#include "x509_internal.h"
+#include "x509_lcl.h"
 
 #define V1_ROOT (EXFLAG_V1|EXFLAG_SS)
 #define ku_reject(x, usage) \
@@ -133,7 +136,7 @@ X509_check_purpose(X509 *x, int id, int ca)
 		x509v3_cache_extensions(x);
 		CRYPTO_w_unlock(CRYPTO_LOCK_X509);
 		if (x->ex_flags & EXFLAG_INVALID)
-			return X509_V_ERR_UNSPECIFIED;
+			return -1;
 	}
 	if (id == -1)
 		return 1;
@@ -447,9 +450,7 @@ x509v3_cache_extensions(X509 *x)
 	if (x->ex_flags & EXFLAG_SET)
 		return;
 
-#ifndef OPENSSL_NO_SHA
-	X509_digest(x, EVP_sha1(), x->sha1_hash, NULL);
-#endif
+	X509_digest(x, X509_CERT_HASH_EVP, x->hash, NULL);
 
 	/* V1 should mean no extensions ... */
 	if (!X509_get_version(x))
@@ -549,6 +550,10 @@ x509v3_cache_extensions(X509 *x)
 			case NID_dvcs:
 				x->ex_xkusage |= XKU_DVCS;
 				break;
+
+			case NID_anyExtendedKeyUsage:
+				x->ex_xkusage |= XKU_ANYEKU;
+				break;
 			}
 		}
 		sk_ASN1_OBJECT_pop_free(extusage, ASN1_OBJECT_free);
@@ -595,8 +600,12 @@ x509v3_cache_extensions(X509 *x)
 	x->rfc3779_addr = X509_get_ext_d2i(x, NID_sbgp_ipAddrBlock, &i, NULL);
 	if (x->rfc3779_addr == NULL && i != -1)
 		x->ex_flags |= EXFLAG_INVALID;
+	if (!X509v3_addr_is_canonical(x->rfc3779_addr))
+		x->ex_flags |= EXFLAG_INVALID;
 	x->rfc3779_asid = X509_get_ext_d2i(x, NID_sbgp_autonomousSysNum, &i, NULL);
 	if (x->rfc3779_asid == NULL && i != -1)
+		x->ex_flags |= EXFLAG_INVALID;
+	if (!X509v3_asid_is_canonical(x->rfc3779_asid))
 		x->ex_flags |= EXFLAG_INVALID;
 #endif
 
@@ -612,6 +621,9 @@ x509v3_cache_extensions(X509 *x)
 			break;
 		}
 	}
+
+	x509_verify_cert_info_populate(x);
+
 	x->ex_flags |= EXFLAG_SET;
 }
 
@@ -659,8 +671,6 @@ X509_check_ca(X509 *x)
 		CRYPTO_w_lock(CRYPTO_LOCK_X509);
 		x509v3_cache_extensions(x);
 		CRYPTO_w_unlock(CRYPTO_LOCK_X509);
-		if (x->ex_flags & EXFLAG_INVALID)
-			return X509_V_ERR_UNSPECIFIED;
 	}
 
 	return check_ca(x);
@@ -937,4 +947,40 @@ X509_check_akid(X509 *issuer, AUTHORITY_KEYID *akid)
 			return X509_V_ERR_AKID_ISSUER_SERIAL_MISMATCH;
 	}
 	return X509_V_OK;
+}
+
+uint32_t
+X509_get_extension_flags(X509 *x)
+{
+	/* Call for side-effect of computing hash and caching extensions */
+	if (X509_check_purpose(x, -1, -1) != 1)
+		return EXFLAG_INVALID;
+
+	return x->ex_flags;
+}
+
+uint32_t
+X509_get_key_usage(X509 *x)
+{
+	/* Call for side-effect of computing hash and caching extensions */
+	if (X509_check_purpose(x, -1, -1) != 1)
+		return 0;
+
+	if (x->ex_flags & EXFLAG_KUSAGE)
+		return x->ex_kusage;
+
+	return UINT32_MAX;
+}
+
+uint32_t
+X509_get_extended_key_usage(X509 *x)
+{
+	/* Call for side-effect of computing hash and caching extensions */
+	if (X509_check_purpose(x, -1, -1) != 1)
+		return 0;
+
+	if (x->ex_flags & EXFLAG_XKUSAGE)
+		return x->ex_xkusage;
+
+	return UINT32_MAX;
 }

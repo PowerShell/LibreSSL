@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_constraints.c,v 1.17 2021/09/23 15:49:48 jsing Exp $ */
+/* $OpenBSD: x509_constraints.c,v 1.28 2022/06/27 15:03:11 beck Exp $ */
 /*
  * Copyright (c) 2020 Bob Beck <beck@openbsd.org>
  *
@@ -390,7 +390,7 @@ x509_constraints_parse_mailbox(uint8_t *candidate, size_t len,
 		}
 		if (c == '@') {
 			if (wi == 0)
-				goto bad;;
+				goto bad;
 			if (candidate_local != NULL)
 				goto bad;
 			candidate_local = strdup(working);
@@ -424,9 +424,14 @@ x509_constraints_parse_mailbox(uint8_t *candidate, size_t len,
 	    strlen(candidate_domain)))
 		goto bad;
 
-	name->local = candidate_local;
-	name->name = candidate_domain;
-	name->type = GEN_EMAIL;
+	if (name != NULL) {
+		name->local = candidate_local;
+		name->name = candidate_domain;
+		name->type = GEN_EMAIL;
+	} else {
+		free(candidate_local);
+		free(candidate_domain);
+	}
 	return 1;
  bad:
 	free(candidate_local);
@@ -450,9 +455,15 @@ x509_constraints_valid_domain_constraint(uint8_t *constraint, size_t len)
 }
 
 /*
- * Extract the host part of a URI, returns the host part as a c string
- * the caller must free, or or NULL if it could not be found or is
- * invalid.
+ * Extract the host part of a URI. On failure to parse a valid host part of the
+ * URI, 0 is returned indicating an invalid URI. If the host part parses as
+ * valid, or is not present, 1 is returned indicating a possibly valid URI.
+ *
+ * In the case of a valid URI, *hostpart will be set to a copy of the host part
+ * of the URI, or the empty string if no URI is present. If memory allocation
+ * fails *hostpart will be set to NULL, even though we returned 1. It is the
+ * caller's responsibility to indicate an error for memory allocation failure,
+ * and the callers responsibility to free *hostpart.
  *
  * RFC 3986:
  * the authority part of a uri starts with // and is terminated with
@@ -484,8 +495,17 @@ x509_constraints_uri_host(uint8_t *uri, size_t len, char **hostpart)
 			break;
 		}
 	}
-	if (authority == NULL)
-		return 0;
+	if (authority == NULL) {
+		/*
+		 * There is no authority, so no host part in this
+		 * URI. This might be ok or might not, but it must
+		 * fail if we run into a name constraint later, so
+		 * we indicate that we have a URI with an empty
+		 * host part, and succeed.
+		 */
+		*hostpart = strdup("");
+		return 1;
+	}
 	for (i = authority - uri; i < len; i++) {
 		if (!isascii(uri[i]))
 			return 0;
@@ -511,7 +531,8 @@ x509_constraints_uri_host(uint8_t *uri, size_t len, char **hostpart)
 		host = authority;
 	if (!x509_constraints_valid_host(host, hostlen))
 		return 0;
-	*hostpart = strndup(host, hostlen);
+	if (hostpart != NULL)
+		*hostpart = strndup(host, hostlen);
 	return 1;
 }
 
@@ -630,7 +651,11 @@ int
 x509_constraints_dirname(uint8_t *dirname, size_t dlen,
     uint8_t *constraint, size_t len)
 {
-	if (len != dlen)
+	/*
+	 * The constraint must be a prefix in DER format, so it can't be
+	 * longer than the name it is checked against.
+	 */
+	if (len > dlen)
 		return 0;
 	return (memcmp(constraint, dirname, len) == 0);
 }
@@ -647,35 +672,45 @@ x509_constraints_general_to_bytes(GENERAL_NAME *name, uint8_t **bytes,
 
 	if (name->type == GEN_DNS) {
 		ASN1_IA5STRING *aname = name->d.dNSName;
+
 		*bytes = aname->data;
-		*len = strlen(aname->data);
+		*len = aname->length;
+
 		return name->type;
 	}
 	if (name->type == GEN_EMAIL) {
 		ASN1_IA5STRING *aname = name->d.rfc822Name;
+
 		*bytes = aname->data;
-		*len = strlen(aname->data);
+		*len = aname->length;
+
 		return name->type;
 	}
 	if (name->type == GEN_URI) {
 		ASN1_IA5STRING *aname = name->d.uniformResourceIdentifier;
+
 		*bytes = aname->data;
-		*len = strlen(aname->data);
+		*len = aname->length;
+
 		return name->type;
 	}
 	if (name->type == GEN_DIRNAME) {
 		X509_NAME *dname = name->d.directoryName;
+
 		if (!dname->modified || i2d_X509_NAME(dname, NULL) >= 0) {
 			*bytes = dname->canon_enc;
 			*len = dname->canon_enclen;
+
 			return name->type;
 		}
 	}
 	if (name->type == GEN_IPADD) {
 		*bytes = name->d.ip->data;
 		*len = name->d.ip->length;
+
 		return name->type;
 	}
+
 	return 0;
 }
 
@@ -713,7 +748,7 @@ x509_constraints_extract_names(struct x509_constraints_names *names,
 				*error = X509_V_ERR_UNSUPPORTED_NAME_SYNTAX;
 				goto err;
 			}
-			if ((vname->name = strdup(bytes)) == NULL) {
+			if ((vname->name = strndup(bytes, len)) == NULL) {
 				*error = X509_V_ERR_OUT_OF_MEM;
 				goto err;
 			}
@@ -741,13 +776,13 @@ x509_constraints_extract_names(struct x509_constraints_names *names,
 			vname->type = GEN_URI;
 			break;
 		case GEN_DIRNAME:
+			if (len == 0) {
+				*error = X509_V_ERR_UNSUPPORTED_NAME_SYNTAX;
+				goto err;
+			}
 			if (bytes == NULL || ((vname->der = malloc(len)) ==
 			    NULL)) {
 				*error = X509_V_ERR_OUT_OF_MEM;
-				goto err;
-			}
-			if (len == 0) {
-				*error = X509_V_ERR_UNSUPPORTED_NAME_SYNTAX;
 				goto err;
 			}
 			memcpy(vname->der, bytes, len);
@@ -759,8 +794,7 @@ x509_constraints_extract_names(struct x509_constraints_names *names,
 				vname->af = AF_INET;
 			if (len == 16)
 				vname->af = AF_INET6;
-			if (vname->af != AF_INET && vname->af !=
-			    AF_INET6) {
+			if (vname->af != AF_INET && vname->af != AF_INET6) {
 				*error = X509_V_ERR_UNSUPPORTED_NAME_SYNTAX;
 				goto err;
 			}
@@ -887,21 +921,34 @@ x509_constraints_extract_names(struct x509_constraints_names *names,
  */
 int
 x509_constraints_validate(GENERAL_NAME *constraint,
-    struct x509_constraints_name *name, int *error)
+    struct x509_constraints_name **out_name, int *out_error)
 {
 	uint8_t *bytes = NULL;
 	size_t len = 0;
+	struct x509_constraints_name *name;
+	int error = X509_V_ERR_UNSUPPORTED_CONSTRAINT_SYNTAX;
 	int name_type;
+
+	if (out_name == NULL || *out_name != NULL)
+		return 0;
+
+	if (out_error != NULL)
+		*out_error = 0;
+
+	if ((name = x509_constraints_name_new()) == NULL) {
+		error = X509_V_ERR_OUT_OF_MEM;
+		goto err;
+	}
 
 	name_type = x509_constraints_general_to_bytes(constraint, &bytes, &len);
 	switch (name_type) {
 	case GEN_DIRNAME:
-		if (bytes == NULL || (name->der = malloc(len)) == NULL) {
-			*error = X509_V_ERR_OUT_OF_MEM;
-			return 0;
-		}
 		if (len == 0)
 			goto err; /* XXX The RFCs are delightfully vague */
+		if (bytes == NULL || (name->der = malloc(len)) == NULL) {
+			error = X509_V_ERR_OUT_OF_MEM;
+			goto err;
+		}
 		memcpy(name->der, bytes, len);
 		name->der_len = len;
 		name->type = GEN_DIRNAME;
@@ -909,24 +956,31 @@ x509_constraints_validate(GENERAL_NAME *constraint,
 	case GEN_DNS:
 		if (!x509_constraints_valid_domain_constraint(bytes, len))
 			goto err;
-		if ((name->name = strdup(bytes)) == NULL) {
-			*error = X509_V_ERR_OUT_OF_MEM;
-			return 0;
+		if ((name->name = strndup(bytes, len)) == NULL) {
+			error = X509_V_ERR_OUT_OF_MEM;
+			goto err;
 		}
 		name->type = GEN_DNS;
 		break;
 	case GEN_EMAIL:
-		if (memchr(bytes, '@', len) != NULL) {
+		if (len > 0 && memchr(bytes + 1, '@', len - 1) != NULL) {
 			if (!x509_constraints_parse_mailbox(bytes, len, name))
 				goto err;
-		} else {
-			if (!x509_constraints_valid_domain_constraint(bytes,
-			    len))
-				goto err;
-			if ((name->name = strdup(bytes)) == NULL) {
-				*error = X509_V_ERR_OUT_OF_MEM;
-				return 0;
-			}
+			break;
+		}
+		/*
+		 * Mail constraints of the form @domain.com are accepted by
+		 * OpenSSL and Microsoft.
+		 */
+		if (len > 0 && bytes[0] == '@') {
+			bytes++;
+			len--;
+		}
+		if (!x509_constraints_valid_domain_constraint(bytes, len))
+			goto err;
+		if ((name->name = strndup(bytes, len)) == NULL) {
+			error = X509_V_ERR_OUT_OF_MEM;
+			goto err;
 		}
 		name->type = GEN_EMAIL;
 		break;
@@ -944,15 +998,25 @@ x509_constraints_validate(GENERAL_NAME *constraint,
 	case GEN_URI:
 		if (!x509_constraints_valid_domain_constraint(bytes, len))
 			goto err;
-		name->name = strdup(bytes);
+		if ((name->name = strndup(bytes, len)) == NULL) {
+			error = X509_V_ERR_OUT_OF_MEM;
+			goto err;
+		}
 		name->type = GEN_URI;
 		break;
 	default:
 		break;
 	}
+
+	*out_name = name;
+
 	return 1;
+
  err:
-	*error = X509_V_ERR_UNSUPPORTED_CONSTRAINT_SYNTAX;
+	x509_constraints_name_free(name);
+	if (out_error != NULL)
+		*out_error = error;
+
 	return 0;
 }
 
@@ -962,7 +1026,7 @@ x509_constraints_extract_constraints(X509 *cert,
     struct x509_constraints_names *excluded,
     int *error)
 {
-	struct x509_constraints_name *vname;
+	struct x509_constraints_name *vname = NULL;
 	NAME_CONSTRAINTS *nc = cert->nc;
 	GENERAL_SUBTREE *subtree;
 	int i;
@@ -977,24 +1041,20 @@ x509_constraints_extract_constraints(X509 *cert,
 			*error = X509_V_ERR_SUBTREE_MINMAX;
 			return 0;
 		}
-		if ((vname = x509_constraints_name_new()) == NULL) {
-			*error = X509_V_ERR_OUT_OF_MEM;
+		if (!x509_constraints_validate(subtree->base, &vname, error))
 			return 0;
-		}
-		if (x509_constraints_validate(subtree->base, vname, error) ==
-		    0) {
-			x509_constraints_name_free(vname);
-			return 0;
-		}
 		if (vname->type == 0) {
 			x509_constraints_name_free(vname);
+			vname = NULL;
 			continue;
 		}
 		if (!x509_constraints_names_add(permitted, vname)) {
 			x509_constraints_name_free(vname);
+			vname = NULL;
 			*error = X509_V_ERR_OUT_OF_MEM;
 			return 0;
 		}
+		vname = NULL;
 	}
 
 	for (i = 0; i < sk_GENERAL_SUBTREE_num(nc->excludedSubtrees); i++) {
@@ -1003,24 +1063,20 @@ x509_constraints_extract_constraints(X509 *cert,
 			*error = X509_V_ERR_SUBTREE_MINMAX;
 			return 0;
 		}
-		if ((vname = x509_constraints_name_new()) == NULL) {
-			*error = X509_V_ERR_OUT_OF_MEM;
+		if (!x509_constraints_validate(subtree->base, &vname, error))
 			return 0;
-		}
-		if (x509_constraints_validate(subtree->base, vname, error) ==
-		    0) {
-			x509_constraints_name_free(vname);
-			return 0;
-		}
 		if (vname->type == 0) {
 			x509_constraints_name_free(vname);
+			vname = NULL;
 			continue;
 		}
 		if (!x509_constraints_names_add(excluded, vname)) {
 			x509_constraints_name_free(vname);
+			vname = NULL;
 			*error = X509_V_ERR_OUT_OF_MEM;
 			return 0;
 		}
+		vname = NULL;
 	}
 
 	return 1;

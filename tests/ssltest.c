@@ -1,4 +1,4 @@
-/* ssl/ssltest.c */
+/*	$OpenBSD: ssltest.c,v 1.35 2022/07/07 13:10:22 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -143,7 +143,6 @@
 #define _BSD_SOURCE 1		/* Or gethostname won't be declared properly
 				   on Linux and GNU platforms. */
 #include <sys/types.h>
-#include <sys/param.h>
 #include <sys/socket.h>
 
 #include <netinet/in.h>
@@ -176,6 +175,8 @@
 #include <openssl/dsa.h>
 #include <openssl/dh.h>
 #include <openssl/bn.h>
+
+#include "ssl_locl.h"
 
 #define TEST_SERVER_CERT "../apps/server.pem"
 #define TEST_CLIENT_CERT "../apps/client.pem"
@@ -370,34 +371,45 @@ static void
 print_details(SSL *c_ssl, const char *prefix)
 {
 	const SSL_CIPHER *ciph;
-	X509 *cert;
+	X509 *cert = NULL;
+	EVP_PKEY *pkey;
 
 	ciph = SSL_get_current_cipher(c_ssl);
 	BIO_printf(bio_stdout, "%s%s, cipher %s %s",
 	    prefix, SSL_get_version(c_ssl), SSL_CIPHER_get_version(ciph),
 	    SSL_CIPHER_get_name(ciph));
-	cert = SSL_get_peer_certificate(c_ssl);
-	if (cert != NULL) {
-		EVP_PKEY *pkey = X509_get_pubkey(cert);
-		if (pkey != NULL) {
-			if (pkey->type == EVP_PKEY_RSA &&
-			    pkey->pkey.rsa != NULL &&
-			    pkey->pkey.rsa->n != NULL) {
-				BIO_printf(bio_stdout, ", %d bit RSA",
-				    BN_num_bits(pkey->pkey.rsa->n));
-			} else if (pkey->type == EVP_PKEY_DSA &&
-			    pkey->pkey.dsa != NULL &&
-			    pkey->pkey.dsa->p != NULL) {
-				BIO_printf(bio_stdout, ", %d bit DSA",
-				    BN_num_bits(pkey->pkey.dsa->p));
-			}
-			EVP_PKEY_free(pkey);
-		}
-		X509_free(cert);
+
+	if ((cert = SSL_get_peer_certificate(c_ssl)) == NULL)
+		goto out;
+	if ((pkey = X509_get0_pubkey(cert)) == NULL)
+		goto out;
+	if (EVP_PKEY_id(pkey) == EVP_PKEY_RSA) {
+		RSA *rsa;
+
+		if ((rsa = EVP_PKEY_get0_RSA(pkey)) == NULL)
+			goto out;
+
+		BIO_printf(bio_stdout, ", %d bit RSA", RSA_bits(rsa));
+	} else if (EVP_PKEY_id(pkey) == EVP_PKEY_DSA) {
+		DSA *dsa;
+		const BIGNUM *p;
+
+		if ((dsa = EVP_PKEY_get0_DSA(pkey)) == NULL)
+			goto out;
+
+		DSA_get0_pqg(dsa, &p, NULL, NULL);
+
+		BIO_printf(bio_stdout, ", %d bit DSA", BN_num_bits(p));
 	}
-	/* The SSL API does not allow us to look at temporary RSA/DH keys,
-	 * otherwise we should print their lengths too */
+
+ out:
+	/*
+	 * The SSL API does not allow us to look at temporary RSA/DH keys,
+	 * otherwise we should print their lengths too
+	 */
 	BIO_printf(bio_stdout, "\n");
+
+	X509_free(cert);
 }
 
 int
@@ -422,6 +434,7 @@ main(int argc, char *argv[])
 	const SSL_METHOD *meth = NULL;
 	SSL *c_ssl, *s_ssl;
 	int number = 1, reuse = 0;
+	int seclevel = 0;
 	long bytes = 256L;
 	DH *dh;
 	int dhe1024dsa = 0;
@@ -482,6 +495,10 @@ main(int argc, char *argv[])
 			number = atoi(*(++argv));
 			if (number == 0)
 				number = 1;
+		} else if (strncmp(*argv, "-seclevel", 9) == 0) {
+			if (--argc < 1)
+				goto bad;
+			seclevel = atoi(*(++argv));
 		} else if (strcmp(*argv, "-bytes") == 0) {
 			if (--argc < 1)
 				goto bad;
@@ -608,6 +625,9 @@ bad:
 		goto end;
 	}
 
+	SSL_CTX_set_security_level(c_ctx, seclevel);
+	SSL_CTX_set_security_level(s_ctx, seclevel);
+
 	if (cipher != NULL) {
 		SSL_CTX_set_cipher_list(c_ctx, cipher);
 		SSL_CTX_set_cipher_list(s_ctx, cipher);
@@ -647,8 +667,7 @@ bad:
 		EC_KEY_free(ecdh);
 	}
 
-	if (!SSL_CTX_use_certificate_file(s_ctx, server_cert,
-	    SSL_FILETYPE_PEM)) {
+	if (!SSL_CTX_use_certificate_chain_file(s_ctx, server_cert)) {
 		ERR_print_errors(bio_err);
 	} else if (!SSL_CTX_use_PrivateKey_file(s_ctx,
 	    (server_key ? server_key : server_cert), SSL_FILETYPE_PEM)) {
@@ -657,8 +676,7 @@ bad:
 	}
 
 	if (client_auth) {
-		SSL_CTX_use_certificate_file(c_ctx, client_cert,
-		    SSL_FILETYPE_PEM);
+		SSL_CTX_use_certificate_chain_file(c_ctx, client_cert);
 		SSL_CTX_use_PrivateKey_file(c_ctx,
 		    (client_key ? client_key : client_cert),
 		    SSL_FILETYPE_PEM);
@@ -1389,24 +1407,27 @@ get_proxy_auth_ex_data_idx(void)
 static int
 verify_callback(int ok, X509_STORE_CTX *ctx)
 {
+	X509 *xs;
 	char *s, buf[256];
+	int error, error_depth;
 
-	s = X509_NAME_oneline(X509_get_subject_name(ctx->current_cert), buf,
-	    sizeof buf);
+	xs = X509_STORE_CTX_get_current_cert(ctx);
+	s = X509_NAME_oneline(X509_get_subject_name(xs), buf, sizeof buf);
+	error = X509_STORE_CTX_get_error(ctx);
+	error_depth = X509_STORE_CTX_get_error_depth(ctx);
 	if (s != NULL) {
 		if (ok)
-			fprintf(stderr, "depth=%d %s\n",
-			    ctx->error_depth, buf);
+			fprintf(stderr, "depth=%d %s\n", error_depth, buf);
 		else {
-			fprintf(stderr, "depth=%d error=%d %s\n",
-			    ctx->error_depth, ctx->error, buf);
+			fprintf(stderr, "depth=%d error=%d %s\n", error_depth,
+			    error, buf);
 		}
 	}
 
 	if (ok == 0) {
 		fprintf(stderr, "Error string: %s\n",
-		    X509_verify_cert_error_string(ctx->error));
-		switch (ctx->error) {
+		    X509_verify_cert_error_string(error));
+		switch (error) {
 		case X509_V_ERR_CERT_NOT_YET_VALID:
 		case X509_V_ERR_CERT_HAS_EXPIRED:
 		case X509_V_ERR_DEPTH_ZERO_SELF_SIGNED_CERT:
@@ -1416,12 +1437,7 @@ verify_callback(int ok, X509_STORE_CTX *ctx)
 	}
 
 	if (ok == 1) {
-		X509 *xs = ctx->current_cert;
-#if 0
-		X509 *xi = ctx->current_issuer;
-#endif
-
-		if (xs->ex_flags & EXFLAG_PROXY) {
+		if (X509_get_extension_flags(xs) & EXFLAG_PROXY) {
 			unsigned int *letters =
 			    X509_STORE_CTX_get_ex_data(ctx,
 			    get_proxy_auth_ex_data_idx());
@@ -1759,16 +1775,19 @@ app_verify_callback(X509_STORE_CTX *ctx, void *arg)
 	unsigned int letters[26]; /* only used with proxy_auth */
 
 	if (cb_arg->app_verify) {
+		X509 *xs;
 		char *s = NULL, buf[256];
 
+		xs = X509_STORE_CTX_get0_cert(ctx);
 		fprintf(stderr, "In app_verify_callback, allowing cert. ");
 		fprintf(stderr, "Arg is: %s\n", cb_arg->string);
 		fprintf(stderr, "Finished printing do we have a context? 0x%p a cert? 0x%p\n",
-		    (void *)ctx, (void *)ctx->cert);
-		if (ctx->cert)
-			s = X509_NAME_oneline(X509_get_subject_name(ctx->cert), buf, 256);
+		    (void *)ctx, (void *)xs);
+		if (xs)
+			s = X509_NAME_oneline(X509_get_subject_name(xs), buf, 256);
 		if (s != NULL) {
-			fprintf(stderr, "cert depth=%d %s\n", ctx->error_depth, buf);
+			fprintf(stderr, "cert depth=%d %s\n",
+			    X509_STORE_CTX_get_error_depth(ctx), buf);
 		}
 		return (1);
 	}
@@ -1855,16 +1874,26 @@ get_dh1024()
 		0x02,
 	};
 	DH *dh;
+	BIGNUM *dh_p = NULL, *dh_g = NULL;
 
 	if ((dh = DH_new()) == NULL)
-		return (NULL);
-	dh->p = BN_bin2bn(dh1024_p, sizeof(dh1024_p), NULL);
-	dh->g = BN_bin2bn(dh1024_g, sizeof(dh1024_g), NULL);
-	if ((dh->p == NULL) || (dh->g == NULL)) {
-		DH_free(dh);
-		return (NULL);
-	}
-	return (dh);
+		return NULL;
+
+	dh_p = BN_bin2bn(dh1024_p, sizeof(dh1024_p), NULL);
+	dh_g = BN_bin2bn(dh1024_g, sizeof(dh1024_g), NULL);
+	if (dh_p == NULL || dh_g == NULL)
+		goto err;
+
+	if (!DH_set0_pqg(dh, dh_p, NULL, dh_g))
+		goto err;
+
+	return dh;
+
+ err:
+	BN_free(dh_p);
+	BN_free(dh_g);
+	DH_free(dh);
+	return NULL;
 }
 
 static DH *
@@ -1897,15 +1926,26 @@ get_dh1024dsa()
 		0x07, 0xE7, 0x68, 0x1A, 0x82, 0x5D, 0x32, 0xA2,
 	};
 	DH *dh;
+	BIGNUM *dh_p = NULL, *dh_g = NULL;
 
 	if ((dh = DH_new()) == NULL)
-		return (NULL);
-	dh->p = BN_bin2bn(dh1024_p, sizeof(dh1024_p), NULL);
-	dh->g = BN_bin2bn(dh1024_g, sizeof(dh1024_g), NULL);
-	if ((dh->p == NULL) || (dh->g == NULL)) {
-		DH_free(dh);
-		return (NULL);
-	}
-	dh->length = 160;
-	return (dh);
+		return NULL;
+
+	dh_p = BN_bin2bn(dh1024_p, sizeof(dh1024_p), NULL);
+	dh_g = BN_bin2bn(dh1024_g, sizeof(dh1024_g), NULL);
+	if (dh_p == NULL || dh_g == NULL)
+		goto err;
+
+	if (!DH_set0_pqg(dh, dh_p, NULL, dh_g))
+		goto err;
+
+	DH_set_length(dh, 160);
+
+	return dh;
+
+ err:
+	BN_free(dh_p);
+	BN_free(dh_g);
+	DH_free(dh);
+	return NULL;
 }

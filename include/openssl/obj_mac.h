@@ -881,6 +881,14 @@
 #define NID_id_ct_signedChecklist		1014
 #define OBJ_id_ct_signedChecklist		OBJ_id_smime_ct,48L
 
+#define SN_id_ct_ASPA		"id-ct-ASPA"
+#define NID_id_ct_ASPA		1017
+#define OBJ_id_ct_ASPA		OBJ_id_smime_ct,49L
+
+#define SN_id_ct_signedTAL		"id-ct-signedTAL"
+#define NID_id_ct_signedTAL		1024
+#define OBJ_id_ct_signedTAL		OBJ_id_smime_ct,50L
+
 #define SN_id_smime_aa_receiptRequest		"id-smime-aa-receiptRequest"
 #define NID_id_smime_aa_receiptRequest		212
 #define OBJ_id_smime_aa_receiptRequest		OBJ_id_smime_aa,1L
@@ -996,6 +1004,10 @@
 #define SN_id_smime_aa_dvcs_dvc		"id-smime-aa-dvcs-dvc"
 #define NID_id_smime_aa_dvcs_dvc		240
 #define OBJ_id_smime_aa_dvcs_dvc		OBJ_id_smime_aa,29L
+
+#define SN_id_smime_aa_signingCertificateV2		"id-smime-aa-signingCertificateV2"
+#define NID_id_smime_aa_signingCertificateV2		1023
+#define OBJ_id_smime_aa_signingCertificateV2		OBJ_id_smime_aa,47L
 
 #define SN_id_smime_alg_ESDHwith3DES		"id-smime-alg-ESDHwith3DES"
 #define NID_id_smime_alg_ESDHwith3DES		241
@@ -1517,6 +1529,11 @@
 #define LN_proxyCertInfo		"Proxy Certificate Information"
 #define NID_proxyCertInfo		663
 #define OBJ_proxyCertInfo		OBJ_id_pe,14L
+
+#define SN_tlsfeature		"tlsfeature"
+#define LN_tlsfeature		"TLS Feature"
+#define NID_tlsfeature		1016
+#define OBJ_tlsfeature		OBJ_id_pe,24L
 
 #define SN_sbgp_ipAddrBlockv2		"sbgp-ipAddrBlockv2"
 #define NID_sbgp_ipAddrBlockv2		1006
@@ -4220,6 +4237,30 @@
 
 #define SN_dh_cofactor_kdf		"dh-cofactor-kdf"
 #define NID_dh_cofactor_kdf		991
+
+#define SN_ct_precert_scts		"ct_precert_scts"
+#define LN_ct_precert_scts		"CT Precertificate SCTs"
+#define NID_ct_precert_scts		1018
+#define OBJ_ct_precert_scts		1L,3L,6L,1L,4L,1L,11129L,2L,4L,2L
+
+#define SN_ct_precert_poison		"ct_precert_poison"
+#define LN_ct_precert_poison		"CT Precertificate Poison"
+#define NID_ct_precert_poison		1019
+#define OBJ_ct_precert_poison		1L,3L,6L,1L,4L,1L,11129L,2L,4L,3L
+
+#define SN_ct_precert_signer		"ct_precert_signer"
+#define LN_ct_precert_signer		"CT Precertificate Signer"
+#define NID_ct_precert_signer		1020
+#define OBJ_ct_precert_signer		1L,3L,6L,1L,4L,1L,11129L,2L,4L,4L
+
+#define SN_ct_cert_scts		"ct_cert_scts"
+#define LN_ct_cert_scts		"CT Certificate SCTs"
+#define NID_ct_cert_scts		1021
+#define OBJ_ct_cert_scts		1L,3L,6L,1L,4L,1L,11129L,2L,4L,5L
+
+#define SN_hkdf		"HKDF"
+#define LN_hkdf		"hkdf"
+#define NID_hkdf		1022
 
 #define SN_teletrust		"teletrust"
 #define NID_teletrust		920

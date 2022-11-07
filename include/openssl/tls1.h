@@ -1,4 +1,4 @@
-/* $OpenBSD: tls1.h,v 1.49 2021/09/10 14:57:31 tb Exp $ */
+/* $OpenBSD: tls1.h,v 1.56 2022/07/17 14:39:09 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -159,6 +159,8 @@
 extern "C" {
 #endif
 
+#define OPENSSL_TLS_SECURITY_LEVEL 1
+
 #define TLS1_ALLOW_EXPERIMENTAL_CIPHERSUITES	0
 
 #if defined(LIBRESSL_HAS_TLS1_3) || defined(LIBRESSL_INTERNAL)
@@ -268,6 +270,11 @@ extern "C" {
 #define TLSEXT_TYPE_post_handshake_auth		49
 #define TLSEXT_TYPE_signature_algorithms_cert	50
 #define TLSEXT_TYPE_key_share			51
+#endif
+
+/* ExtensionType value from RFC 9001 section 8.2 */
+#if defined(LIBRESSL_HAS_QUIC) || defined(LIBRESSL_INTERNAL)
+#define TLSEXT_TYPE_quic_transport_parameters	57
 #endif
 
 /*
@@ -722,6 +729,12 @@ SSL_CTX_callback_ctrl(ssl,SSL_CTRL_SET_TLSEXT_TICKET_KEY_CB,(void (*)(void))cb)
 #define TLS1_3_TXT_CHACHA20_POLY1305_SHA256		"AEAD-CHACHA20-POLY1305-SHA256"
 #define TLS1_3_TXT_AES_128_CCM_SHA256			"AEAD-AES128-CCM-SHA256"
 #define TLS1_3_TXT_AES_128_CCM_8_SHA256			"AEAD-AES128-CCM-8-SHA256"
+
+#define TLS1_3_RFC_AES_128_GCM_SHA256			"TLS_AES_128_GCM_SHA256"
+#define TLS1_3_RFC_AES_256_GCM_SHA384			"TLS_AES_256_GCM_SHA384"
+#define TLS1_3_RFC_CHACHA20_POLY1305_SHA256		"TLS_CHACHA20_POLY1305_SHA256"
+#define TLS1_3_RFC_AES_128_CCM_SHA256			"TLS_AES_128_CCM_SHA256"
+#define TLS1_3_RFC_AES_128_CCM_8_SHA256			"TLS_AES_128_CCM_8_SHA256"
 #endif
 
 #define TLS_CT_RSA_SIGN			1
@@ -760,14 +773,6 @@ SSL_CTX_callback_ctrl(ssl,SSL_CTRL_SET_TLSEXT_TICKET_KEY_CB,(void (*)(void))cb)
 #define TLS_MD_IV_BLOCK_CONST_SIZE		8
 #define TLS_MD_MASTER_SECRET_CONST		"master secret"
 #define TLS_MD_MASTER_SECRET_CONST_SIZE		13
-
-#if defined(LIBRESSL_INTERNAL)
-/* TLS Session Ticket extension struct. */
-struct tls_session_ticket_ext_st {
-	unsigned short length;
-	void *data;
-};
-#endif
 
 #ifdef  __cplusplus
 }

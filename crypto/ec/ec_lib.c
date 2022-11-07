@@ -1,4 +1,4 @@
-/* $OpenBSD: ec_lib.c,v 1.41 2021/09/12 16:23:19 tb Exp $ */
+/* $OpenBSD: ec_lib.c,v 1.45 2022/04/07 17:37:25 tb Exp $ */
 /*
  * Originally written by Bodo Moeller for the OpenSSL project.
  */
@@ -114,7 +114,7 @@ EC_GROUP_new(const EC_METHOD * meth)
 }
 
 
-void 
+void
 EC_GROUP_free(EC_GROUP * group)
 {
 	if (!group)
@@ -135,7 +135,7 @@ EC_GROUP_free(EC_GROUP * group)
 }
 
 
-void 
+void
 EC_GROUP_clear_free(EC_GROUP * group)
 {
 	if (!group)
@@ -157,7 +157,7 @@ EC_GROUP_clear_free(EC_GROUP * group)
 }
 
 
-int 
+int
 EC_GROUP_copy(EC_GROUP * dest, const EC_GROUP * src)
 {
 	EC_EXTRA_DATA *d;
@@ -247,7 +247,7 @@ EC_GROUP_method_of(const EC_GROUP *group)
 }
 
 
-int 
+int
 EC_METHOD_get_field_type(const EC_METHOD *meth)
 {
 	return meth->field_type;
@@ -300,7 +300,7 @@ ec_guess_cofactor(EC_GROUP *group)
 		if (!BN_copy(q, &group->field))
 			goto err;
 	}
-	
+
 	/*
 	 * Compute
 	 *     h = \lfloor (q + 1)/n \rceil = \lfloor (q + 1 + n/2) / n \rfloor.
@@ -321,14 +321,18 @@ ec_guess_cofactor(EC_GROUP *group)
 		goto err;
 
 	ret = 1;
+
  err:
 	BN_CTX_end(ctx);
 	BN_CTX_free(ctx);
-	BN_zero(&group->cofactor);
+
+	if (ret != 1)
+		BN_zero(&group->cofactor);
+
 	return ret;
 }
 
-int 
+int
 EC_GROUP_set_generator(EC_GROUP *group, const EC_POINT *generator,
     const BIGNUM *order, const BIGNUM *cofactor)
 {
@@ -344,10 +348,10 @@ EC_GROUP_set_generator(EC_GROUP *group, const EC_POINT *generator,
 	}
 
 	/*
-	 * Require order >= 1 and enforce an upper bound of at most one bit more
+	 * Require order > 1 and enforce an upper bound of at most one bit more
 	 * than the field cardinality due to Hasse's theorem.
 	 */
-	if (order == NULL || BN_is_zero(order) || BN_is_negative(order) ||
+	if (order == NULL || BN_cmp(order, BN_value_one()) <= 0 ||
 	    BN_num_bits(order) > BN_num_bits(&group->field) + 1) {
 		ECerror(EC_R_INVALID_GROUP_ORDER);
 		return 0;
@@ -381,6 +385,12 @@ EC_GROUP_set_generator(EC_GROUP *group, const EC_POINT *generator,
 	} else if (!ec_guess_cofactor(group))
 		return 0;
 
+	/* Use Hasse's theorem to bound the cofactor. */
+	if (BN_num_bits(&group->cofactor) > BN_num_bits(&group->field) + 1) {
+		ECerror(EC_R_INVALID_GROUP_ORDER);
+		return 0;
+	}
+
 	return 1;
 }
 
@@ -392,7 +402,7 @@ EC_GROUP_get0_generator(const EC_GROUP *group)
 }
 
 
-int 
+int
 EC_GROUP_get_order(const EC_GROUP *group, BIGNUM *order, BN_CTX *ctx)
 {
 	if (!BN_copy(order, &group->order))
@@ -407,7 +417,7 @@ EC_GROUP_order_bits(const EC_GROUP *group)
 	return group->meth->group_order_bits(group);
 }
 
-int 
+int
 EC_GROUP_get_cofactor(const EC_GROUP *group, BIGNUM *cofactor, BN_CTX *ctx)
 {
 	if (!BN_copy(cofactor, &group->cofactor))
@@ -417,35 +427,35 @@ EC_GROUP_get_cofactor(const EC_GROUP *group, BIGNUM *cofactor, BN_CTX *ctx)
 }
 
 
-void 
+void
 EC_GROUP_set_curve_name(EC_GROUP * group, int nid)
 {
 	group->curve_name = nid;
 }
 
 
-int 
+int
 EC_GROUP_get_curve_name(const EC_GROUP * group)
 {
 	return group->curve_name;
 }
 
 
-void 
+void
 EC_GROUP_set_asn1_flag(EC_GROUP * group, int flag)
 {
 	group->asn1_flag = flag;
 }
 
 
-int 
+int
 EC_GROUP_get_asn1_flag(const EC_GROUP * group)
 {
 	return group->asn1_flag;
 }
 
 
-void 
+void
 EC_GROUP_set_point_conversion_form(EC_GROUP * group,
     point_conversion_form_t form)
 {
@@ -453,14 +463,14 @@ EC_GROUP_set_point_conversion_form(EC_GROUP * group,
 }
 
 
-point_conversion_form_t 
+point_conversion_form_t
 EC_GROUP_get_point_conversion_form(const EC_GROUP * group)
 {
 	return group->asn1_form;
 }
 
 
-size_t 
+size_t
 EC_GROUP_set_seed(EC_GROUP * group, const unsigned char *p, size_t len)
 {
 	if (group->seed) {
@@ -487,7 +497,7 @@ EC_GROUP_get0_seed(const EC_GROUP * group)
 }
 
 
-size_t 
+size_t
 EC_GROUP_get_seed_len(const EC_GROUP * group)
 {
 	return group->seed_len;
@@ -545,7 +555,7 @@ EC_GROUP_get_curve_GF2m(const EC_GROUP *group, BIGNUM *p, BIGNUM *a,
 }
 #endif
 
-int 
+int
 EC_GROUP_get_degree(const EC_GROUP * group)
 {
 	if (group->meth->group_get_degree == 0) {
@@ -556,7 +566,7 @@ EC_GROUP_get_degree(const EC_GROUP * group)
 }
 
 
-int 
+int
 EC_GROUP_check_discriminant(const EC_GROUP * group, BN_CTX * ctx)
 {
 	if (group->meth->group_check_discriminant == 0) {
@@ -567,7 +577,7 @@ EC_GROUP_check_discriminant(const EC_GROUP * group, BN_CTX * ctx)
 }
 
 
-int 
+int
 EC_GROUP_cmp(const EC_GROUP * a, const EC_GROUP * b, BN_CTX * ctx)
 {
 	int r = 0;
@@ -660,7 +670,7 @@ ec_point_blind_coordinates(const EC_GROUP *group, EC_POINT *p, BN_CTX *ctx)
 }
 
 /* this has 'package' visibility */
-int 
+int
 EC_EX_DATA_set_data(EC_EXTRA_DATA ** ex_data, void *data,
     void *(*dup_func) (void *),
     void (*free_func) (void *),
@@ -716,7 +726,7 @@ EC_EX_DATA_get_data(const EC_EXTRA_DATA * ex_data,
 }
 
 /* this has 'package' visibility */
-void 
+void
 EC_EX_DATA_free_data(EC_EXTRA_DATA ** ex_data,
     void *(*dup_func) (void *),
     void (*free_func) (void *),
@@ -743,7 +753,7 @@ EC_EX_DATA_free_data(EC_EXTRA_DATA ** ex_data,
 }
 
 /* this has 'package' visibility */
-void 
+void
 EC_EX_DATA_clear_free_data(EC_EXTRA_DATA ** ex_data,
     void *(*dup_func) (void *),
     void (*free_func) (void *),
@@ -770,7 +780,7 @@ EC_EX_DATA_clear_free_data(EC_EXTRA_DATA ** ex_data,
 }
 
 /* this has 'package' visibility */
-void 
+void
 EC_EX_DATA_free_all_data(EC_EXTRA_DATA ** ex_data)
 {
 	EC_EXTRA_DATA *d;
@@ -791,7 +801,7 @@ EC_EX_DATA_free_all_data(EC_EXTRA_DATA ** ex_data)
 }
 
 /* this has 'package' visibility */
-void 
+void
 EC_EX_DATA_clear_free_all_data(EC_EXTRA_DATA ** ex_data)
 {
 	EC_EXTRA_DATA *d;
@@ -842,7 +852,7 @@ EC_POINT_new(const EC_GROUP * group)
 }
 
 
-void 
+void
 EC_POINT_free(EC_POINT * point)
 {
 	if (!point)
@@ -854,7 +864,7 @@ EC_POINT_free(EC_POINT * point)
 }
 
 
-void 
+void
 EC_POINT_clear_free(EC_POINT * point)
 {
 	if (!point)
@@ -868,7 +878,7 @@ EC_POINT_clear_free(EC_POINT * point)
 }
 
 
-int 
+int
 EC_POINT_copy(EC_POINT * dest, const EC_POINT * src)
 {
 	if (dest->meth->point_copy == 0) {
@@ -913,7 +923,7 @@ EC_POINT_method_of(const EC_POINT * point)
 }
 
 
-int 
+int
 EC_POINT_set_to_infinity(const EC_GROUP * group, EC_POINT * point)
 {
 	if (group->meth->point_set_to_infinity == 0) {
@@ -1041,7 +1051,7 @@ EC_POINT_get_affine_coordinates_GF2m(const EC_GROUP *group, const EC_POINT *poin
 }
 #endif
 
-int 
+int
 EC_POINT_add(const EC_GROUP *group, EC_POINT *r, const EC_POINT *a,
     const EC_POINT *b, BN_CTX *ctx)
 {
@@ -1057,7 +1067,7 @@ EC_POINT_add(const EC_GROUP *group, EC_POINT *r, const EC_POINT *a,
 }
 
 
-int 
+int
 EC_POINT_dbl(const EC_GROUP *group, EC_POINT *r, const EC_POINT *a, BN_CTX *ctx)
 {
 	if (group->meth->dbl == 0) {
@@ -1072,7 +1082,7 @@ EC_POINT_dbl(const EC_GROUP *group, EC_POINT *r, const EC_POINT *a, BN_CTX *ctx)
 }
 
 
-int 
+int
 EC_POINT_invert(const EC_GROUP *group, EC_POINT *a, BN_CTX *ctx)
 {
 	if (group->meth->invert == 0) {
@@ -1087,7 +1097,7 @@ EC_POINT_invert(const EC_GROUP *group, EC_POINT *a, BN_CTX *ctx)
 }
 
 
-int 
+int
 EC_POINT_is_at_infinity(const EC_GROUP *group, const EC_POINT *point)
 {
 	if (group->meth->is_at_infinity == 0) {
@@ -1102,7 +1112,7 @@ EC_POINT_is_at_infinity(const EC_GROUP *group, const EC_POINT *point)
 }
 
 
-int 
+int
 EC_POINT_is_on_curve(const EC_GROUP * group, const EC_POINT * point, BN_CTX * ctx)
 {
 	if (group->meth->is_on_curve == 0) {
@@ -1117,7 +1127,7 @@ EC_POINT_is_on_curve(const EC_GROUP * group, const EC_POINT * point, BN_CTX * ct
 }
 
 
-int 
+int
 EC_POINT_cmp(const EC_GROUP *group, const EC_POINT *a, const EC_POINT *b,
     BN_CTX * ctx)
 {
@@ -1133,7 +1143,7 @@ EC_POINT_cmp(const EC_GROUP *group, const EC_POINT *a, const EC_POINT *b,
 }
 
 
-int 
+int
 EC_POINT_make_affine(const EC_GROUP *group, EC_POINT *point, BN_CTX *ctx)
 {
 	if (group->meth->make_affine == 0) {
@@ -1148,7 +1158,7 @@ EC_POINT_make_affine(const EC_GROUP *group, EC_POINT *point, BN_CTX *ctx)
 }
 
 
-int 
+int
 EC_POINTs_make_affine(const EC_GROUP *group, size_t num, EC_POINT *points[],
     BN_CTX *ctx)
 {
@@ -1169,7 +1179,7 @@ EC_POINTs_make_affine(const EC_GROUP *group, size_t num, EC_POINT *points[],
 
 
 /* Functions for point multiplication */
-int 
+int
 EC_POINTs_mul(const EC_GROUP *group, EC_POINT *r, const BIGNUM *scalar,
     size_t num, const EC_POINT *points[], const BIGNUM *scalars[], BN_CTX *ctx)
 {
@@ -1184,22 +1194,22 @@ EC_POINTs_mul(const EC_GROUP *group, EC_POINT *r, const BIGNUM *scalar,
 		ECerror(ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED);
 		return 0;
 	}
-	
+
 	/* Either bP or aG + bP, this is sane. */
 	if (num == 1 && points != NULL && scalars != NULL)
 		return EC_POINT_mul(group, r, scalar, points[0], scalars[0],
 		    ctx);
-	
+
 	/* aG, this is sane */
 	if (scalar != NULL && points == NULL && scalars == NULL)
 		return EC_POINT_mul(group, r, scalar, NULL, NULL, ctx);
-	
+
 	/* anything else is an error */
 	ECerror(ERR_R_EC_LIB);
 	return 0;
 }
 
-int 
+int
 EC_POINT_mul(const EC_GROUP *group, EC_POINT *r, const BIGNUM *g_scalar,
     const EC_POINT *point, const BIGNUM *p_scalar, BN_CTX *ctx)
 {
@@ -1241,13 +1251,13 @@ EC_POINT_mul(const EC_GROUP *group, EC_POINT *r, const BIGNUM *g_scalar,
 		return group->meth->mul_double_nonct(group, r, g_scalar,
 		    p_scalar, point, ctx);
 	}
-		
+
 	/* Anything else is an error. */
 	ECerror(ERR_R_EC_LIB);
 	return 0;
 }
 
-int 
+int
 EC_GROUP_precompute_mult(EC_GROUP * group, BN_CTX * ctx)
 {
 	if (group->meth->precompute_mult != 0)
@@ -1256,7 +1266,7 @@ EC_GROUP_precompute_mult(EC_GROUP * group, BN_CTX * ctx)
 		return 1;	/* nothing to do, so report success */
 }
 
-int 
+int
 EC_GROUP_have_precompute_mult(const EC_GROUP * group)
 {
 	if (group->meth->have_precompute_mult != 0)
@@ -1290,5 +1300,5 @@ ECParameters_dup(EC_KEY *key)
 	if ((len = i2d_ECParameters(key, &p)) > 0)
 		k = d2i_ECParameters(NULL, (const unsigned char **)&p, len);
 
-	return (k);	
+	return (k);
 }
