@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_clnt.c,v 1.153 2022/08/17 07:39:19 jsing Exp $ */
+/* $OpenBSD: ssl_clnt.c,v 1.141 2022/02/05 14:54:10 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -217,13 +217,6 @@ ssl3_connect(SSL *s)
 			    &s->s3->hs.our_min_tls_version,
 			    &s->s3->hs.our_max_tls_version)) {
 				SSLerror(s, SSL_R_NO_PROTOCOLS_AVAILABLE);
-				ret = -1;
-				goto end;
-			}
-
-			if (!ssl_security_version(s,
-			    s->s3->hs.our_min_tls_version)) {
-				SSLerror(s, SSL_R_VERSION_TOO_LOW);
 				ret = -1;
 				goto end;
 			}
@@ -659,8 +652,9 @@ ssl3_send_client_hello(SSL *s)
 		}
 		s->version = max_version;
 
-		if (sess == NULL || sess->ssl_version != s->version ||
-		    (sess->session_id_length == 0 && sess->tlsext_tick == NULL) ||
+		if (sess == NULL ||
+		    sess->ssl_version != s->version ||
+		    (!sess->session_id_length && !sess->tlsext_tick) ||
 		    sess->not_resumable) {
 			if (!ssl_get_new_session(s, 0))
 				goto err;
@@ -822,6 +816,7 @@ ssl3_get_server_hello(SSL *s)
 	const SSL_CIPHER *cipher;
 	const SSL_METHOD *method;
 	unsigned long alg_k;
+	size_t outlen;
 	int al, ret;
 
 	s->internal->first_packet = 1;
@@ -928,26 +923,16 @@ ssl3_get_server_hello(SSL *s)
 	 * Check if we want to resume the session based on external
 	 * pre-shared secret.
 	 */
-	if (s->internal->tls_session_secret_cb != NULL) {
+	if (s->internal->tls_session_secret_cb) {
 		SSL_CIPHER *pref_cipher = NULL;
-		int master_key_length = sizeof(s->session->master_key);
-
-		if (!s->internal->tls_session_secret_cb(s,
-		    s->session->master_key, &master_key_length, NULL,
-		    &pref_cipher, s->internal->tls_session_secret_cb_arg)) {
-			SSLerror(s, ERR_R_INTERNAL_ERROR);
-			goto err;
-		}
-		if (master_key_length <= 0) {
-			SSLerror(s, ERR_R_INTERNAL_ERROR);
-			goto err;
-		}
-		s->session->master_key_length = master_key_length;
-
-		if ((s->session->cipher = pref_cipher) == NULL)
-			s->session->cipher =
+		s->session->master_key_length = sizeof(s->session->master_key);
+		if (s->internal->tls_session_secret_cb(s, s->session->master_key,
+		    &s->session->master_key_length, NULL, &pref_cipher,
+		    s->internal->tls_session_secret_cb_arg)) {
+			s->session->cipher = pref_cipher ? pref_cipher :
 			    ssl3_get_cipher_by_value(cipher_suite);
-		s->s3->flags |= SSL3_FLAGS_CCS_OK;
+			s->s3->flags |= SSL3_FLAGS_CCS_OK;
+		}
 	}
 
 	if (s->session->session_id_length != 0 &&
@@ -981,9 +966,9 @@ ssl3_get_server_hello(SSL *s)
 		 * zero length session identifier.
 		 */
 		if (!CBS_write_bytes(&session_id, s->session->session_id,
-		    sizeof(s->session->session_id),
-		    &s->session->session_id_length))
+		    sizeof(s->session->session_id), &outlen))
 			goto err;
+		s->session->session_id_length = outlen;
 
 		s->session->ssl_version = s->version;
 	}
@@ -1086,10 +1071,12 @@ ssl3_get_server_hello(SSL *s)
 int
 ssl3_get_server_certificate(SSL *s)
 {
-	CBS cbs, cert_list, cert_data;
-	STACK_OF(X509) *certs = NULL;
-	X509 *cert = NULL;
-	const uint8_t *p;
+	CBS cbs, cert_list;
+	X509 *x = NULL;
+	const unsigned char *q;
+	STACK_OF(X509) *sk = NULL;
+	EVP_PKEY *pkey;
+	int cert_type;
 	int al, ret;
 
 	if ((ret = ssl3_get_message(s, SSL3_ST_CR_CERT_A,
@@ -1109,7 +1096,7 @@ ssl3_get_server_certificate(SSL *s)
 		goto fatal_err;
 	}
 
-	if ((certs = sk_X509_new_null()) == NULL) {
+	if ((sk = sk_X509_new_null()) == NULL) {
 		SSLerror(s, ERR_R_MALLOC_FAILURE);
 		goto err;
 	}
@@ -1118,48 +1105,86 @@ ssl3_get_server_certificate(SSL *s)
 		goto decode_err;
 
 	CBS_init(&cbs, s->internal->init_msg, s->internal->init_num);
+	if (CBS_len(&cbs) < 3)
+		goto decode_err;
 
-	if (!CBS_get_u24_length_prefixed(&cbs, &cert_list))
-		goto decode_err;
-	if (CBS_len(&cbs) != 0)
-		goto decode_err;
+	if (!CBS_get_u24_length_prefixed(&cbs, &cert_list) ||
+	    CBS_len(&cbs) != 0) {
+		al = SSL_AD_DECODE_ERROR;
+		SSLerror(s, SSL_R_LENGTH_MISMATCH);
+		goto fatal_err;
+	}
 
 	while (CBS_len(&cert_list) > 0) {
-		if (!CBS_get_u24_length_prefixed(&cert_list, &cert_data))
+		CBS cert;
+
+		if (CBS_len(&cert_list) < 3)
 			goto decode_err;
-		p = CBS_data(&cert_data);
-		if ((cert = d2i_X509(NULL, &p, CBS_len(&cert_data))) == NULL) {
+		if (!CBS_get_u24_length_prefixed(&cert_list, &cert)) {
+			al = SSL_AD_DECODE_ERROR;
+			SSLerror(s, SSL_R_CERT_LENGTH_MISMATCH);
+			goto fatal_err;
+		}
+
+		q = CBS_data(&cert);
+		x = d2i_X509(NULL, &q, CBS_len(&cert));
+		if (x == NULL) {
 			al = SSL_AD_BAD_CERTIFICATE;
 			SSLerror(s, ERR_R_ASN1_LIB);
 			goto fatal_err;
 		}
-		if (p != CBS_data(&cert_data) + CBS_len(&cert_data))
-			goto decode_err;
-		if (!sk_X509_push(certs, cert)) {
+		if (q != CBS_data(&cert) + CBS_len(&cert)) {
+			al = SSL_AD_DECODE_ERROR;
+			SSLerror(s, SSL_R_CERT_LENGTH_MISMATCH);
+			goto fatal_err;
+		}
+		if (!sk_X509_push(sk, x)) {
 			SSLerror(s, ERR_R_MALLOC_FAILURE);
 			goto err;
 		}
-		cert = NULL;
+		x = NULL;
 	}
 
-	/* A server must always provide a non-empty certificate list. */
-	if (sk_X509_num(certs) < 1) {
-		SSLerror(s, SSL_R_PEER_DID_NOT_RETURN_A_CERTIFICATE);
-		goto decode_err;
-	}
-
-	if (ssl_verify_cert_chain(s, certs) <= 0 &&
+	if (ssl_verify_cert_chain(s, sk) <= 0 &&
 	    s->verify_mode != SSL_VERIFY_NONE) {
 		al = ssl_verify_alarm_type(s->verify_result);
 		SSLerror(s, SSL_R_CERTIFICATE_VERIFY_FAILED);
 		goto fatal_err;
 	}
+	ERR_clear_error(); /* but we keep s->verify_result */
+
+	/*
+	 * Inconsistency alert: cert_chain does include the peer's
+	 * certificate, which we don't include in s3_srvr.c
+	 */
+	x = sk_X509_value(sk, 0);
+
+	if ((pkey = X509_get0_pubkey(x)) == NULL ||
+	    EVP_PKEY_missing_parameters(pkey)) {
+		x = NULL;
+		al = SSL3_AL_FATAL;
+		SSLerror(s, SSL_R_UNABLE_TO_FIND_PUBLIC_KEY_PARAMETERS);
+		goto fatal_err;
+	}
+	if ((cert_type = ssl_cert_type(pkey)) < 0) {
+		x = NULL;
+		al = SSL3_AL_FATAL;
+		SSLerror(s, SSL_R_UNKNOWN_CERTIFICATE_TYPE);
+		goto fatal_err;
+	}
+
+	X509_up_ref(x);
+	X509_free(s->session->peer_cert);
+	s->session->peer_cert = x;
+	s->session->peer_cert_type = cert_type;
+
 	s->session->verify_result = s->verify_result;
-	ERR_clear_error();
 
-	if (!tls_process_peer_certs(s, certs))
-		goto err;
+	sk_X509_pop_free(s->session->cert_chain, X509_free);
+	s->session->cert_chain = sk;
+	sk = NULL;
 
+	x = NULL;
 	ret = 1;
 
 	if (0) {
@@ -1171,8 +1196,8 @@ ssl3_get_server_certificate(SSL *s)
 		ssl3_send_alert(s, SSL3_AL_FATAL, al);
 	}
  err:
-	sk_X509_pop_free(certs, X509_free);
-	X509_free(cert);
+	X509_free(x);
+	sk_X509_pop_free(sk, X509_free);
 
 	return (ret);
 }
@@ -1215,12 +1240,6 @@ ssl3_get_server_kex_dhe(SSL *s, CBS *cbs)
 		goto err;
 	}
 
-	if (!tls_key_share_peer_security(s, s->s3->hs.key_share)) {
-		SSLerror(s, SSL_R_DH_KEY_TOO_SMALL);
-		ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_HANDSHAKE_FAILURE);
-		return 0;
-	}
-
 	return 1;
 
  err:
@@ -1231,13 +1250,13 @@ static int
 ssl3_get_server_kex_ecdhe(SSL *s, CBS *cbs)
 {
 	uint8_t curve_type;
-	uint16_t group_id;
+	uint16_t curve_id;
 	int decode_error;
 	CBS public;
 
 	if (!CBS_get_u8(cbs, &curve_type))
 		goto decode_err;
-	if (!CBS_get_u16(cbs, &group_id))
+	if (!CBS_get_u16(cbs, &curve_id))
 		goto decode_err;
 
 	/* Only named curves are supported. */
@@ -1251,17 +1270,17 @@ ssl3_get_server_kex_ecdhe(SSL *s, CBS *cbs)
 		goto decode_err;
 
 	/*
-	 * Check that the group is one of our preferences - if it is not,
-	 * the server has sent us an invalid group.
+	 * Check that the curve is one of our preferences - if it is not,
+	 * the server has sent us an invalid curve.
 	 */
-	if (!tls1_check_group(s, group_id)) {
+	if (!tls1_check_curve(s, curve_id)) {
 		SSLerror(s, SSL_R_WRONG_CURVE);
 		ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_ILLEGAL_PARAMETER);
 		goto err;
 	}
 
 	tls_key_share_free(s->s3->hs.key_share);
-	if ((s->s3->hs.key_share = tls_key_share_new(group_id)) == NULL)
+	if ((s->s3->hs.key_share = tls_key_share_new(curve_id)) == NULL)
 		goto err;
 
 	if (!tls_key_share_peer_public(s->s3->hs.key_share, &public,
@@ -1577,7 +1596,6 @@ ssl3_get_new_session_ticket(SSL *s)
 {
 	uint32_t lifetime_hint;
 	CBS cbs, session_ticket;
-	unsigned int session_id_length = 0;
 	int al, ret;
 
 	if ((ret = ssl3_get_message(s, SSL3_ST_CR_SESSION_TICKET_A,
@@ -1629,15 +1647,12 @@ ssl3_get_new_session_ticket(SSL *s)
 	 *
 	 * We choose the former approach because this fits in with
 	 * assumptions elsewhere in OpenSSL. The session ID is set
-	 * to the SHA256 hash of the ticket.
+	 * to the SHA256 (or SHA1 is SHA256 is disabled) hash of the
+	 * ticket.
 	 */
-	if (!EVP_Digest(CBS_data(&session_ticket), CBS_len(&session_ticket),
-	    s->session->session_id, &session_id_length, EVP_sha256(), NULL)) {
-		al = SSL_AD_INTERNAL_ERROR;
-		SSLerror(s, ERR_R_EVP_LIB);
-		goto fatal_err;
-	}
-	s->session->session_id_length = session_id_length;
+	EVP_Digest(CBS_data(&session_ticket), CBS_len(&session_ticket),
+	    s->session->session_id, &s->session->session_id_length,
+	    EVP_sha256(), NULL);
 
 	return (1);
 
@@ -1729,6 +1744,7 @@ ssl3_get_cert_status(SSL *s)
 	}
 
 	if (s->ctx->internal->tlsext_status_cb) {
+		int ret;
 		ret = s->ctx->internal->tlsext_status_cb(s,
 		    s->ctx->internal->tlsext_status_arg);
 		if (ret == 0) {
@@ -1854,12 +1870,6 @@ ssl3_send_client_kex_dhe(SSL *s, CBB *cbb)
 		goto err;
 	if (!tls_key_share_derive(s->s3->hs.key_share, &key, &key_len))
 		goto err;
-
-	if (!tls_key_share_peer_security(s, s->s3->hs.key_share)) {
-		SSLerror(s, SSL_R_DH_KEY_TOO_SMALL);
-		ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_HANDSHAKE_FAILURE);
-		return 0;
-	}
 
 	if (!tls12_derive_master_secret(s, key, key_len))
 		goto err;

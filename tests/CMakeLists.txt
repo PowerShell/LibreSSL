@@ -4,7 +4,6 @@ include_directories(
 	.
 	../crypto/asn1
 	../crypto/bio
-	../crypto/bn
 	../crypto/evp
 	../crypto/modes
 	../crypto/x509
@@ -22,12 +21,7 @@ file(TO_NATIVE_PATH ${CMAKE_CURRENT_SOURCE_DIR} TEST_SOURCE_DIR)
 # aeadtest
 add_executable(aeadtest aeadtest.c)
 target_link_libraries(aeadtest ${OPENSSL_TEST_LIBS})
-if(NOT WIN32)
-	add_test(NAME aeadtest COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/aeadtest.sh)
-	set_tests_properties(aeadtest PROPERTIES ENVIRONMENT "srcdir=${TEST_SOURCE_DIR}")
-else()
-	add_test(aeadtest aeadtest aead ${CMAKE_CURRENT_SOURCE_DIR}/aeadtests.txt)
-endif()
+add_test(aeadtest aeadtest ${CMAKE_CURRENT_SOURCE_DIR}/aeadtests.txt)
 
 # aes_wrap
 add_executable(aes_wrap aes_wrap.c)
@@ -110,11 +104,6 @@ add_executable(bnaddsub bnaddsub.c)
 target_link_libraries(bnaddsub ${OPENSSL_TEST_LIBS})
 add_test(bnaddsub bnaddsub)
 
-# bn_isqrt
-add_executable(bn_isqrt bn_isqrt.c)
-target_link_libraries(bn_isqrt ${OPENSSL_TEST_LIBS})
-add_test(bn_isqrt bn_isqrt)
-
 # bn_mod_exp2_mont
 add_executable(bn_mod_exp2_mont bn_mod_exp2_mont.c)
 target_link_libraries(bn_mod_exp2_mont ${OPENSSL_TEST_LIBS})
@@ -124,11 +113,6 @@ add_test(bn_mod_exp2_mont bn_mod_exp2_mont)
 add_executable(bn_mod_sqrt bn_mod_sqrt.c)
 target_link_libraries(bn_mod_sqrt ${OPENSSL_TEST_LIBS})
 add_test(bn_mod_sqrt bn_mod_sqrt)
-
-# bn_primes
-add_executable(bn_primes bn_primes.c)
-target_link_libraries(bn_primes ${OPENSSL_TEST_LIBS})
-add_test(bn_primes bn_primes)
 
 # bn_rand_interval
 add_executable(bn_rand_interval bn_rand_interval.c)
@@ -342,10 +326,15 @@ add_test(keypairtest keypairtest
 	${CMAKE_CURRENT_SOURCE_DIR}/server.pem
 	${CMAKE_CURRENT_SOURCE_DIR}/server.pem)
 
-# md_test
-add_executable(md_test md_test.c)
-target_link_libraries(md_test ${OPENSSL_TEST_LIBS})
-add_test(md_test md_test)
+# md4test
+add_executable(md4test md4test.c)
+target_link_libraries(md4test ${OPENSSL_TEST_LIBS})
+add_test(md4test md4test)
+
+# md5test
+add_executable(md5test md5test.c)
+target_link_libraries(md5test ${OPENSSL_TEST_LIBS})
+add_test(md5test md5test)
 
 # mont
 add_executable(mont mont.c)
@@ -408,31 +397,20 @@ else()
 endif()
 set_tests_properties(pq_test PROPERTIES ENVIRONMENT "srcdir=${TEST_SOURCE_DIR}")
 
-# quictest
-set(QUICTEST_SRC quictest.c)
-add_executable(quictest ${QUICTEST_SRC})
-target_link_libraries(quictest ${OPENSSL_TEST_LIBS})
-if(NOT MSVC)
-	add_test(NAME quictest COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/quictest.sh)
-else()
-	add_test(NAME quictest COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/quictest.bat $<TARGET_FILE:quictest>)
-endif()
-set_tests_properties(quictest PROPERTIES ENVIRONMENT "srcdir=${TEST_SOURCE_DIR}")
-
 # randtest
 add_executable(randtest randtest.c)
 target_link_libraries(randtest ${OPENSSL_TEST_LIBS})
 add_test(randtest randtest)
 
-# rc2_test
-add_executable(rc2_test rc2_test.c)
-target_link_libraries(rc2_test ${OPENSSL_TEST_LIBS})
-add_test(rc2_test rc2_test)
+# rc2test
+add_executable(rc2test rc2test.c)
+target_link_libraries(rc2test ${OPENSSL_TEST_LIBS})
+add_test(rc2test rc2test)
 
-# rc4_test
-add_executable(rc4_test rc4_test.c)
-target_link_libraries(rc4_test ${OPENSSL_TEST_LIBS})
-add_test(rc4_test rc4_test)
+# rc4test
+add_executable(rc4test rc4test.c)
+target_link_libraries(rc4test ${OPENSSL_TEST_LIBS})
+add_test(rc4test rc4test)
 
 # recordtest
 add_executable(recordtest recordtest.c)
@@ -459,10 +437,10 @@ else()
 	add_test(rfc5280time rfc5280time)
 endif()
 
-# rmd_test
-add_executable(rmd_test rmd_test.c)
-target_link_libraries(rmd_test ${OPENSSL_TEST_LIBS})
-add_test(rmd_test rmd_test)
+# rmdtest
+add_executable(rmdtest rmdtest.c)
+target_link_libraries(rmdtest ${OPENSSL_TEST_LIBS})
+add_test(rmdtest rmdtest)
 
 # rsa_test
 add_executable(rsa_test rsa_test.c)
@@ -479,10 +457,20 @@ else()
 endif()
 set_tests_properties(servertest PROPERTIES ENVIRONMENT "srcdir=${TEST_SOURCE_DIR}")
 
-# sha_test
-add_executable(sha_test sha_test.c)
-target_link_libraries(sha_test ${OPENSSL_TEST_LIBS})
-add_test(sha_test sha_test)
+# sha1test
+add_executable(sha1test sha1test.c)
+target_link_libraries(sha1test ${OPENSSL_TEST_LIBS})
+add_test(sha1test sha1test)
+
+# sha256test
+add_executable(sha256test sha256test.c)
+target_link_libraries(sha256test ${OPENSSL_TEST_LIBS})
+add_test(sha256test sha256test)
+
+# sha512test
+add_executable(sha512test sha512test.c)
+target_link_libraries(sha512test ${OPENSSL_TEST_LIBS})
+add_test(sha512test sha512test)
 
 # sm3test
 add_executable(sm3test sm3test.c)
@@ -505,11 +493,6 @@ add_test(ssl_get_shared_ciphers ssl_get_shared_ciphers)
 add_executable(ssl_methods ssl_methods.c)
 target_link_libraries(ssl_methods ${OPENSSL_TEST_LIBS})
 add_test(ssl_methods ssl_methods)
-
-# ssl_set_alpn_protos
-add_executable(ssl_set_alpn_protos ssl_set_alpn_protos.c)
-target_link_libraries(ssl_set_alpn_protos ${OPENSSL_TEST_LIBS})
-add_test(ssl_set_alpn_protos ssl_set_alpn_protos)
 
 # ssl_versions
 add_executable(ssl_versions ssl_versions.c)

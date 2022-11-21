@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_pkt.c,v 1.60 2022/09/11 13:51:25 jsing Exp $ */
+/* $OpenBSD: ssl_pkt.c,v 1.58 2022/03/26 15:05:53 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -690,7 +690,6 @@ ssl3_read_alert(SSL *s)
 {
 	SSL3_RECORD_INTERNAL *rr = &s->s3->rrec;
 	uint8_t alert_level, alert_descr;
-	CBS cbs;
 
 	/*
 	 * TLSv1.2 permits an alert to be fragmented across multiple records or
@@ -714,15 +713,10 @@ ssl3_read_alert(SSL *s)
 		return 1;
 	}
 
-	CBS_init(&cbs, s->s3->alert_fragment, sizeof(s->s3->alert_fragment));
+	ssl_msg_callback(s, 0, SSL3_RT_ALERT, s->s3->alert_fragment, 2);
 
-	ssl_msg_callback_cbs(s, 0, SSL3_RT_ALERT, &cbs);
-
-	if (!CBS_get_u8(&cbs, &alert_level))
-		return -1;
-	if (!CBS_get_u8(&cbs, &alert_descr))
-		return -1;
-
+	alert_level = s->s3->alert_fragment[0];
+	alert_descr = s->s3->alert_fragment[1];
 	s->s3->alert_fragment_len = 0;
 
 	ssl_info_callback(s, SSL_CB_READ_ALERT,
@@ -762,20 +756,17 @@ int
 ssl3_read_change_cipher_spec(SSL *s)
 {
 	SSL3_RECORD_INTERNAL *rr = &s->s3->rrec;
-	const uint8_t ccs[] = { SSL3_MT_CCS };
-	CBS cbs;
 
 	/*
 	 * 'Change Cipher Spec' is just a single byte, so we know exactly what
 	 * the record payload has to look like.
 	 */
-	CBS_init(&cbs, rr->data, rr->length);
-	if (rr->off != 0 || CBS_len(&cbs) != sizeof(ccs)) {
+	if (rr->length != 1 || rr->off != 0) {
 		SSLerror(s, SSL_R_BAD_CHANGE_CIPHER_SPEC);
 		ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_DECODE_ERROR);
 		return -1;
 	}
-	if (!CBS_mem_equal(&cbs, ccs, sizeof(ccs))) {
+	if (rr->data[0] != SSL3_MT_CCS) {
 		SSLerror(s, SSL_R_BAD_CHANGE_CIPHER_SPEC);
 		ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_ILLEGAL_PARAMETER);
 		return -1;
@@ -783,7 +774,7 @@ ssl3_read_change_cipher_spec(SSL *s)
 
 	/* XDTLS: check that epoch is consistent */
 
-	ssl_msg_callback_cbs(s, 0, SSL3_RT_CHANGE_CIPHER_SPEC, &cbs);
+	ssl_msg_callback(s, 0, SSL3_RT_CHANGE_CIPHER_SPEC, rr->data, 1);
 
 	/* Check that we have a cipher to change to. */
 	if (s->s3->hs.cipher == NULL) {

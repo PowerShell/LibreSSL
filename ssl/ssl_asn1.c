@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_asn1.c,v 1.65 2022/06/07 17:53:42 tb Exp $ */
+/* $OpenBSD: ssl_asn1.c,v 1.61 2022/01/11 18:39:28 jsing Exp $ */
 /*
  * Copyright (c) 2016 Joel Sing <jsing@openbsd.org>
  *
@@ -71,7 +71,7 @@ SSL_SESSION_encode(SSL_SESSION *s, unsigned char **out, size_t *out_len,
 
 	/* Cipher suite ID. */
 	/* XXX - require cipher to be non-NULL or always/only use cipher_id. */
-	cid = (uint16_t)(s->cipher_id & SSL3_CK_VALUE_MASK);
+	cid = (uint16_t)(s->cipher_id & 0xffff);
 	if (s->cipher != NULL)
 		cid = ssl3_cipher_get_value(s->cipher);
 	if (!CBB_add_asn1(&session, &cipher_suite, CBS_ASN1_OCTETSTRING))
@@ -295,15 +295,21 @@ d2i_SSL_SESSION(SSL_SESSION **a, const unsigned char **pp, long length)
 	if (!CBS_get_asn1(&session, &session_id, CBS_ASN1_OCTETSTRING))
 		goto err;
 	if (!CBS_write_bytes(&session_id, s->session_id, sizeof(s->session_id),
-	    &s->session_id_length))
+	    &data_len))
 		goto err;
+	if (data_len > UINT_MAX)
+		goto err;
+	s->session_id_length = (unsigned int)data_len;
 
 	/* Master key. */
 	if (!CBS_get_asn1(&session, &master_key, CBS_ASN1_OCTETSTRING))
 		goto err;
 	if (!CBS_write_bytes(&master_key, s->master_key, sizeof(s->master_key),
-	    &s->master_key_length))
+	    &data_len))
 		goto err;
+	if (data_len > INT_MAX)
+		goto err;
+	s->master_key_length = (int)data_len;
 
 	/* Time [1]. */
 	s->time = time(NULL);
@@ -348,8 +354,11 @@ d2i_SSL_SESSION(SSL_SESSION **a, const unsigned char **pp, long length)
 		goto err;
 	if (present) {
 		if (!CBS_write_bytes(&session_id, (uint8_t *)&s->sid_ctx,
-		    sizeof(s->sid_ctx), &s->sid_ctx_length))
+		    sizeof(s->sid_ctx), &data_len))
 			goto err;
+		if (data_len > UINT_MAX)
+			goto err;
+		s->sid_ctx_length = (unsigned int)data_len;
 	}
 
 	/* Verify result [5]. */

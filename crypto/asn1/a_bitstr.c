@@ -1,4 +1,4 @@
-/* $OpenBSD: a_bitstr.c,v 1.36 2022/05/17 09:17:20 tb Exp $ */
+/* $OpenBSD: a_bitstr.c,v 1.33 2021/12/25 08:52:44 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -56,7 +56,6 @@
  * [including the GNU Public Licence.]
  */
 
-#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -65,8 +64,6 @@
 #include <openssl/conf.h>
 #include <openssl/err.h>
 #include <openssl/x509v3.h>
-
-#include "bytestring.h"
 
 const ASN1_ITEM ASN1_BIT_STRING_it = {
 	.itype = ASN1_ITYPE_PRIMITIVE,
@@ -84,25 +81,6 @@ void
 ASN1_BIT_STRING_free(ASN1_BIT_STRING *a)
 {
 	ASN1_item_free((ASN1_VALUE *)a, &ASN1_BIT_STRING_it);
-}
-
-static void
-asn1_abs_clear_unused_bits(ASN1_BIT_STRING *abs)
-{
-	abs->flags &= ~(ASN1_STRING_FLAG_BITS_LEFT | 0x07);
-}
-
-int
-asn1_abs_set_unused_bits(ASN1_BIT_STRING *abs, uint8_t unused_bits)
-{
-	if (unused_bits > 7)
-		return 0;
-
-	asn1_abs_clear_unused_bits(abs);
-
-	abs->flags |= ASN1_STRING_FLAG_BITS_LEFT | unused_bits;
-
-	return 1;
 }
 
 int
@@ -126,7 +104,7 @@ ASN1_BIT_STRING_set_bit(ASN1_BIT_STRING *a, int n, int value)
 	if (a == NULL)
 		return 0;
 
-	asn1_abs_clear_unused_bits(a);
+	a->flags &= ~(ASN1_STRING_FLAG_BITS_LEFT | 0x07); /* clear, set on write */
 
 	if ((a->length < (w + 1)) || (a->data == NULL)) {
 		if (!value)
@@ -291,90 +269,68 @@ i2c_ASN1_BIT_STRING(ASN1_BIT_STRING *a, unsigned char **pp)
 	return (ret);
 }
 
-int
-c2i_ASN1_BIT_STRING_cbs(ASN1_BIT_STRING **out_abs, CBS *cbs)
+ASN1_BIT_STRING *
+c2i_ASN1_BIT_STRING(ASN1_BIT_STRING **a, const unsigned char **pp, long len)
 {
-	ASN1_BIT_STRING *abs = NULL;
-	uint8_t *data = NULL;
-	size_t data_len = 0;
-	uint8_t unused_bits;
-	int ret = 0;
+	ASN1_BIT_STRING *ret = NULL;
+	const unsigned char *p;
+	unsigned char *s;
+	int i;
 
-	if (out_abs == NULL)
-		goto err;
-
-	if (*out_abs != NULL) {
-		ASN1_BIT_STRING_free(*out_abs);
-		*out_abs = NULL;
-	}
-
-	if (!CBS_get_u8(cbs, &unused_bits)) {
+	if (len < 1) {
 		ASN1error(ASN1_R_STRING_TOO_SHORT);
 		goto err;
 	}
 
-	if (!CBS_stow(cbs, &data, &data_len))
-		goto err;
-	if (data_len > INT_MAX)
-		goto err;
+	if (a == NULL || *a == NULL) {
+		if ((ret = ASN1_BIT_STRING_new()) == NULL)
+			return (NULL);
+	} else
+		ret = *a;
 
-	if ((abs = ASN1_BIT_STRING_new()) == NULL)
+	p = *pp;
+	i = *(p++);
+	if (i > 7) {
+		ASN1error(ASN1_R_INVALID_BIT_STRING_BITS_LEFT);
 		goto err;
-
-	abs->data = data;
-	abs->length = (int)data_len;
-	data = NULL;
+	}
 
 	/*
 	 * We do this to preserve the settings. If we modify the settings,
 	 * via the _set_bit function, we will recalculate on output.
 	 */
-	if (!asn1_abs_set_unused_bits(abs, unused_bits)) {
-		ASN1error(ASN1_R_INVALID_BIT_STRING_BITS_LEFT);
-		goto err;
-	}
-	if (abs->length > 0)
-		abs->data[abs->length - 1] &= 0xff << unused_bits;
+	ret->flags &= ~(ASN1_STRING_FLAG_BITS_LEFT | 0x07); /* clear */
+	ret->flags |= (ASN1_STRING_FLAG_BITS_LEFT | i); /* set */
 
-	*out_abs = abs;
-	abs = NULL;
+	/* using one because of the bits left byte */
+	if (len-- > 1) {
+		if ((s = malloc(len)) == NULL) {
+			ASN1error(ERR_R_MALLOC_FAILURE);
+			goto err;
+		}
+		memcpy(s, p, len);
+		s[len - 1] &= (0xff << i);
+		p += len;
+	} else
+		s = NULL;
 
-	ret = 1;
+	free(ret->data);
+	ret->data = s;
+	ret->length = (int)len;
+	ret->type = V_ASN1_BIT_STRING;
+
+	if (a != NULL)
+		*a = ret;
+
+	*pp = p;
+
+	return (ret);
 
  err:
-	ASN1_BIT_STRING_free(abs);
-	freezero(data, data_len);
+	if (a == NULL || *a != ret)
+		ASN1_BIT_STRING_free(ret);
 
-	return ret;
-}
-
-ASN1_BIT_STRING *
-c2i_ASN1_BIT_STRING(ASN1_BIT_STRING **out_abs, const unsigned char **pp, long len)
-{
-	ASN1_BIT_STRING *abs = NULL;
-	CBS content;
-
-	if (out_abs != NULL) {
-		ASN1_BIT_STRING_free(*out_abs);
-		*out_abs = NULL;
-	}
-
-	if (len < 0) {
-		ASN1error(ASN1_R_LENGTH_ERROR);
-		return NULL;
-	}
-
-	CBS_init(&content, *pp, len);
-
-	if (!c2i_ASN1_BIT_STRING_cbs(&abs, &content))
-		return NULL;
-
-	*pp = CBS_data(&content);
-
-	if (out_abs != NULL)
-		*out_abs = abs;
-
-	return abs;
+	return (NULL);
 }
 
 int

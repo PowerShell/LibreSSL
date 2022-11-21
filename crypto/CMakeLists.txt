@@ -333,7 +333,6 @@ set(
 	bn/bn_add.c
 	bn/bn_asm.c
 	bn/bn_blind.c
-	bn/bn_bpsw.c
 	bn/bn_const.c
 	bn/bn_ctx.c
 	bn/bn_depr.c
@@ -343,7 +342,6 @@ set(
 	bn/bn_exp2.c
 	bn/bn_gcd.c
 	bn/bn_gf2m.c
-	bn/bn_isqrt.c
 	bn/bn_kron.c
 	bn/bn_lib.c
 	bn/bn_mod.c
@@ -604,8 +602,6 @@ set(
 	idea/i_ecb.c
 	idea/i_ofb64.c
 	idea/i_skey.c
-	kdf/hkdf_evp.c
-	kdf/kdf_err.c
 	lhash/lh_stats.c
 	lhash/lhash.c
 	md4/md4_dgst.c
@@ -658,7 +654,6 @@ set(
 	pkcs12/p12_npas.c
 	pkcs12/p12_p8d.c
 	pkcs12/p12_p8e.c
-	pkcs12/p12_sbag.c
 	pkcs12/p12_utl.c
 	pkcs12/pk12err.c
 	pkcs7/bio_pk7.c
@@ -999,7 +994,6 @@ target_include_directories(crypto_obj
 		hmac
 		modes
 		ocsp
-		pkcs12
 		rsa
 		x509
 		../include/compat

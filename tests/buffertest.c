@@ -1,6 +1,5 @@
-/* $OpenBSD: buffertest.c,v 1.6 2022/07/22 19:34:55 jsing Exp $ */
 /*
- * Copyright (c) 2019, 2022 Joel Sing <jsing@openbsd.org>
+ * Copyright (c) 2019 Joel Sing <jsing@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -60,7 +59,7 @@ struct extend_test {
 	ssize_t want_ret;
 };
 
-const struct extend_test extend_tests[] = {
+struct extend_test extend_tests[] = {
 	{
 		.extend_len = 4,
 		.read_len = 0,
@@ -100,17 +99,16 @@ const struct extend_test extend_tests[] = {
 
 #define N_EXTEND_TESTS (sizeof(extend_tests) / sizeof(extend_tests[0]))
 
-static int
-tls_buffer_extend_test(void)
+int
+main(int argc, char **argv)
 {
-	const struct extend_test *et;
 	struct tls_buffer *buf;
+	struct extend_test *et;
 	struct read_state rs;
-	uint8_t *data = NULL;
+	uint8_t *data;
 	size_t i, data_len;
 	ssize_t ret;
 	CBS cbs;
-	int failed = 1;
 
 	rs.buf = testdata;
 	rs.offset = 0;
@@ -124,241 +122,37 @@ tls_buffer_extend_test(void)
 
 		ret = tls_buffer_extend(buf, et->extend_len, read_cb, &rs);
 		if (ret != extend_tests[i].want_ret) {
-			fprintf(stderr, "FAIL: Test %zd - extend returned %zd, "
-			    "want %zd\n", i, ret, et->want_ret);
-			goto failed;
+			fprintf(stderr, "FAIL: Test %zi - extend returned %zi, "
+			    "want %zi\n", i, ret, et->want_ret);
+			return 1;
 		}
 
-		if (!tls_buffer_data(buf, &cbs)) {
-			fprintf(stderr, "FAIL: Test %zd - failed to get data\n",
-			    i);
-			goto failed;
-		}
+		tls_buffer_cbs(buf, &cbs);
 
 		if (!CBS_mem_equal(&cbs, testdata, CBS_len(&cbs))) {
-			fprintf(stderr, "FAIL: Test %zd - extend buffer "
+			fprintf(stderr, "FAIL: Test %zi - extend buffer "
 			    "mismatch", i);
-			goto failed;
+			return 1;
 		}
 	}
 
 	if (!tls_buffer_finish(buf, &data, &data_len)) {
 		fprintf(stderr, "FAIL: failed to finish\n");
-		goto failed;
+		return 1;
 	}
 
 	tls_buffer_free(buf);
-	buf = NULL;
 
 	if (data_len != sizeof(testdata)) {
 		fprintf(stderr, "FAIL: got data length %zu, want %zu\n",
 		    data_len, sizeof(testdata));
-		goto failed;
+		return 1;
 	}
 	if (memcmp(data, testdata, data_len) != 0) {
 		fprintf(stderr, "FAIL: data mismatch\n");
-		goto failed;
+		return 1;
 	}
-
-	failed = 0;
-
- failed:
-	tls_buffer_free(buf);
 	free(data);
 
-	return failed;
-}
-
-struct read_write_test {
-	uint8_t pattern;
-	size_t read;
-	size_t write;
-	size_t append;
-	ssize_t want;
-};
-
-const struct read_write_test read_write_tests[] = {
-	{
-		.read = 2048,
-		.want = TLS_IO_WANT_POLLIN,
-	},
-	{
-		.pattern = 0xdb,
-		.write = 2048,
-		.want = 2048,
-	},
-	{
-		.pattern = 0xbd,
-		.append = 2048,
-		.want = 1,
-	},
-	{
-		.pattern = 0xdb,
-		.read = 2048,
-		.want = 2048,
-	},
-	{
-		.pattern = 0xfe,
-		.append = 1024,
-		.want = 1,
-	},
-	{
-		.pattern = 0xbd,
-		.read = 1000,
-		.want = 1000,
-	},
-	{
-		.pattern = 0xbd,
-		.read = 1048,
-		.want = 1048,
-	},
-	{
-		.pattern = 0xdb,
-		.write = 2048,
-		.want = 2048,
-	},
-	{
-		.pattern = 0xbd,
-		.append = 1024,
-		.want = 1,
-	},
-	{
-		.pattern = 0xee,
-		.append = 4096,
-		.want = 1,
-	},
-	{
-		.pattern = 0xfe,
-		.append = 1,
-		.want = 0,
-	},
-	{
-		.pattern = 0xfe,
-		.write = 1,
-		.want = TLS_IO_FAILURE,
-	},
-	{
-		.pattern = 0xfe,
-		.read = 1024,
-		.want = 1024,
-	},
-	{
-		.pattern = 0xdb,
-		.read = 2048,
-		.want = 2048,
-	},
-	{
-		.pattern = 0xbd,
-		.read = 1024,
-		.want = 1024,
-	},
-	{
-		.pattern = 0xee,
-		.read = 1024,
-		.want = 1024,
-	},
-	{
-		.pattern = 0xee,
-		.read = 4096,
-		.want = 3072,
-	},
-	{
-		.read = 2048,
-		.want = TLS_IO_WANT_POLLIN,
-	},
-};
-
-#define N_READ_WRITE_TESTS (sizeof(read_write_tests) / sizeof(read_write_tests[0]))
-
-static int
-tls_buffer_read_write_test(void)
-{
-	const struct read_write_test *rwt;
-	struct tls_buffer *buf = NULL;
-	uint8_t *rbuf = NULL, *wbuf = NULL;
-	ssize_t n;
-	size_t i;
-	int ret;
-	int failed = 1;
-
-	if ((buf = tls_buffer_new(0)) == NULL)
-		errx(1, "tls_buffer_new");
-
-	tls_buffer_set_capacity_limit(buf, 8192);
-
-	for (i = 0; i < N_READ_WRITE_TESTS; i++) {
-		rwt = &read_write_tests[i];
-
-		if (rwt->append > 0) {
-			free(wbuf);
-			if ((wbuf = malloc(rwt->append)) == NULL)
-				errx(1, "malloc");
-			memset(wbuf, rwt->pattern, rwt->append);
-			if ((ret = tls_buffer_append(buf, wbuf, rwt->append)) !=
-			    rwt->want) {
-				fprintf(stderr, "FAIL: test %zu - "
-				    "tls_buffer_append() = %d, want %zu\n",
-				    i, ret, rwt->want);
-				goto failed;
-			}
-		}
-
-		if (rwt->write > 0) {
-			free(wbuf);
-			if ((wbuf = malloc(rwt->write)) == NULL)
-				errx(1, "malloc");
-			memset(wbuf, rwt->pattern, rwt->write);
-			if ((n = tls_buffer_write(buf, wbuf, rwt->write)) !=
-			    rwt->want) {
-				fprintf(stderr, "FAIL: test %zu - "
-				    "tls_buffer_write() = %zi, want %zu\n",
-				    i, n, rwt->want);
-				goto failed;
-			}
-		}
-
-		if (rwt->read > 0) {
-			free(rbuf);
-			if ((rbuf = calloc(1, rwt->read)) == NULL)
-				errx(1, "malloc");
-			if ((n = tls_buffer_read(buf, rbuf, rwt->read)) !=
-			    rwt->want) {
-				fprintf(stderr, "FAIL: test %zu - "
-				    "tls_buffer_read() = %zi, want %zu\n",
-				    i, n, rwt->want);
-				goto failed;
-			}
-			if (rwt->want > 0) {
-				free(wbuf);
-				if ((wbuf = malloc(rwt->want)) == NULL)
-					errx(1, "malloc");
-				memset(wbuf, rwt->pattern, rwt->want);
-				if (memcmp(rbuf, wbuf, rwt->want) != 0) {
-					fprintf(stderr, "FAIL: test %zu - "
-					    "read byte mismatch\n", i);
-					goto failed;
-				}
-			}
-		}
-	}
-
-	failed = 0;
-
- failed:
-	tls_buffer_free(buf);
-	free(rbuf);
-	free(wbuf);
-
-	return failed;
-}
-
-int
-main(int argc, char **argv)
-{
-	int failed = 0;
-
-	failed |= tls_buffer_extend_test();
-	failed |= tls_buffer_read_write_test();
-
-	return failed;
+	return 0;
 }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: x509_addr.c,v 1.83 2022/05/25 17:10:30 tb Exp $ */
+/*	$OpenBSD: x509_addr.c,v 1.78 2022/03/16 11:44:36 tb Exp $ */
 /*
  * Contributed to the OpenSSL Project by the American Registry for
  * Internet Numbers ("ARIN").
@@ -73,7 +73,6 @@
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 
-#include "asn1_locl.h"
 #include "bytestring.h"
 #include "x509_lcl.h"
 
@@ -848,45 +847,44 @@ range_should_be_prefix(const unsigned char *min, const unsigned char *max,
 }
 
 /*
- * Fill IPAddressOrRange with bit string encoding of a prefix - RFC 3779, 2.1.1.
+ * Construct a prefix.
  */
 static int
-make_addressPrefix(IPAddressOrRange **out_aor, uint8_t *addr, uint32_t afi,
-    int prefix_len)
+make_addressPrefix(IPAddressOrRange **result, unsigned char *addr,
+    unsigned int afi, int prefix_len)
 {
-	IPAddressOrRange *aor = NULL;
-	int afi_len, max_len, num_bits, num_octets;
-	uint8_t unused_bits;
+	IPAddressOrRange *aor;
+	int afi_len, byte_len, bit_len, max_len;
 
 	if (prefix_len < 0)
-		goto err;
+		return 0;
 
 	max_len = 16;
 	if ((afi_len = length_from_afi(afi)) > 0)
 		max_len = afi_len;
 	if (prefix_len > 8 * max_len)
-		goto err;
+		return 0;
 
-	num_octets = (prefix_len + 7) / 8;
-	num_bits = prefix_len % 8;
-
-	unused_bits = 0;
-	if (num_bits > 0)
-		unused_bits = 8 - num_bits;
+	byte_len = (prefix_len + 7) / 8;
+	bit_len = prefix_len % 8;
 
 	if ((aor = IPAddressOrRange_new()) == NULL)
-		goto err;
-
+		return 0;
 	aor->type = IPAddressOrRange_addressPrefix;
-
 	if ((aor->u.addressPrefix = ASN1_BIT_STRING_new()) == NULL)
 		goto err;
-	if (!ASN1_BIT_STRING_set(aor->u.addressPrefix, addr, num_octets))
-		goto err;
-	if (!asn1_abs_set_unused_bits(aor->u.addressPrefix, unused_bits))
+
+	if (!ASN1_BIT_STRING_set(aor->u.addressPrefix, addr, byte_len))
 		goto err;
 
-	*out_aor = aor;
+	aor->u.addressPrefix->flags &= ~7;
+	aor->u.addressPrefix->flags |= ASN1_STRING_FLAG_BITS_LEFT;
+	if (bit_len > 0) {
+		aor->u.addressPrefix->data[byte_len - 1] &= ~(0xff >> bit_len);
+		aor->u.addressPrefix->flags |= 8 - bit_len;
+	}
+
+	*result = aor;
 	return 1;
 
  err:
@@ -894,126 +892,59 @@ make_addressPrefix(IPAddressOrRange **out_aor, uint8_t *addr, uint32_t afi,
 	return 0;
 }
 
-static uint8_t
-count_trailing_zeroes(uint8_t octet)
-{
-	uint8_t count = 0;
-
-	if (octet == 0)
-		return 8;
-
-	while ((octet & (1 << count)) == 0)
-		count++;
-
-	return count;
-}
-
-static int
-trim_end_u8(CBS *cbs, uint8_t trim)
-{
-	uint8_t octet;
-
-	while (CBS_len(cbs) > 0) {
-		if (!CBS_peek_last_u8(cbs, &octet))
-			return 0;
-		if (octet != trim)
-			return 1;
-		if (!CBS_get_last_u8(cbs, &octet))
-			return 0;
-	}
-
-	return 1;
-}
-
 /*
- * Populate IPAddressOrRange with bit string encoding of a range, see
- * RFC 3779, 2.1.2.
+ * Construct a range.  If it can be expressed as a prefix,
+ * return a prefix instead.  Doing this here simplifies
+ * the rest of the code considerably.
  */
 static int
-make_addressRange(IPAddressOrRange **out_aor, uint8_t *min, uint8_t *max,
-    uint32_t afi, int length)
+make_addressRange(IPAddressOrRange **result, unsigned char *min,
+    unsigned char *max, unsigned int afi, int length)
 {
-	IPAddressOrRange *aor = NULL;
-	IPAddressRange *range;
-	int prefix_len;
-	CBS cbs;
-	size_t max_len, min_len;
-	uint8_t unused_bits_min, unused_bits_max;
-	uint8_t octet;
+	IPAddressOrRange *aor;
+	int i, prefix_len;
 
 	if (memcmp(min, max, length) > 0)
-		goto err;
-
-	/*
-	 * RFC 3779, 2.2.3.6 - a range that can be expressed as a prefix
-	 * must be encoded as a prefix.
-	 */
+		return 0;
 
 	if ((prefix_len = range_should_be_prefix(min, max, length)) >= 0)
-		return make_addressPrefix(out_aor, min, afi, prefix_len);
-
-	/*
-	 * The bit string representing min is formed by removing all its
-	 * trailing zero bits, so remove all trailing zero octets and count
-	 * the trailing zero bits of the last octet.
-	 */
-
-	CBS_init(&cbs, min, length);
-
-	if (!trim_end_u8(&cbs, 0x00))
-		goto err;
-
-	unused_bits_min = 0;
-	if ((min_len = CBS_len(&cbs)) > 0) {
-		if (!CBS_peek_last_u8(&cbs, &octet))
-			goto err;
-
-		unused_bits_min = count_trailing_zeroes(octet);
-	}
-
-	/*
-	 * The bit string representing max is formed by removing all its
-	 * trailing one bits, so remove all trailing 0xff octets and count
-	 * the trailing ones of the last octet.
-	 */
-
-	CBS_init(&cbs, max, length);
-
-	if (!trim_end_u8(&cbs, 0xff))
-		goto err;
-
-	unused_bits_max = 0;
-	if ((max_len = CBS_len(&cbs)) > 0) {
-		if (!CBS_peek_last_u8(&cbs, &octet))
-			goto err;
-
-		unused_bits_max = count_trailing_zeroes(octet + 1);
-	}
-
-	/*
-	 * Populate IPAddressOrRange.
-	 */
+		return make_addressPrefix(result, min, afi, prefix_len);
 
 	if ((aor = IPAddressOrRange_new()) == NULL)
-		goto err;
-
+		return 0;
 	aor->type = IPAddressOrRange_addressRange;
-
-	if ((range = aor->u.addressRange = IPAddressRange_new()) == NULL)
+	if ((aor->u.addressRange = IPAddressRange_new()) == NULL)
 		goto err;
 
-	if (!ASN1_BIT_STRING_set(range->min, min, min_len))
+	for (i = length; i > 0 && min[i - 1] == 0x00; --i)
+		continue;
+	if (!ASN1_BIT_STRING_set(aor->u.addressRange->min, min, i))
 		goto err;
-	if (!asn1_abs_set_unused_bits(range->min, unused_bits_min))
-		goto err;
+	aor->u.addressRange->min->flags &= ~7;
+	aor->u.addressRange->min->flags |= ASN1_STRING_FLAG_BITS_LEFT;
+	if (i > 0) {
+		unsigned char b = min[i - 1];
+		int j = 1;
+		while ((b & (0xffU >> j)) != 0)
+			++j;
+		aor->u.addressRange->min->flags |= 8 - j;
+	}
 
-	if (!ASN1_BIT_STRING_set(range->max, max, max_len))
+	for (i = length; i > 0 && max[i - 1] == 0xff; --i)
+		continue;
+	if (!ASN1_BIT_STRING_set(aor->u.addressRange->max, max, i))
 		goto err;
-	if (!asn1_abs_set_unused_bits(range->max, unused_bits_max))
-		goto err;
+	aor->u.addressRange->max->flags &= ~7;
+	aor->u.addressRange->max->flags |= ASN1_STRING_FLAG_BITS_LEFT;
+	if (i > 0) {
+		unsigned char b = max[i - 1];
+		int j = 1;
+		while ((b & (0xffU >> j)) != (0xffU >> j))
+			++j;
+		aor->u.addressRange->max->flags |= 8 - j;
+	}
 
-	*out_aor = aor;
-
+	*result = aor;
 	return 1;
 
  err:
@@ -1307,6 +1238,10 @@ X509v3_addr_is_canonical(IPAddrBlocks *addr)
 		for (j = 0; j < sk_IPAddressOrRange_num(aors) - 1; j++) {
 			aor_a = sk_IPAddressOrRange_value(aors, j);
 			aor_b = sk_IPAddressOrRange_value(aors, j + 1);
+
+			/*
+			 * XXX - check that both are either a prefix or a range.
+			 */
 
 			if (!extract_min_max(aor_a, a_min, a_max, length) ||
 			    !extract_min_max(aor_b, b_min, b_max, length))
@@ -1839,17 +1774,17 @@ addr_validate_path_internal(X509_STORE_CTX *ctx, STACK_OF(X509) *chain,
 
 	/*
 	 * Figure out where to start. If we don't have an extension to check,
-	 * (either extracted from the leaf or passed by the caller), we're done.
-	 * Otherwise, check canonical form and set up for walking up the chain.
+	 * we're done.  Otherwise, check canonical form and set up for walking
+	 * up the chain.
 	 */
 	if (ext == NULL) {
 		depth = 0;
 		cert = sk_X509_value(chain, depth);
-		if ((X509_get_extension_flags(cert) & EXFLAG_INVALID) != 0)
-			goto done;
 		if ((ext = cert->rfc3779_addr) == NULL)
 			goto done;
-	} else if (!X509v3_addr_is_canonical(ext)) {
+	}
+
+	if (!X509v3_addr_is_canonical(ext)) {
 		if ((ret = verify_error(ctx, cert,
 		    X509_V_ERR_INVALID_EXTENSION, depth)) == 0)
 			goto done;
@@ -1871,12 +1806,6 @@ addr_validate_path_internal(X509_STORE_CTX *ctx, STACK_OF(X509) *chain,
 	for (depth++; depth < sk_X509_num(chain); depth++) {
 		cert = sk_X509_value(chain, depth);
 
-		if ((X509_get_extension_flags(cert) & EXFLAG_INVALID) != 0) {
-			if ((ret = verify_error(ctx, cert,
-			    X509_V_ERR_INVALID_EXTENSION, depth)) == 0)
-				goto done;
-		}
-
 		if ((parent = cert->rfc3779_addr) == NULL) {
 			for (i = 0; i < sk_IPAddressFamily_num(child); i++) {
 				child_af = sk_IPAddressFamily_value(child, i);
@@ -1891,6 +1820,12 @@ addr_validate_path_internal(X509_STORE_CTX *ctx, STACK_OF(X509) *chain,
 				break;
 			}
 			continue;
+		}
+
+		if (!X509v3_addr_is_canonical(parent)) {
+			if ((ret = verify_error(ctx, cert,
+			    X509_V_ERR_INVALID_EXTENSION, depth)) == 0)
+				goto done;
 		}
 
 		/*

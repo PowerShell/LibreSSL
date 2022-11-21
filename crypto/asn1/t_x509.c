@@ -1,4 +1,4 @@
-/* $OpenBSD: t_x509.c,v 1.40 2022/08/11 10:36:32 tb Exp $ */
+/* $OpenBSD: t_x509.c,v 1.37 2021/12/25 13:17:48 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -118,6 +118,7 @@ X509_print_ex(BIO *bp, X509 *x, unsigned long nmflags, unsigned long cflag)
 	X509_CINF *ci;
 	ASN1_INTEGER *bs;
 	EVP_PKEY *pkey = NULL;
+	const char *neg;
 
 	if ((nmflags & XN_FLAG_SEP_MASK) == XN_FLAG_SEP_MULTILINE) {
 		mlch = '\n';
@@ -136,15 +137,9 @@ X509_print_ex(BIO *bp, X509 *x, unsigned long nmflags, unsigned long cflag)
 	}
 	if (!(cflag & X509_FLAG_NO_VERSION)) {
 		l = X509_get_version(x);
-		if (l >= 0 && l <= 2) {
-			if (BIO_printf(bp, "%8sVersion: %ld (0x%lx)\n",
-			    "", l + 1, l) <= 0)
-				goto err;
-		} else {
-			if (BIO_printf(bp, "%8sVersion: unknown (%ld)\n",
-			    "", l) <= 0)
-				goto err;
-		}
+		if (BIO_printf(bp, "%8sVersion: %lu (0x%lx)\n",
+		    "", l + 1, l) <= 0)
+			goto err;
 	}
 	if (!(cflag & X509_FLAG_NO_SERIAL)) {
 		if (BIO_write(bp, "        Serial Number:", 22) <= 0)
@@ -154,15 +149,18 @@ X509_print_ex(BIO *bp, X509 *x, unsigned long nmflags, unsigned long cflag)
 		l = -1;
 		if (bs->length <= (int)sizeof(long))
 			l = ASN1_INTEGER_get(bs);
-		if (l >= 0) {
-			if (BIO_printf(bp, " %ld (0x%lx)\n", l, l) <= 0)
+		if (l != -1) {
+			if (bs->type == V_ASN1_NEG_INTEGER) {
+				l = -l;
+				neg = "-";
+			} else
+				neg = "";
+			if (BIO_printf(bp, " %s%lu (%s0x%lx)\n",
+			    neg, l, neg, l) <= 0)
 				goto err;
 		} else {
-			const char *neg = "";
-
-			if (bs->type == V_ASN1_NEG_INTEGER)
-				neg = " (Negative)";
-
+			neg = (bs->type == V_ASN1_NEG_INTEGER) ?
+			    " (Negative)" : "";
 			if (BIO_printf(bp, "\n%12s%s", "", neg) <= 0)
 				goto err;
 			for (i = 0; i < bs->length; i++) {
@@ -470,8 +468,9 @@ int
 X509_NAME_print(BIO *bp, const X509_NAME *name, int obase)
 {
 	char *s, *c, *b;
-	int i;
-	int ret = 0;
+	int ret = 0, l, i;
+
+	l = 80 - 2 - obase;
 
 	b = X509_NAME_oneline(name, NULL, 0);
 	if (b == NULL)
@@ -496,10 +495,12 @@ X509_NAME_print(BIO *bp, const X509_NAME *name, int obase)
 				if (BIO_write(bp, ", ", 2) != 2)
 					goto err;
 			}
+			l--;
 		}
 		if (*s == '\0')
 			break;
 		s++;
+		l--;
 	}
 
 	ret = 1;

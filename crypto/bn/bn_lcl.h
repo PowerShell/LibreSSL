@@ -1,4 +1,4 @@
-/* $OpenBSD: bn_lcl.h,v 1.35 2022/07/15 06:10:00 tb Exp $ */
+/* $OpenBSD: bn_lcl.h,v 1.31 2022/01/14 08:01:47 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -493,9 +493,6 @@ struct bn_gencb_st {
 	}
 #endif /* !BN_LLONG */
 
-/* The least significant word of a BIGNUM. */
-#define BN_lsw(n) (((n)->top == 0) ? (BN_ULONG) 0 : (n)->d[0])
-
 void bn_mul_normal(BN_ULONG *r, BN_ULONG *a, int na, BN_ULONG *b, int nb);
 void bn_mul_comba8(BN_ULONG *r, BN_ULONG *a, BN_ULONG *b);
 void bn_mul_comba4(BN_ULONG *r, BN_ULONG *a, BN_ULONG *b);
@@ -655,11 +652,6 @@ int	BN_gcd_ct(BIGNUM *r, const BIGNUM *a, const BIGNUM *b, BN_CTX *ctx);
 int	BN_gcd_nonct(BIGNUM *r, const BIGNUM *a, const BIGNUM *b, BN_CTX *ctx);
 
 int	BN_swap_ct(BN_ULONG swap, BIGNUM *a, BIGNUM *b, size_t nwords);
-
-int bn_isqrt(BIGNUM *out_sqrt, int *out_perfect, const BIGNUM *n, BN_CTX *ctx);
-int bn_is_perfect_square(int *out_perfect, const BIGNUM *n, BN_CTX *ctx);
-
-int bn_is_prime_bpsw(int *is_prime, const BIGNUM *n, BN_CTX *in_ctx);
 
 __END_HIDDEN_DECLS
 #endif
