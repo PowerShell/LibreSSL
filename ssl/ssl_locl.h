@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_locl.h,v 1.425 2022/09/10 15:29:33 jsing Exp $ */
+/* $OpenBSD: ssl_locl.h,v 1.388 2022/03/17 17:22:16 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -213,10 +213,10 @@ __BEGIN_HIDDEN_DECLS
 
 /* Bits for algorithm_auth (server authentication) */
 #define SSL_aRSA		0x00000001L /* RSA auth */
-#define SSL_aDSS		0x00000002L /* DSS auth */
-#define SSL_aNULL		0x00000004L /* no auth (i.e. use ADH or AECDH) */
+#define SSL_aDSS 		0x00000002L /* DSS auth */
+#define SSL_aNULL 		0x00000004L /* no auth (i.e. use ADH or AECDH) */
 #define SSL_aECDSA              0x00000040L /* ECDSA auth*/
-#define SSL_aGOST01		0x00000200L /* GOST R 34.10-2001 signature auth */
+#define SSL_aGOST01 		0x00000200L /* GOST R 34.10-2001 signature auth */
 #define SSL_aTLS1_3		0x00000400L /* TLSv1.3 authentication */
 
 /* Bits for algorithm_enc (symmetric encryption) */
@@ -234,7 +234,7 @@ __BEGIN_HIDDEN_DECLS
 #define SSL_AES256GCM		0x00000800L
 #define SSL_CHACHA20POLY1305	0x00001000L
 
-#define SSL_AES			(SSL_AES128|SSL_AES256|SSL_AES128GCM|SSL_AES256GCM)
+#define SSL_AES        		(SSL_AES128|SSL_AES256|SSL_AES128GCM|SSL_AES256GCM)
 #define SSL_CAMELLIA		(SSL_CAMELLIA128|SSL_CAMELLIA256)
 
 
@@ -341,7 +341,7 @@ __BEGIN_HIDDEN_DECLS
 #define SSL_MAX_EMPTY_RECORDS	32
 
 /* SSL_kRSA <- RSA_ENC | (RSA_TMP & RSA_SIGN) |
- *	    <- (EXPORT & (RSA_ENC | RSA_TMP) & RSA_SIGN)
+ * 	    <- (EXPORT & (RSA_ENC | RSA_TMP) & RSA_SIGN)
  * SSL_kDH  <- DH_ENC & (RSA_ENC | RSA_SIGN | DSA_SIGN)
  * SSL_kDHE <- RSA_ENC | RSA_SIGN | DSA_SIGN
  * SSL_aRSA <- RSA_ENC | RSA_SIGN
@@ -379,11 +379,6 @@ typedef struct ssl_cert_st {
 	DH *dhe_params;
 	DH *(*dhe_params_cb)(SSL *ssl, int is_export, int keysize);
 	int dhe_params_auto;
-
-	int (*security_cb)(const SSL *s, const SSL_CTX *ctx, int op, int bits,
-	    int nid, void *other, void *ex_data); /* Not exposed in API. */
-	int security_level;
-	void *security_ex_data; /* Not exposed in API. */
 
 	int references; /* >1 only if SSL_copy_session_id is used */
 } SSL_CERT;
@@ -439,14 +434,13 @@ struct ssl_method_st {
 	unsigned int enc_flags;		/* SSL_ENC_FLAG_* */
 };
 
-/*
- * Let's make this into an ASN.1 type structure as follows
+/* Lets make this into an ASN.1 type structure as follows
  * SSL_SESSION_ID ::= SEQUENCE {
- *	version			INTEGER,	-- structure version number
- *	SSLversion		INTEGER,	-- SSL version number
- *	Cipher			OCTET STRING,	-- the 2 byte cipher ID
- *	Session_ID		OCTET STRING,	-- the Session ID
- *	Master_key		OCTET STRING,	-- the master key
+ *	version 		INTEGER,	-- structure version number
+ *	SSLversion 		INTEGER,	-- SSL version number
+ *	Cipher 			OCTET STRING,	-- the 3 byte cipher ID
+ *	Session_ID 		OCTET STRING,	-- the Session ID
+ *	Master_key 		OCTET STRING,	-- the master key
  *	KRB5_principal		OCTET STRING	-- optional Kerberos principal
  *	Time [ 1 ] EXPLICIT	INTEGER,	-- optional Start Time
  *	Timeout [ 2 ] EXPLICIT	INTEGER,	-- optional Timeout ins seconds
@@ -460,7 +454,7 @@ struct ssl_method_st {
  *	Ticket [10]             EXPLICIT OCTET STRING, -- session ticket (clients only)
  *	Compression_meth [11]   EXPLICIT OCTET STRING, -- optional compression method
  *	SRP_username [ 12 ] EXPLICIT OCTET STRING -- optional SRP username
- * }
+ *	}
  * Look in ssl/ssl_asn1.c for more details
  * I'm using EXPLICIT tags so I can read the damn things using asn1parse :-).
  */
@@ -468,17 +462,17 @@ struct ssl_session_st {
 	int ssl_version;	/* what ssl version session info is
 				 * being kept in here? */
 
-	size_t master_key_length;
+	int master_key_length;
 	unsigned char master_key[SSL_MAX_MASTER_KEY_LENGTH];
 
 	/* session_id - valid? */
-	size_t session_id_length;
+	unsigned int session_id_length;
 	unsigned char session_id[SSL_MAX_SSL_SESSION_ID_LENGTH];
 
 	/* this is used to determine whether the session is being reused in
 	 * the appropriate context. It is up to the application to set this,
 	 * via SSL_new */
-	size_t sid_ctx_length;
+	unsigned int sid_ctx_length;
 	unsigned char sid_ctx[SSL_MAX_SID_CTX_LENGTH];
 
 	/* Peer provided leaf (end-entity) certificate. */
@@ -518,6 +512,8 @@ struct ssl_session_st {
 	 * not_resumable_session_cb to disable session caching and tickets. */
 	int not_resumable;
 
+	STACK_OF(X509) *cert_chain; /* as received from peer */
+
 	size_t tlsext_ecpointformatlist_length;
 	uint8_t *tlsext_ecpointformatlist; /* peer's list */
 	size_t tlsext_supportedgroups_length;
@@ -552,9 +548,6 @@ typedef struct ssl_handshake_tls13_st {
 	int use_legacy;
 	int hrr;
 
-	/* Client indicates psk_dhe_ke support in PskKeyExchangeMode. */
-	int use_psk_dhe_ke;
-
 	/* Certificate selected for use (static pointer). */
 	const SSL_CERT_PKEY *cpk;
 
@@ -579,11 +572,6 @@ typedef struct ssl_handshake_tls13_st {
 	EVP_MD_CTX *clienthello_md_ctx;
 	unsigned char *clienthello_hash;
 	unsigned int clienthello_hash_len;
-
-	/* QUIC read buffer and read/write encryption levels. */
-	struct tls_buffer *quic_read_buffer;
-	enum ssl_encryption_level_t quic_read_level;
-	enum ssl_encryption_level_t quic_write_level;
 } SSL_HANDSHAKE_TLS13;
 
 typedef struct ssl_handshake_st {
@@ -643,10 +631,6 @@ typedef struct ssl_handshake_st {
 	size_t finished_len;
 	uint8_t peer_finished[EVP_MAX_MD_SIZE];
 	size_t peer_finished_len;
-
-	/* List of certificates received from our peer. */
-	STACK_OF(X509) *peer_certs;
-	STACK_OF(X509) *peer_certs_no_leaf;
 
 	SSL_HANDSHAKE_TLS12 tls12;
 	SSL_HANDSHAKE_TLS13 tls13;
@@ -870,8 +854,8 @@ typedef struct ssl_ctx_internal_st {
 	void *alpn_select_cb_arg;
 
 	/* Client list of supported protocols in wire format. */
-	uint8_t *alpn_client_proto_list;
-	size_t alpn_client_proto_list_len;
+	unsigned char *alpn_client_proto_list;
+	unsigned int alpn_client_proto_list_len;
 
 	size_t tlsext_ecpointformatlist_length;
 	uint8_t *tlsext_ecpointformatlist; /* our list */
@@ -883,7 +867,6 @@ typedef struct ssl_ctx_internal_st {
 
 struct ssl_ctx_st {
 	const SSL_METHOD *method;
-	const SSL_QUIC_METHOD *quic_method;
 
 	STACK_OF(SSL_CIPHER) *cipher_list;
 
@@ -901,7 +884,7 @@ struct ssl_ctx_st {
 	STACK_OF(X509) *extra_certs;
 
 	int verify_mode;
-	size_t sid_ctx_length;
+	unsigned int sid_ctx_length;
 	unsigned char sid_ctx[SSL_MAX_SID_CTX_LENGTH];
 
 	X509_VERIFY_PARAM *param;
@@ -937,12 +920,8 @@ typedef struct ssl_internal_st {
 	unsigned long mode; /* API behaviour */
 
 	/* Client list of supported protocols in wire format. */
-	uint8_t *alpn_client_proto_list;
-	size_t alpn_client_proto_list_len;
-
-	/* QUIC transport params we will send */
-	uint8_t *quic_transport_params;
-	size_t quic_transport_params_len;
+	unsigned char *alpn_client_proto_list;
+	unsigned int alpn_client_proto_list_len;
 
 	/* XXX Callbacks */
 
@@ -1055,7 +1034,7 @@ typedef struct ssl_internal_st {
 	const SRTP_PROTECTION_PROFILE *srtp_profile;		/* What's been chosen */
 
 	int renegotiate;/* 1 if we are renegotiating.
-			 * 2 if we are a server and are inside a handshake
+		 	 * 2 if we are a server and are inside a handshake
 	                 * (i.e. not just sending a HelloRequest) */
 
 	int rstate;	/* where we are when reading */
@@ -1074,8 +1053,7 @@ struct ssl_st {
 	 */
 	int version;
 
-	const SSL_METHOD *method;
-	const SSL_QUIC_METHOD *quic_method;
+	const SSL_METHOD *method; /* SSLv3 */
 
 	/* There are 2 BIO's even though they are normally both the
 	 * same.  This is so data can be read and written to different
@@ -1100,7 +1078,7 @@ struct ssl_st {
 
 	/* the session_id_context is used to ensure sessions are only reused
 	 * in the appropriate context */
-	size_t sid_ctx_length;
+	unsigned int sid_ctx_length;
 	unsigned char sid_ctx[SSL_MAX_SID_CTX_LENGTH];
 
 	/* This can also be in the session once a session is established */
@@ -1189,7 +1167,7 @@ typedef struct ssl3_state_st {
 	const unsigned char *wpend_buf;
 
 	/* Transcript of handshake messages that have been sent and received. */
-	struct tls_buffer *handshake_transcript;
+	BUF_MEM *handshake_transcript;
 
 	/* Rolling hash of handshake messages. */
 	EVP_MD_CTX *handshake_hash;
@@ -1229,12 +1207,8 @@ typedef struct ssl3_state_st {
 	 * protocol that the server selected once the ServerHello has been
 	 * processed.
 	 */
-	uint8_t *alpn_selected;
+	unsigned char *alpn_selected;
 	size_t alpn_selected_len;
-
-	/* Contains the QUIC transport params received from our peer. */
-	uint8_t *peer_quic_transport_params;
-	size_t peer_quic_transport_params_len;
 } SSL3_STATE;
 
 /*
@@ -1290,34 +1264,14 @@ int ssl_clear_bad_session(SSL *s);
 void ssl_info_callback(const SSL *s, int type, int value);
 void ssl_msg_callback(SSL *s, int is_write, int content_type,
     const void *msg_buf, size_t msg_len);
-void ssl_msg_callback_cbs(SSL *s, int is_write, int content_type, CBS *cbs);
 
 SSL_CERT *ssl_cert_new(void);
 SSL_CERT *ssl_cert_dup(SSL_CERT *cert);
 void ssl_cert_free(SSL_CERT *c);
-SSL_CERT *ssl_get0_cert(SSL_CTX *ctx, SSL *ssl);
-int ssl_cert_set0_chain(SSL_CTX *ctx, SSL *ssl, STACK_OF(X509) *chain);
-int ssl_cert_set1_chain(SSL_CTX *ctx, SSL *ssl, STACK_OF(X509) *chain);
-int ssl_cert_add0_chain_cert(SSL_CTX *ctx, SSL *ssl, X509 *cert);
-int ssl_cert_add1_chain_cert(SSL_CTX *ctx, SSL *ssl, X509 *cert);
-
-int ssl_security_default_cb(const SSL *ssl, const SSL_CTX *ctx, int op,
-    int bits, int nid, void *other, void *ex_data);
-
-int ssl_security_cipher_check(const SSL *ssl, SSL_CIPHER *cipher);
-int ssl_security_shared_cipher(const SSL *ssl, SSL_CIPHER *cipher);
-int ssl_security_supported_cipher(const SSL *ssl, SSL_CIPHER *cipher);
-int ssl_ctx_security_dh(const SSL_CTX *ctx, DH *dh);
-int ssl_security_dh(const SSL *ssl, DH *dh);
-int ssl_security_sigalg_check(const SSL *ssl, const EVP_PKEY *pkey);
-int ssl_security_tickets(const SSL *ssl);
-int ssl_security_version(const SSL *ssl, int version);
-int ssl_security_cert(const SSL_CTX *ctx, const SSL *ssl, X509 *x509,
-    int is_peer, int *out_error);
-int ssl_security_cert_chain(const SSL *ssl, STACK_OF(X509) *sk,
-    X509 *x509, int *out_error);
-int ssl_security_shared_group(const SSL *ssl, uint16_t group_id);
-int ssl_security_supported_group(const SSL *ssl, uint16_t group_id);
+int ssl_cert_set0_chain(SSL_CERT *c, STACK_OF(X509) *chain);
+int ssl_cert_set1_chain(SSL_CERT *c, STACK_OF(X509) *chain);
+int ssl_cert_add0_chain_cert(SSL_CERT *c, X509 *cert);
+int ssl_cert_add1_chain_cert(SSL_CERT *c, X509 *cert);
 
 int ssl_get_new_session(SSL *s, int session);
 int ssl_get_prev_session(SSL *s, CBS *session_id, CBS *ext_block,
@@ -1329,7 +1283,7 @@ int ssl_cipher_list_to_bytes(SSL *s, STACK_OF(SSL_CIPHER) *ciphers, CBB *cbb);
 STACK_OF(SSL_CIPHER) *ssl_bytes_to_cipher_list(SSL *s, CBS *cbs);
 STACK_OF(SSL_CIPHER) *ssl_create_cipher_list(const SSL_METHOD *meth,
     STACK_OF(SSL_CIPHER) **pref, STACK_OF(SSL_CIPHER) *tls13,
-    const char *rule_str, SSL_CERT *cert);
+    const char *rule_str);
 int ssl_parse_ciphersuites(STACK_OF(SSL_CIPHER) **out_ciphers, const char *str);
 int ssl_merge_cipherlists(STACK_OF(SSL_CIPHER) *cipherlist,
     STACK_OF(SSL_CIPHER) *cipherlist_tls13,
@@ -1516,23 +1470,20 @@ int tls12_derive_master_secret(SSL *s, uint8_t *premaster_secret,
 int ssl_using_ecc_cipher(SSL *s);
 int ssl_check_srvr_ecc_cert_and_alg(SSL *s, X509 *x);
 
-void tls1_get_formatlist(const SSL *s, int client_formats,
-    const uint8_t **pformats, size_t *pformatslen);
-void tls1_get_group_list(const SSL *s, int client_groups,
-    const uint16_t **pgroups, size_t *pgroupslen);
+void tls1_get_formatlist(SSL *s, int client_formats, const uint8_t **pformats,
+    size_t *pformatslen);
+void tls1_get_group_list(SSL *s, int client_groups, const uint16_t **pgroups,
+    size_t *pgroupslen);
 
 int tls1_set_groups(uint16_t **out_group_ids, size_t *out_group_ids_len,
     const int *groups, size_t ngroups);
 int tls1_set_group_list(uint16_t **out_group_ids, size_t *out_group_ids_len,
     const char *groups);
 
-int tls1_ec_group_id2nid(uint16_t group_id, int *out_nid);
-int tls1_ec_group_id2bits(uint16_t group_id, int *out_bits);
-int tls1_ec_nid2group_id(int nid, uint16_t *out_group_id);
-int tls1_check_group(SSL *s, uint16_t group_id);
-int tls1_count_shared_groups(const SSL *ssl, size_t *out_count);
-int tls1_get_shared_group_by_index(const SSL *ssl, size_t index, int *out_nid);
-int tls1_get_supported_group(const SSL *s, int *out_nid);
+int tls1_ec_curve_id2nid(const uint16_t curve_id);
+uint16_t tls1_ec_nid2curve_id(const int nid);
+int tls1_check_curve(SSL *s, const uint16_t group_id);
+int tls1_get_shared_curve(SSL *s);
 
 int ssl_check_clienthello_tlsext_early(SSL *s);
 int ssl_check_clienthello_tlsext_late(SSL *s);
@@ -1573,8 +1524,6 @@ int srtp_find_profile_by_num(unsigned int profile_num,
     const SRTP_PROTECTION_PROFILE **pptr);
 
 #endif /* OPENSSL_NO_SRTP */
-
-int tls_process_peer_certs(SSL *s, STACK_OF(X509) *peer_certs);
 
 __END_HIDDEN_DECLS
 

@@ -1,4 +1,4 @@
-/* $OpenBSD: tasn_utl.c,v 1.17 2022/05/12 19:55:58 jsing Exp $ */
+/* $OpenBSD: tasn_utl.c,v 1.13 2021/12/25 13:17:48 jsing Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2000.
  */
@@ -56,16 +56,12 @@
  *
  */
 
-#include <limits.h>
 #include <stddef.h>
 #include <string.h>
-
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
 #include <openssl/objects.h>
 #include <openssl/err.h>
-
-#include "bytestring.h"
 
 /* Utility functions for manipulating fields and offsets */
 
@@ -127,96 +123,79 @@ asn1_do_lock(ASN1_VALUE **pval, int op, const ASN1_ITEM *it)
 static ASN1_ENCODING *
 asn1_get_enc_ptr(ASN1_VALUE **pval, const ASN1_ITEM *it)
 {
-	const ASN1_AUX *aux = it->funcs;
+	const ASN1_AUX *aux;
 
-	if (pval == NULL || *pval == NULL)
+	if (!pval || !*pval)
 		return NULL;
-
-	if (aux == NULL || (aux->flags & ASN1_AFLG_ENCODING) == 0)
+	aux = it->funcs;
+	if (!aux || !(aux->flags & ASN1_AFLG_ENCODING))
 		return NULL;
-
 	return offset2ptr(*pval, aux->enc_offset);
 }
 
 void
 asn1_enc_init(ASN1_VALUE **pval, const ASN1_ITEM *it)
 {
-	ASN1_ENCODING *aenc;
+	ASN1_ENCODING *enc;
 
-	if ((aenc = asn1_get_enc_ptr(pval, it)) == NULL)
-		return;
-
-	aenc->enc = NULL;
-	aenc->len = 0;
-	aenc->modified = 1;
-}
-
-static void
-asn1_enc_clear(ASN1_ENCODING *aenc)
-{
-	freezero(aenc->enc, aenc->len);
-	aenc->enc = NULL;
-	aenc->len = 0;
-	aenc->modified = 1;
+	enc = asn1_get_enc_ptr(pval, it);
+	if (enc) {
+		enc->enc = NULL;
+		enc->len = 0;
+		enc->modified = 1;
+	}
 }
 
 void
-asn1_enc_cleanup(ASN1_VALUE **pval, const ASN1_ITEM *it)
+asn1_enc_free(ASN1_VALUE **pval, const ASN1_ITEM *it)
 {
-	ASN1_ENCODING *aenc;
+	ASN1_ENCODING *enc;
 
-	if ((aenc = asn1_get_enc_ptr(pval, it)) == NULL)
-		return;
-
-	asn1_enc_clear(aenc);
+	enc = asn1_get_enc_ptr(pval, it);
+	if (enc) {
+		free(enc->enc);
+		enc->enc = NULL;
+		enc->len = 0;
+		enc->modified = 1;
+	}
 }
 
 int
-asn1_enc_save(ASN1_VALUE **pval, CBS *cbs, const ASN1_ITEM *it)
+asn1_enc_save(ASN1_VALUE **pval, const unsigned char *in, int inlen,
+    const ASN1_ITEM *it)
 {
-	ASN1_ENCODING *aenc;
-	uint8_t *data = NULL;
-	size_t data_len = 0;
+	ASN1_ENCODING *enc;
 
-	if ((aenc = asn1_get_enc_ptr(pval, it)) == NULL)
+	enc = asn1_get_enc_ptr(pval, it);
+	if (!enc)
 		return 1;
 
-	asn1_enc_clear(aenc);
-
-	if (!CBS_stow(cbs, &data, &data_len))
+	free(enc->enc);
+	enc->enc = malloc(inlen);
+	if (!enc->enc)
 		return 0;
-	if (data_len > LONG_MAX) {
-		freezero(data, data_len);
-		return 0;
-	}
-
-	aenc->enc = data;
-	aenc->len = (long)data_len;
-	aenc->modified = 0;
+	memcpy(enc->enc, in, inlen);
+	enc->len = inlen;
+	enc->modified = 0;
 
 	return 1;
 }
 
 int
-asn1_enc_restore(int *out_len, unsigned char **out, ASN1_VALUE **pval,
+asn1_enc_restore(int *len, unsigned char **out, ASN1_VALUE **pval,
     const ASN1_ITEM *it)
 {
-	ASN1_ENCODING *aenc;
+	ASN1_ENCODING *enc;
 
-	if ((aenc = asn1_get_enc_ptr(pval, it)) == NULL)
+	enc = asn1_get_enc_ptr(pval, it);
+	if (!enc || enc->modified)
 		return 0;
-
-	if (aenc->modified)
-		return 0;
-
-	if (out != NULL) {
-		memcpy(*out, aenc->enc, aenc->len);
-		*out += aenc->len;
+	if (out) {
+		memcpy(*out, enc->enc, enc->len);
+		*out += enc->len;
 	}
-
-	if (out_len != NULL)
-		*out_len = aenc->len;
-
+	if (len)
+		*len = enc->len;
 	return 1;
 }
 
@@ -226,6 +205,8 @@ asn1_get_field_ptr(ASN1_VALUE **pval, const ASN1_TEMPLATE *tt)
 {
 	ASN1_VALUE **pvaltmp;
 
+	if (tt->flags & ASN1_TFLG_COMBINE)
+		return pval;
 	pvaltmp = offset2ptr(*pval, tt->offset);
 	/* NOTE for BOOLEAN types the field is just a plain
  	 * int so we can't return int **, so settle for

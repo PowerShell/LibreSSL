@@ -62,12 +62,12 @@
  * [including the GNU Public Licence.]
  */
 
-#define NUM_NID 1025
-#define NUM_SN 1018
-#define NUM_LN 1018
-#define NUM_OBJ 947
+#define NUM_NID 1022
+#define NUM_SN 1015
+#define NUM_LN 1015
+#define NUM_OBJ 945
 
-static const unsigned char lvalues[6699]={
+static const unsigned char lvalues[6677]={
 0x2A,0x86,0x48,0x86,0xF7,0x0D,               /* [  0] OBJ_rsadsi */
 0x2A,0x86,0x48,0x86,0xF7,0x0D,0x01,          /* [  6] OBJ_pkcs */
 0x2A,0x86,0x48,0x86,0xF7,0x0D,0x02,0x02,     /* [ 13] OBJ_md2 */
@@ -1007,8 +1007,6 @@ static const unsigned char lvalues[6699]={
 0x2B,0x06,0x01,0x04,0x01,0xD6,0x79,0x02,0x04,0x03,/* [6646] OBJ_ct_precert_poison */
 0x2B,0x06,0x01,0x04,0x01,0xD6,0x79,0x02,0x04,0x04,/* [6656] OBJ_ct_precert_signer */
 0x2B,0x06,0x01,0x04,0x01,0xD6,0x79,0x02,0x04,0x05,/* [6666] OBJ_ct_cert_scts */
-0x2A,0x86,0x48,0x86,0xF7,0x0D,0x01,0x09,0x10,0x02,0x2F,/* [6676] OBJ_id_smime_aa_signingCertificateV2 */
-0x2A,0x86,0x48,0x86,0xF7,0x0D,0x01,0x09,0x10,0x01,0x32,/* [6687] OBJ_id_ct_signedTAL */
 };
 
 static const ASN1_OBJECT nid_objs[NUM_NID]={
@@ -2671,12 +2669,6 @@ static const ASN1_OBJECT nid_objs[NUM_NID]={
 	10,&(lvalues[6656]),0},
 {"ct_cert_scts","CT Certificate SCTs",NID_ct_cert_scts,10,
 	&(lvalues[6666]),0},
-{"HKDF","hkdf",NID_hkdf,0,NULL,0},
-{"id-smime-aa-signingCertificateV2",
-	"id-smime-aa-signingCertificateV2",
-	NID_id_smime_aa_signingCertificateV2,11,&(lvalues[6676]),0},
-{"id-ct-signedTAL","id-ct-signedTAL",NID_id_ct_signedTAL,11,
-	&(lvalues[6687]),0},
 };
 
 static const unsigned int sn_objs[NUM_SN]={
@@ -2777,7 +2769,6 @@ static const unsigned int sn_objs[NUM_SN]={
 955,	/* "Ed448ph" */
 936,	/* "FRP256v1" */
 99,	/* "GN" */
-1022,	/* "HKDF" */
 855,	/* "HMAC" */
 780,	/* "HMAC-MD5" */
 781,	/* "HMAC-SHA1" */
@@ -3175,7 +3166,6 @@ static const unsigned int sn_objs[NUM_SN]={
 1003,	/* "id-ct-rpkiGhostbusters" */
 1002,	/* "id-ct-rpkiManifest" */
 1014,	/* "id-ct-signedChecklist" */
-1024,	/* "id-ct-signedTAL" */
 408,	/* "id-ecPublicKey" */
 508,	/* "id-hex-multipart-message" */
 507,	/* "id-hex-partial-message" */
@@ -3274,7 +3264,6 @@ static const unsigned int sn_objs[NUM_SN]={
 213,	/* "id-smime-aa-securityLabel" */
 239,	/* "id-smime-aa-signatureType" */
 223,	/* "id-smime-aa-signingCertificate" */
-1023,	/* "id-smime-aa-signingCertificateV2" */
 224,	/* "id-smime-aa-smimeEncryptCerts" */
 225,	/* "id-smime-aa-timeStampToken" */
 192,	/* "id-smime-alg" */
@@ -4090,7 +4079,6 @@ static const unsigned int ln_objs[NUM_LN]={
 939,	/* "gost89-cbc" */
 814,	/* "gost89-cnt" */
 938,	/* "gost89-ecb" */
-1022,	/* "hkdf" */
 855,	/* "hmac" */
 780,	/* "hmac-md5" */
 781,	/* "hmac-sha1" */
@@ -4195,7 +4183,6 @@ static const unsigned int ln_objs[NUM_LN]={
 1003,	/* "id-ct-rpkiGhostbusters" */
 1002,	/* "id-ct-rpkiManifest" */
 1014,	/* "id-ct-signedChecklist" */
-1024,	/* "id-ct-signedTAL" */
 408,	/* "id-ecPublicKey" */
 508,	/* "id-hex-multipart-message" */
 507,	/* "id-hex-partial-message" */
@@ -4286,7 +4273,6 @@ static const unsigned int ln_objs[NUM_LN]={
 213,	/* "id-smime-aa-securityLabel" */
 239,	/* "id-smime-aa-signatureType" */
 223,	/* "id-smime-aa-signingCertificate" */
-1023,	/* "id-smime-aa-signingCertificateV2" */
 224,	/* "id-smime-aa-smimeEncryptCerts" */
 225,	/* "id-smime-aa-timeStampToken" */
 192,	/* "id-smime-alg" */
@@ -5610,7 +5596,6 @@ static const unsigned int obj_objs[NUM_OBJ]={
 1013,	/* OBJ_id_ct_geofeedCSVwithCRLF     1 2 840 113549 1 9 16 1 47 */
 1014,	/* OBJ_id_ct_signedChecklist        1 2 840 113549 1 9 16 1 48 */
 1017,	/* OBJ_id_ct_ASPA                   1 2 840 113549 1 9 16 1 49 */
-1024,	/* OBJ_id_ct_signedTAL              1 2 840 113549 1 9 16 1 50 */
 212,	/* OBJ_id_smime_aa_receiptRequest   1 2 840 113549 1 9 16 2 1 */
 213,	/* OBJ_id_smime_aa_securityLabel    1 2 840 113549 1 9 16 2 2 */
 214,	/* OBJ_id_smime_aa_mlExpandHistory  1 2 840 113549 1 9 16 2 3 */
@@ -5640,7 +5625,6 @@ static const unsigned int obj_objs[NUM_OBJ]={
 238,	/* OBJ_id_smime_aa_ets_archiveTimeStamp 1 2 840 113549 1 9 16 2 27 */
 239,	/* OBJ_id_smime_aa_signatureType    1 2 840 113549 1 9 16 2 28 */
 240,	/* OBJ_id_smime_aa_dvcs_dvc         1 2 840 113549 1 9 16 2 29 */
-1023,	/* OBJ_id_smime_aa_signingCertificateV2 1 2 840 113549 1 9 16 2 47 */
 241,	/* OBJ_id_smime_alg_ESDHwith3DES    1 2 840 113549 1 9 16 3 1 */
 242,	/* OBJ_id_smime_alg_ESDHwithRC2     1 2 840 113549 1 9 16 3 2 */
 243,	/* OBJ_id_smime_alg_3DESwrap        1 2 840 113549 1 9 16 3 3 */

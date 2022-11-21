@@ -1,4 +1,4 @@
-/* $OpenBSD: tls13_record.c,v 1.10 2022/07/22 19:33:53 jsing Exp $ */
+/* $OpenBSD: tls13_record.c,v 1.9 2021/10/23 13:12:14 jsing Exp $ */
 /*
  * Copyright (c) 2018, 2019 Joel Sing <jsing@openbsd.org>
  *
@@ -134,8 +134,7 @@ tls13_record_recv(struct tls13_record *rec, tls_read_cb wire_read,
 		    TLS13_RECORD_HEADER_LEN, wire_read, wire_arg)) <= 0)
 			return ret;
 
-		if (!tls_buffer_data(rec->buf, &cbs))
-			return TLS13_IO_FAILURE;
+		tls_buffer_cbs(rec->buf, &cbs);
 
 		if (!CBS_get_u8(&cbs, &content_type))
 			return TLS13_IO_FAILURE;

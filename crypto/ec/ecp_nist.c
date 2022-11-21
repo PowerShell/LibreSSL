@@ -1,4 +1,4 @@
-/* $OpenBSD: ecp_nist.c,v 1.19 2022/06/30 11:14:47 tb Exp $ */
+/* $OpenBSD: ecp_nist.c,v 1.18 2021/09/08 17:29:21 tb Exp $ */
 /*
  * Written by Nils Larsch for the OpenSSL project.
  */
@@ -64,8 +64,7 @@
 #include <limits.h>
 
 #include <openssl/err.h>
-#include <openssl/objects.h>
-
+#include <openssl/obj_mac.h>
 #include "ec_lcl.h"
 
 const EC_METHOD *

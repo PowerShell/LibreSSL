@@ -1,4 +1,4 @@
-/* $OpenBSD: s3_lib.c,v 1.238 2022/08/21 19:39:44 jsing Exp $ */
+/* $OpenBSD: s3_lib.c,v 1.228 2022/03/17 17:24:37 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -1559,17 +1559,13 @@ ssl3_free(SSL *s)
 	tls1_cleanup_key_block(s);
 	ssl3_release_read_buffer(s);
 	ssl3_release_write_buffer(s);
-
 	freezero(s->s3->hs.sigalgs, s->s3->hs.sigalgs_len);
-	sk_X509_pop_free(s->s3->hs.peer_certs, X509_free);
-	sk_X509_pop_free(s->s3->hs.peer_certs_no_leaf, X509_free);
+
 	tls_key_share_free(s->s3->hs.key_share);
 
 	tls13_secrets_destroy(s->s3->hs.tls13.secrets);
 	freezero(s->s3->hs.tls13.cookie, s->s3->hs.tls13.cookie_len);
 	tls13_clienthello_hash_clear(&s->s3->hs.tls13);
-
-	tls_buffer_free(s->s3->hs.tls13.quic_read_buffer);
 
 	sk_X509_NAME_pop_free(s->s3->hs.tls12.ca_names, X509_NAME_free);
 	sk_X509_pop_free(s->internal->verified_chain, X509_free);
@@ -1579,9 +1575,6 @@ ssl3_free(SSL *s)
 
 	free(s->s3->alpn_selected);
 
-	freezero(s->s3->peer_quic_transport_params,
-	    s->s3->peer_quic_transport_params_len);
-
 	freezero(s->s3, sizeof(*s->s3));
 
 	s->s3 = NULL;
@@ -1590,8 +1583,8 @@ ssl3_free(SSL *s)
 void
 ssl3_clear(SSL *s)
 {
-	unsigned char *rp, *wp;
-	size_t rlen, wlen;
+	unsigned char	*rp, *wp;
+	size_t		 rlen, wlen;
 
 	tls1_cleanup_key_block(s);
 	sk_X509_NAME_pop_free(s->s3->hs.tls12.ca_names, X509_NAME_free);
@@ -1602,11 +1595,6 @@ ssl3_clear(SSL *s)
 	s->s3->hs.sigalgs = NULL;
 	s->s3->hs.sigalgs_len = 0;
 
-	sk_X509_pop_free(s->s3->hs.peer_certs, X509_free);
-	s->s3->hs.peer_certs = NULL;
-	sk_X509_pop_free(s->s3->hs.peer_certs_no_leaf, X509_free);
-	s->s3->hs.peer_certs_no_leaf = NULL;
-
 	tls_key_share_free(s->s3->hs.key_share);
 	s->s3->hs.key_share = NULL;
 
@@ -1616,11 +1604,6 @@ ssl3_clear(SSL *s)
 	s->s3->hs.tls13.cookie = NULL;
 	s->s3->hs.tls13.cookie_len = 0;
 	tls13_clienthello_hash_clear(&s->s3->hs.tls13);
-
-	tls_buffer_free(s->s3->hs.tls13.quic_read_buffer);
-	s->s3->hs.tls13.quic_read_buffer = NULL;
-	s->s3->hs.tls13.quic_read_level = ssl_encryption_initial;
-	s->s3->hs.tls13.quic_write_level = ssl_encryption_initial;
 
 	s->s3->hs.extensions_seen = 0;
 
@@ -1635,11 +1618,6 @@ ssl3_clear(SSL *s)
 	free(s->s3->alpn_selected);
 	s->s3->alpn_selected = NULL;
 	s->s3->alpn_selected_len = 0;
-
-	freezero(s->s3->peer_quic_transport_params,
-	    s->s3->peer_quic_transport_params_len);
-	s->s3->peer_quic_transport_params = NULL;
-	s->s3->peer_quic_transport_params_len = 0;
 
 	memset(s->s3, 0, sizeof(*s->s3));
 
@@ -1660,39 +1638,6 @@ ssl3_clear(SSL *s)
 	s->version = TLS1_VERSION;
 
 	s->s3->hs.state = SSL_ST_BEFORE|((s->server) ? SSL_ST_ACCEPT : SSL_ST_CONNECT);
-}
-
-long
-_SSL_get_shared_group(SSL *s, long n)
-{
-	size_t count;
-	int nid;
-
-	/* OpenSSL document that they return -1 for clients. They return 0. */
-	if (!s->server)
-		return 0;
-
-	if (n == -1) {
-		if (!tls1_count_shared_groups(s, &count))
-			return 0;
-
-		if (count > LONG_MAX)
-			count = LONG_MAX;
-
-		return count;
-	}
-
-	/* Undocumented special case added for Suite B profile support. */
-	if (n == -2)
-		n = 0;
-
-	if (n < 0)
-		return 0;
-
-	if (!tls1_get_shared_group_by_index(s, n, &nid))
-		return NID_undef;
-
-	return nid;
 }
 
 long
@@ -1758,11 +1703,6 @@ _SSL_set_tmp_dh(SSL *s, DH *dh)
 
 	if (dh == NULL) {
 		SSLerror(s, ERR_R_PASSED_NULL_PARAMETER);
-		return 0;
-	}
-
-	if (!ssl_security_dh(s, dh)) {
-		SSLerror(s, SSL_R_DH_KEY_TOO_SMALL);
 		return 0;
 	}
 
@@ -1914,25 +1854,25 @@ _SSL_set_tlsext_status_ocsp_resp(SSL *s, unsigned char *resp, int resp_len)
 int
 SSL_set0_chain(SSL *ssl, STACK_OF(X509) *chain)
 {
-	return ssl_cert_set0_chain(NULL, ssl, chain);
+	return ssl_cert_set0_chain(ssl->cert, chain);
 }
 
 int
 SSL_set1_chain(SSL *ssl, STACK_OF(X509) *chain)
 {
-	return ssl_cert_set1_chain(NULL, ssl, chain);
+	return ssl_cert_set1_chain(ssl->cert, chain);
 }
 
 int
 SSL_add0_chain_cert(SSL *ssl, X509 *x509)
 {
-	return ssl_cert_add0_chain_cert(NULL, ssl, x509);
+	return ssl_cert_add0_chain_cert(ssl->cert, x509);
 }
 
 int
 SSL_add1_chain_cert(SSL *ssl, X509 *x509)
 {
-	return ssl_cert_add1_chain_cert(NULL, ssl, x509);
+	return ssl_cert_add1_chain_cert(ssl->cert, x509);
 }
 
 int
@@ -1949,7 +1889,7 @@ SSL_get0_chain_certs(const SSL *ssl, STACK_OF(X509) **out_chain)
 int
 SSL_clear_chain_certs(SSL *ssl)
 {
-	return ssl_cert_set0_chain(NULL, ssl, NULL);
+	return ssl_cert_set0_chain(ssl->cert, NULL);
 }
 
 int
@@ -2115,9 +2055,6 @@ ssl3_ctrl(SSL *s, int cmd, long larg, void *parg)
 	case SSL_CTRL_SET_GROUPS_LIST:
 		return SSL_set1_groups_list(s, parg);
 
-	case SSL_CTRL_GET_SHARED_GROUP:
-		return _SSL_get_shared_group(s, larg);
-
 	/* XXX - rename to SSL_CTRL_GET_PEER_TMP_KEY and remove server check. */
 	case SSL_CTRL_GET_SERVER_TMP_KEY:
 		if (s->server != 0)
@@ -2198,11 +2135,6 @@ _SSL_CTX_set_tmp_dh(SSL_CTX *ctx, DH *dh)
 
 	if (dh == NULL) {
 		SSLerrorx(ERR_R_PASSED_NULL_PARAMETER);
-		return 0;
-	}
-
-	if (!ssl_ctx_security_dh(ctx, dh)) {
-		SSLerrorx(SSL_R_DH_KEY_TOO_SMALL);
 		return 0;
 	}
 
@@ -2305,25 +2237,25 @@ _SSL_CTX_set_tlsext_status_arg(SSL_CTX *ctx, void *arg)
 int
 SSL_CTX_set0_chain(SSL_CTX *ctx, STACK_OF(X509) *chain)
 {
-	return ssl_cert_set0_chain(ctx, NULL, chain);
+	return ssl_cert_set0_chain(ctx->internal->cert, chain);
 }
 
 int
 SSL_CTX_set1_chain(SSL_CTX *ctx, STACK_OF(X509) *chain)
 {
-	return ssl_cert_set1_chain(ctx, NULL, chain);
+	return ssl_cert_set1_chain(ctx->internal->cert, chain);
 }
 
 int
 SSL_CTX_add0_chain_cert(SSL_CTX *ctx, X509 *x509)
 {
-	return ssl_cert_add0_chain_cert(ctx, NULL, x509);
+	return ssl_cert_add0_chain_cert(ctx->internal->cert, x509);
 }
 
 int
 SSL_CTX_add1_chain_cert(SSL_CTX *ctx, X509 *x509)
 {
-	return ssl_cert_add1_chain_cert(ctx, NULL, x509);
+	return ssl_cert_add1_chain_cert(ctx->internal->cert, x509);
 }
 
 int
@@ -2340,7 +2272,7 @@ SSL_CTX_get0_chain_certs(const SSL_CTX *ctx, STACK_OF(X509) **out_chain)
 int
 SSL_CTX_clear_chain_certs(SSL_CTX *ctx)
 {
-	return ssl_cert_set0_chain(ctx, NULL, NULL);
+	return ssl_cert_set0_chain(ctx->internal->cert, NULL);
 }
 
 static int
@@ -2544,13 +2476,13 @@ ssl3_choose_cipher(SSL *s, STACK_OF(SSL_CIPHER) *clnt,
 	STACK_OF(SSL_CIPHER) *prio, *allow;
 	SSL_CIPHER *c, *ret = NULL;
 	int can_use_ecc;
-	int i, ii, nid, ok;
+	int i, ii, ok;
 	SSL_CERT *cert;
 
 	/* Let's see which ciphers we can support */
 	cert = s->cert;
 
-	can_use_ecc = tls1_get_supported_group(s, &nid);
+	can_use_ecc = (tls1_get_shared_curve(s) != NID_undef);
 
 	/*
 	 * Do not set the compare functions, because this may lead to a
@@ -2583,9 +2515,6 @@ ssl3_choose_cipher(SSL *s, STACK_OF(SSL_CIPHER) *clnt,
 		/* If TLS v1.3, only allow TLS v1.3 ciphersuites. */
 		if (SSL_USE_TLS1_3_CIPHERS(s) &&
 		    !(c->algorithm_ssl & SSL_TLSV1_3))
-			continue;
-
-		if (!ssl_security_shared_cipher(s, c))
 			continue;
 
 		ssl_set_cert_masks(cert, c);

@@ -1,4 +1,4 @@
-/* $OpenBSD: tls13_record_layer.c,v 1.71 2022/09/11 13:50:41 jsing Exp $ */
+/* $OpenBSD: tls13_record_layer.c,v 1.67 2022/01/14 09:12:15 tb Exp $ */
 /*
  * Copyright (c) 2018, 2019 Joel Sing <jsing@openbsd.org>
  *
@@ -146,8 +146,8 @@ tls13_record_layer_new(const struct tls13_record_layer_callbacks *callbacks,
 		goto err;
 
 	rl->legacy_version = TLS1_2_VERSION;
-
-	tls13_record_layer_set_callbacks(rl, callbacks, cb_arg);
+	rl->cb = *callbacks;
+	rl->cb_arg = cb_arg;
 
 	return rl;
 
@@ -175,14 +175,6 @@ tls13_record_layer_free(struct tls13_record_layer *rl)
 	tls13_record_protection_free(rl->write);
 
 	freezero(rl, sizeof(struct tls13_record_layer));
-}
-
-void
-tls13_record_layer_set_callbacks(struct tls13_record_layer *rl,
-    const struct tls13_record_layer_callbacks *callbacks, void *cb_arg)
-{
-	rl->cb = *callbacks;
-	rl->cb_arg = cb_arg;
 }
 
 void
@@ -495,24 +487,16 @@ tls13_record_layer_set_traffic_key(const EVP_AEAD *aead, const EVP_MD *hash,
 
 int
 tls13_record_layer_set_read_traffic_key(struct tls13_record_layer *rl,
-    struct tls13_secret *read_key, enum ssl_encryption_level_t read_level)
+    struct tls13_secret *read_key)
 {
-	if (rl->cb.set_read_traffic_key != NULL)
-		return rl->cb.set_read_traffic_key(read_key, read_level,
-		    rl->cb_arg);
-
 	return tls13_record_layer_set_traffic_key(rl->aead, rl->hash,
 	    rl->read, read_key);
 }
 
 int
 tls13_record_layer_set_write_traffic_key(struct tls13_record_layer *rl,
-    struct tls13_secret *write_key, enum ssl_encryption_level_t write_level)
+    struct tls13_secret *write_key)
 {
-	if (rl->cb.set_write_traffic_key != NULL)
-		return rl->cb.set_write_traffic_key(write_key, write_level,
-		    rl->cb_arg);
-
 	return tls13_record_layer_set_traffic_key(rl->aead, rl->hash,
 	    rl->write, write_key);
 }
@@ -850,8 +834,6 @@ tls13_record_layer_read_record(struct tls13_record_layer *rl)
 			return tls13_send_alert(rl, TLS13_ALERT_DECODE_ERROR);
 		if (ccs != 1)
 			return tls13_send_alert(rl, TLS13_ALERT_ILLEGAL_PARAMETER);
-		if (CBS_len(&cbs) != 0)
-			return tls13_send_alert(rl, TLS13_ALERT_DECODE_ERROR);
 		rl->ccs_seen++;
 		tls13_record_layer_rrec_free(rl);
 		return TLS13_IO_WANT_RETRY;
@@ -927,7 +909,7 @@ tls13_record_layer_recv_phh(struct tls13_record_layer *rl)
 	 * TLS13_IO_FAILURE	 something broke.
 	 */
 	if (rl->cb.phh_recv != NULL)
-		ret = rl->cb.phh_recv(rl->cb_arg);
+		ret = rl->cb.phh_recv(rl->cb_arg, tls_content_cbs(rl->rcontent));
 
 	tls_content_clear(rl->rcontent);
 
@@ -1146,9 +1128,6 @@ tls13_send_dummy_ccs(struct tls13_record_layer *rl)
 ssize_t
 tls13_read_handshake_data(struct tls13_record_layer *rl, uint8_t *buf, size_t n)
 {
-	if (rl->cb.handshake_read != NULL)
-		return rl->cb.handshake_read(buf, n, rl->cb_arg);
-
 	return tls13_record_layer_read(rl, SSL3_RT_HANDSHAKE, buf, n);
 }
 
@@ -1156,9 +1135,6 @@ ssize_t
 tls13_write_handshake_data(struct tls13_record_layer *rl, const uint8_t *buf,
     size_t n)
 {
-	if (rl->cb.handshake_write != NULL)
-		return rl->cb.handshake_write(buf, n, rl->cb_arg);
-
 	return tls13_record_layer_write(rl, SSL3_RT_HANDSHAKE, buf, n);
 }
 
@@ -1204,9 +1180,6 @@ tls13_send_alert(struct tls13_record_layer *rl, uint8_t alert_desc)
 {
 	uint8_t alert_level = TLS13_ALERT_LEVEL_FATAL;
 	ssize_t ret;
-
-	if (rl->cb.alert_send != NULL)
-		return rl->cb.alert_send(alert_desc, rl->cb_arg);
 
 	if (alert_desc == TLS13_ALERT_CLOSE_NOTIFY ||
 	    alert_desc == TLS13_ALERT_USER_CANCELED)

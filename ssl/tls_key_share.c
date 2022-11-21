@@ -1,4 +1,4 @@
-/* $OpenBSD: tls_key_share.c,v 1.7 2022/07/02 16:00:12 tb Exp $ */
+/* $OpenBSD: tls_key_share.c,v 1.4 2022/01/11 18:28:41 jsing Exp $ */
 /*
  * Copyright (c) 2020, 2021 Joel Sing <jsing@openbsd.org>
  *
@@ -61,7 +61,7 @@ tls_key_share_new(uint16_t group_id)
 {
 	int nid;
 
-	if (!tls1_ec_group_id2nid(group_id, &nid))
+	if ((nid = tls1_ec_curve_id2nid(group_id)) == 0)
 		return NULL;
 
 	return tls_key_share_new_internal(nid, group_id);
@@ -73,7 +73,7 @@ tls_key_share_new_nid(int nid)
 	uint16_t group_id = 0;
 
 	if (nid != NID_dhKeyAgreement) {
-		if (!tls1_ec_nid2group_id(nid, &group_id))
+		if ((group_id = tls1_ec_nid2curve_id(nid)) == 0)
 			return NULL;
 	}
 
@@ -470,15 +470,4 @@ tls_key_share_derive(struct tls_key_share *ks, uint8_t **shared_key,
 
 	return tls_key_share_derive_ecdhe_ecp(ks, shared_key,
 	    shared_key_len);
-}
-
-int
-tls_key_share_peer_security(const SSL *ssl, struct tls_key_share *ks)
-{
-	switch (ks->nid) {
-	case NID_dhKeyAgreement:
-		return ssl_security_dh(ssl, ks->dhe_peer);
-	default:
-		return 0;
-	}
 }

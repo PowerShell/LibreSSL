@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_purp.c,v 1.16 2022/05/10 19:42:52 tb Exp $ */
+/* $OpenBSD: x509_purp.c,v 1.13 2021/11/04 23:52:34 beck Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2001.
  */
@@ -600,12 +600,8 @@ x509v3_cache_extensions(X509 *x)
 	x->rfc3779_addr = X509_get_ext_d2i(x, NID_sbgp_ipAddrBlock, &i, NULL);
 	if (x->rfc3779_addr == NULL && i != -1)
 		x->ex_flags |= EXFLAG_INVALID;
-	if (!X509v3_addr_is_canonical(x->rfc3779_addr))
-		x->ex_flags |= EXFLAG_INVALID;
 	x->rfc3779_asid = X509_get_ext_d2i(x, NID_sbgp_autonomousSysNum, &i, NULL);
 	if (x->rfc3779_asid == NULL && i != -1)
-		x->ex_flags |= EXFLAG_INVALID;
-	if (!X509v3_asid_is_canonical(x->rfc3779_asid))
 		x->ex_flags |= EXFLAG_INVALID;
 #endif
 
@@ -671,6 +667,8 @@ X509_check_ca(X509 *x)
 		CRYPTO_w_lock(CRYPTO_LOCK_X509);
 		x509v3_cache_extensions(x);
 		CRYPTO_w_unlock(CRYPTO_LOCK_X509);
+		if (x->ex_flags & EXFLAG_INVALID)
+			return X509_V_ERR_UNSPECIFIED;
 	}
 
 	return check_ca(x);
@@ -954,7 +952,7 @@ X509_get_extension_flags(X509 *x)
 {
 	/* Call for side-effect of computing hash and caching extensions */
 	if (X509_check_purpose(x, -1, -1) != 1)
-		return EXFLAG_INVALID;
+		return 0;
 
 	return x->ex_flags;
 }

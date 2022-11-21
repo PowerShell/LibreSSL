@@ -1,4 +1,4 @@
-/* $OpenBSD: a_string.c,v 1.11 2022/05/20 08:04:21 tb Exp $ */
+/* $OpenBSD: a_string.c,v 1.7 2022/03/17 17:17:58 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -95,7 +95,7 @@ ASN1_STRING_clear(ASN1_STRING *astr)
 	astr->data = NULL;
 	astr->length = 0;
 }
-
+ 
 void
 ASN1_STRING_free(ASN1_STRING *astr)
 {
@@ -276,39 +276,25 @@ ASN1_STRING_print(BIO *bp, const ASN1_STRING *astr)
 int
 ASN1_STRING_to_UTF8(unsigned char **out, const ASN1_STRING *in)
 {
-	ASN1_STRING *astr = NULL;
-	int mbflag;
-	int ret = -1;
-
-	/*
-	 * XXX We can't fail on *out != NULL here since things like haproxy and
-	 * grpc pass in a pointer to an uninitialized pointer on the stack.
-	 */
-	if (out == NULL)
-		goto err;
+	ASN1_STRING stmp, *str = &stmp;
+	int mbflag, ret;
 
 	if (in == NULL)
-		goto err;
+		return -1;
 
 	if ((mbflag = asn1_tag2charwidth(in->type)) == -1)
-		goto err;
+		return -1;
 
 	mbflag |= MBSTRING_FLAG;
 
-	if ((ret = ASN1_mbstring_copy(&astr, in->data, in->length, mbflag,
-	    B_ASN1_UTF8STRING)) < 0)
-		goto err;
-
-	*out = astr->data;
-	ret = astr->length;
-
-	astr->data = NULL;
-	astr->length = 0;
-
- err:
-	ASN1_STRING_free(astr);
-
-	return ret;
+	stmp.data = NULL;
+	stmp.length = 0;
+	ret = ASN1_mbstring_copy(&str, in->data, in->length, mbflag,
+	    B_ASN1_UTF8STRING);
+	if (ret < 0)
+		return ret;
+	*out = stmp.data;
+	return stmp.length;
 }
 
 int

@@ -1,4 +1,4 @@
-/* $OpenBSD: tls13_server.c,v 1.103 2022/09/17 17:14:06 jsing Exp $ */
+/* $OpenBSD: tls13_server.c,v 1.96 2022/02/03 16:33:12 jsing Exp $ */
 /*
  * Copyright (c) 2019, 2020 Joel Sing <jsing@openbsd.org>
  * Copyright (c) 2020 Bob Beck <beck@openbsd.org>
@@ -108,15 +108,10 @@ tls13_client_hello_required_extensions(struct tls13_ctx *ctx)
 	 */
 
 	/*
-	 * RFC 8446 section 4.2.9 - if we received a pre_shared_key, then we
-	 * also need psk_key_exchange_modes. Otherwise, section 9.2 specifies
-	 * that we need both signature_algorithms and supported_groups.
+	 * If we got no pre_shared_key, then signature_algorithms and
+	 * supported_groups must both be present.
 	 */
-	if (tlsext_extension_seen(s, TLSEXT_TYPE_pre_shared_key)) {
-		if (!tlsext_extension_seen(s,
-		    TLSEXT_TYPE_psk_key_exchange_modes))
-			return 0;
-	} else {
+	if (!tlsext_extension_seen(s, TLSEXT_TYPE_pre_shared_key)) {
 		if (!tlsext_extension_seen(s, TLSEXT_TYPE_signature_algorithms))
 			return 0;
 		if (!tlsext_extension_seen(s, TLSEXT_TYPE_supported_groups))
@@ -173,15 +168,6 @@ tls13_client_hello_process(struct tls13_ctx *ctx, CBS *cbs)
 
 	/* Ensure we send subsequent alerts with the correct record version. */
 	tls13_record_layer_set_legacy_version(ctx->rl, TLS1_2_VERSION);
-
-	/*
-	 * Ensure that the client has not requested middlebox compatibility mode
-	 * if it is prohibited from doing so.
-	 */
-	if (!ctx->middlebox_compat && CBS_len(&session_id) != 0) {
-		ctx->alert = TLS13_ALERT_ILLEGAL_PARAMETER;
-		goto err;
-	}
 
 	/* Add decoded values to the current ClientHello hash */
 	if (!tls13_clienthello_hash_init(ctx)) {
@@ -243,14 +229,8 @@ tls13_client_hello_process(struct tls13_ctx *ctx, CBS *cbs)
 		goto err;
 	}
 
-	/*
-	 * The legacy session identifier must either be zero length or a 32 byte
-	 * value (in which case the client is requesting middlebox compatibility
-	 * mode), as per RFC 8446 section 4.1.2. If it is valid, store the value
-	 * so that we can echo it back to the client.
-	 */
-	if (CBS_len(&session_id) != 0 &&
-	    CBS_len(&session_id) != sizeof(ctx->hs->tls13.legacy_session_id)) {
+	/* Store legacy session identifier so we can echo it. */
+	if (CBS_len(&session_id) > sizeof(ctx->hs->tls13.legacy_session_id)) {
 		ctx->alert = TLS13_ALERT_ILLEGAL_PARAMETER;
 		goto err;
 	}
@@ -318,6 +298,7 @@ tls13_client_hello_recv(struct tls13_ctx *ctx, CBS *cbs)
 	if (ctx->hs->key_share != NULL)
 		ctx->handshake_stage.hs_type |= NEGOTIATED | WITHOUT_HRR;
 
+	/* XXX - check this is the correct point */
 	tls13_record_layer_allow_ccs(ctx->rl, 1);
 
 	return 1;
@@ -417,10 +398,10 @@ tls13_server_engage_record_protection(struct tls13_ctx *ctx)
 	tls13_record_layer_set_hash(ctx->rl, ctx->hash);
 
 	if (!tls13_record_layer_set_read_traffic_key(ctx->rl,
-	    &secrets->client_handshake_traffic, ssl_encryption_handshake))
+	    &secrets->client_handshake_traffic))
 		goto err;
 	if (!tls13_record_layer_set_write_traffic_key(ctx->rl,
-	    &secrets->server_handshake_traffic, ssl_encryption_handshake))
+	    &secrets->server_handshake_traffic))
 		goto err;
 
 	ctx->handshake_stage.hs_type |= NEGOTIATED;
@@ -446,9 +427,9 @@ tls13_server_hello_retry_request_send(struct tls13_ctx *ctx, CBB *cbb)
 
 	if (ctx->hs->key_share != NULL)
 		return 0;
-	if (!tls1_get_supported_group(ctx->ssl, &nid))
+	if ((nid = tls1_get_shared_curve(ctx->ssl)) == NID_undef)
 		return 0;
-	if (!tls1_ec_nid2group_id(nid, &ctx->hs->tls13.server_group))
+	if ((ctx->hs->tls13.server_group = tls1_ec_nid2curve_id(nid)) == 0)
 		return 0;
 
 	if (!tls13_server_hello_build(ctx, cbb, 1))
@@ -864,7 +845,7 @@ tls13_server_finished_sent(struct tls13_ctx *ctx)
 	 * using the server application traffic keys.
 	 */
 	return tls13_record_layer_set_write_traffic_key(ctx->rl,
-	    &secrets->server_application_traffic, ssl_encryption_application);
+	    &secrets->server_application_traffic);
 }
 
 int
@@ -874,7 +855,9 @@ tls13_client_certificate_recv(struct tls13_ctx *ctx, CBS *cbs)
 	struct stack_st_X509 *certs = NULL;
 	SSL *s = ctx->ssl;
 	X509 *cert = NULL;
+	EVP_PKEY *pkey;
 	const uint8_t *p;
+	int cert_type;
 	int ret = 0;
 
 	if (!CBS_get_u8_length_prefixed(cbs, &cert_request_context))
@@ -923,11 +906,31 @@ tls13_client_certificate_recv(struct tls13_ctx *ctx, CBS *cbs)
 		    "failed to verify peer certificate", NULL);
 		goto err;
 	}
-	s->session->verify_result = s->verify_result;
 	ERR_clear_error();
 
-	if (!tls_process_peer_certs(s, certs))
+	/*
+	 * Achtung! Due to API inconsistency, a client includes the peer's leaf
+	 * certificate in the stored certificate chain, while a server does not.
+	 */
+	cert = sk_X509_shift(certs);
+
+	if ((pkey = X509_get0_pubkey(cert)) == NULL)
 		goto err;
+	if (EVP_PKEY_missing_parameters(pkey))
+		goto err;
+	if ((cert_type = ssl_cert_type(pkey)) < 0)
+		goto err;
+
+	X509_up_ref(cert);
+	X509_free(s->session->peer_cert);
+	s->session->peer_cert = cert;
+	s->session->peer_cert_type = cert_type;
+
+	s->session->verify_result = s->verify_result;
+
+	sk_X509_pop_free(s->session->cert_chain, X509_free);
+	s->session->cert_chain = certs;
+	certs = NULL;
 
 	ctx->handshake_stage.hs_type |= WITH_CCV;
 	ret = 1;
@@ -1086,7 +1089,7 @@ tls13_client_finished_recv(struct tls13_ctx *ctx, CBS *cbs)
 	 * using the client application traffic keys.
 	 */
 	if (!tls13_record_layer_set_read_traffic_key(ctx->rl,
-	    &secrets->client_application_traffic, ssl_encryption_application))
+	    &secrets->client_application_traffic))
 		goto err;
 
 	tls13_record_layer_allow_ccs(ctx->rl, 0);

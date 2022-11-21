@@ -1,4 +1,4 @@
-/*	$OpenBSD: sha256test.c,v 1.3 2018/07/17 17:06:50 tb Exp $	*/
+/*	$OpenBSD: sha256test.c,v 1.7 2021/12/29 22:56:25 tb Exp $	*/
 /* ====================================================================
  * Copyright (c) 2004 The OpenSSL Project.  All rights reserved.
  * ====================================================================
@@ -65,7 +65,8 @@ int
 main(int argc, char **argv) {
 	unsigned char md[SHA256_DIGEST_LENGTH];
 	int		i;
-	EVP_MD_CTX	evp;
+	int		ret = 1;
+	EVP_MD_CTX	*evp = NULL;
 
 	fprintf(stdout, "Testing SHA-256 ");
 
@@ -73,7 +74,7 @@ main(int argc, char **argv) {
 	if (memcmp(md, app_b1, sizeof(app_b1))) {
 		fflush(stdout);
 		fprintf(stderr, "\nTEST 1 of 3 failed.\n");
-		return 1;
+		goto err;
 	}
 	fprintf(stdout, ".");
 	fflush(stdout);
@@ -85,28 +86,37 @@ main(int argc, char **argv) {
 	if (memcmp(md, app_b2, sizeof(app_b2))) {
 		fflush(stdout);
 		fprintf(stderr, "\nTEST 2 of 3 failed.\n");
-		return 1;
+		goto err;
 	}
 	fprintf(stdout, ".");
 	fflush(stdout);
 
-	EVP_MD_CTX_init(&evp);
-	EVP_DigestInit_ex(&evp, EVP_sha256(), NULL);
-	for (i = 0; i < 1000000; i += 160)
-		EVP_DigestUpdate(&evp,
+	if ((evp = EVP_MD_CTX_new()) == NULL) {
+		fflush(stdout);
+		fprintf(stderr, "\nEVP_MD_CTX_new() failed.\n");
+		goto err;
+	}
+	if (!EVP_DigestInit_ex(evp, EVP_sha256(), NULL))
+		goto err;
+	for (i = 0; i < 1000000; i += 160) {
+		if (!EVP_DigestUpdate(evp,
 		    "aaaaaaaa""aaaaaaaa""aaaaaaaa""aaaaaaaa"
 		    "aaaaaaaa""aaaaaaaa""aaaaaaaa""aaaaaaaa"
 		    "aaaaaaaa""aaaaaaaa""aaaaaaaa""aaaaaaaa"
 		    "aaaaaaaa""aaaaaaaa""aaaaaaaa""aaaaaaaa"
 		    "aaaaaaaa""aaaaaaaa""aaaaaaaa""aaaaaaaa",
-		    (1000000 - i) < 160 ? 1000000 - i : 160);
-	EVP_DigestFinal_ex(&evp, md, NULL);
-	EVP_MD_CTX_cleanup(&evp);
+		    (1000000 - i) < 160 ? 1000000 - i : 160))
+		goto err;
+	}
+	if (!EVP_DigestFinal_ex(evp, md, NULL))
+		goto err;
+	if (!EVP_MD_CTX_reset(evp))
+		goto err;
 
 	if (memcmp(md, app_b3, sizeof(app_b3))) {
 		fflush(stdout);
 		fprintf(stderr, "\nTEST 3 of 3 failed.\n");
-		return 1;
+		goto err;
 	}
 	fprintf(stdout, ".");
 	fflush(stdout);
@@ -115,41 +125,47 @@ main(int argc, char **argv) {
 
 	fprintf(stdout, "Testing SHA-224 ");
 
-	EVP_Digest ("abc",3,md,NULL,EVP_sha224(),NULL);
+	if (!EVP_Digest("abc",3,md,NULL,EVP_sha224(),NULL))
+		goto err;
 	if (memcmp(md, addenum_1, sizeof(addenum_1))) {
 		fflush(stdout);
 		fprintf(stderr, "\nTEST 1 of 3 failed.\n");
-		return 1;
+		goto err;
 	}
 	fprintf(stdout, ".");
 	fflush(stdout);
 
-	EVP_Digest(
+	if (!EVP_Digest(
 	    "abcdbcde""cdefdefg""efghfghi""ghijhijk"
 	    "ijkljklm""klmnlmno""mnopnopq",
-	    56, md, NULL, EVP_sha224(), NULL);
+	    56, md, NULL, EVP_sha224(), NULL))
+		goto err;
 	if (memcmp(md, addenum_2, sizeof(addenum_2))) {
 		fflush(stdout);
 		fprintf(stderr, "\nTEST 2 of 3 failed.\n");
-		return 1;
+		goto err;
 	}
 	fprintf(stdout, ".");
 	fflush(stdout);
 
-	EVP_MD_CTX_init(&evp);
-	EVP_DigestInit_ex (&evp, EVP_sha224(), NULL);
-	for (i = 0; i < 1000000; i += 64)
-		EVP_DigestUpdate(&evp,
+	if (!EVP_DigestInit_ex (evp, EVP_sha224(), NULL))
+		goto err;
+	for (i = 0; i < 1000000; i += 64) {
+		if (!EVP_DigestUpdate(evp,
 		    "aaaaaaaa""aaaaaaaa""aaaaaaaa""aaaaaaaa"
 		    "aaaaaaaa""aaaaaaaa""aaaaaaaa""aaaaaaaa",
-		    (1000000 - i) < 64 ? 1000000 - i : 64);
-	EVP_DigestFinal_ex(&evp, md, NULL);
-	EVP_MD_CTX_cleanup(&evp);
+		    (1000000 - i) < 64 ? 1000000 - i : 64))
+			goto err;
+	}
+	if (!EVP_DigestFinal_ex(evp, md, NULL))
+		goto err;
+	if (!EVP_MD_CTX_reset(evp))
+		goto err;
 
 	if (memcmp(md, addenum_3, sizeof(addenum_3))) {
 		fflush(stdout);
 		fprintf(stderr, "\nTEST 3 of 3 failed.\n");
-		return 1;
+		goto err;
 	}
 	fprintf(stdout, ".");
 	fflush(stdout);
@@ -157,6 +173,11 @@ main(int argc, char **argv) {
 	fprintf(stdout, " passed.\n");
 	fflush(stdout);
 
-	return 0;
+	ret = 0;
+
+ err:
+	EVP_MD_CTX_free(evp);
+
+	return ret;
 }
 #endif

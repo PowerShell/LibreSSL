@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_cert.c,v 1.103 2022/07/07 13:04:39 tb Exp $ */
+/* $OpenBSD: ssl_cert.c,v 1.95 2022/02/05 14:54:10 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -170,9 +170,6 @@ ssl_cert_new(void)
 	}
 	ret->key = &(ret->pkeys[SSL_PKEY_RSA]);
 	ret->references = 1;
-	ret->security_cb = ssl_security_default_cb;
-	ret->security_level = OPENSSL_TLS_SECURITY_LEVEL;
-	ret->security_ex_data = NULL;
 	return (ret);
 }
 
@@ -249,10 +246,6 @@ ssl_cert_dup(SSL_CERT *cert)
 		}
 	}
 
-	ret->security_cb = cert->security_cb;
-	ret->security_level = cert->security_level;
-	ret->security_ex_data = cert->security_ex_data;
-
 	/*
 	 * ret->extra_certs *should* exist, but currently the own certificate
 	 * chain is held inside SSL_CTX
@@ -298,46 +291,20 @@ ssl_cert_free(SSL_CERT *c)
 	free(c);
 }
 
-SSL_CERT *
-ssl_get0_cert(SSL_CTX *ctx, SSL *ssl)
-{
-	if (ssl != NULL)
-		return ssl->cert;
-
-	return ctx->internal->cert;
-}
-
 int
-ssl_cert_set0_chain(SSL_CTX *ctx, SSL *ssl, STACK_OF(X509) *chain)
+ssl_cert_set0_chain(SSL_CERT *c, STACK_OF(X509) *chain)
 {
-	SSL_CERT *ssl_cert;
-	SSL_CERT_PKEY *cpk;
-	X509 *x509;
-	int ssl_err;
-	int i;
-
-	if ((ssl_cert = ssl_get0_cert(ctx, ssl)) == NULL)
+	if (c->key == NULL)
 		return 0;
 
-	if ((cpk = ssl_cert->key) == NULL)
-		return 0;
-
-	for (i = 0; i < sk_X509_num(chain); i++) {
-		x509 = sk_X509_value(chain, i);
-		if (!ssl_security_cert(ctx, ssl, x509, 0, &ssl_err)) {
-			SSLerrorx(ssl_err);
-			return 0;
-		}
-	}
-
-	sk_X509_pop_free(cpk->chain, X509_free);
-	cpk->chain = chain;
+	sk_X509_pop_free(c->key->chain, X509_free);
+	c->key->chain = chain;
 
 	return 1;
 }
 
 int
-ssl_cert_set1_chain(SSL_CTX *ctx, SSL *ssl, STACK_OF(X509) *chain)
+ssl_cert_set1_chain(SSL_CERT *c, STACK_OF(X509) *chain)
 {
 	STACK_OF(X509) *new_chain = NULL;
 
@@ -345,7 +312,7 @@ ssl_cert_set1_chain(SSL_CTX *ctx, SSL *ssl, STACK_OF(X509) *chain)
 		if ((new_chain = X509_chain_up_ref(chain)) == NULL)
 			return 0;
 	}
-	if (!ssl_cert_set0_chain(ctx, ssl, new_chain)) {
+	if (!ssl_cert_set0_chain(c, new_chain)) {
 		sk_X509_pop_free(new_chain, X509_free);
 		return 0;
 	}
@@ -354,37 +321,25 @@ ssl_cert_set1_chain(SSL_CTX *ctx, SSL *ssl, STACK_OF(X509) *chain)
 }
 
 int
-ssl_cert_add0_chain_cert(SSL_CTX *ctx, SSL *ssl, X509 *cert)
+ssl_cert_add0_chain_cert(SSL_CERT *c, X509 *cert)
 {
-	SSL_CERT *ssl_cert;
-	SSL_CERT_PKEY *cpk;
-	int ssl_err;
-
-	if ((ssl_cert = ssl_get0_cert(ctx, ssl)) == NULL)
+	if (c->key == NULL)
 		return 0;
 
-	if ((cpk = ssl_cert->key) == NULL)
-		return 0;
-
-	if (!ssl_security_cert(ctx, ssl, cert, 0, &ssl_err)) {
-		SSLerrorx(ssl_err);
-		return 0;
-	}
-
-	if (cpk->chain == NULL) {
-		if ((cpk->chain = sk_X509_new_null()) == NULL)
+	if (c->key->chain == NULL) {
+		if ((c->key->chain = sk_X509_new_null()) == NULL)
 			return 0;
 	}
-	if (!sk_X509_push(cpk->chain, cert))
+	if (!sk_X509_push(c->key->chain, cert))
 		return 0;
 
 	return 1;
 }
 
 int
-ssl_cert_add1_chain_cert(SSL_CTX *ctx, SSL *ssl, X509 *cert)
+ssl_cert_add1_chain_cert(SSL_CERT *c, X509 *cert)
 {
-	if (!ssl_cert_add0_chain_cert(ctx, ssl, cert))
+	if (!ssl_cert_add0_chain_cert(c, cert))
 		return 0;
 
 	X509_up_ref(cert);
@@ -393,21 +348,20 @@ ssl_cert_add1_chain_cert(SSL_CTX *ctx, SSL *ssl, X509 *cert)
 }
 
 int
-ssl_verify_cert_chain(SSL *s, STACK_OF(X509) *certs)
+ssl_verify_cert_chain(SSL *s, STACK_OF(X509) *sk)
 {
 	X509_STORE_CTX *ctx = NULL;
-	X509_VERIFY_PARAM *param;
-	X509 *cert;
+	X509 *x;
 	int ret = 0;
 
-	if (sk_X509_num(certs) < 1)
+	if ((sk == NULL) || (sk_X509_num(sk) == 0))
 		goto err;
 
 	if ((ctx = X509_STORE_CTX_new()) == NULL)
 		goto err;
 
-	cert = sk_X509_value(certs, 0);
-	if (!X509_STORE_CTX_init(ctx, s->ctx->cert_store, cert, certs)) {
+	x = sk_X509_value(sk, 0);
+	if (!X509_STORE_CTX_init(ctx, s->ctx->cert_store, x, sk)) {
 		SSLerror(s, ERR_R_X509_LIB);
 		goto err;
 	}
@@ -420,15 +374,11 @@ ssl_verify_cert_chain(SSL *s, STACK_OF(X509) *certs)
 	 */
 	X509_STORE_CTX_set_default(ctx, s->server ? "ssl_client" : "ssl_server");
 
-	param = X509_STORE_CTX_get0_param(ctx);
-
-	X509_VERIFY_PARAM_set_auth_level(param, SSL_get_security_level(s));
-
 	/*
 	 * Anything non-default in "param" should overwrite anything
 	 * in the ctx.
 	 */
-	X509_VERIFY_PARAM_set1(param, s->param);
+	X509_VERIFY_PARAM_set1(X509_STORE_CTX_get0_param(ctx), s->param);
 
 	if (s->internal->verify_callback)
 		X509_STORE_CTX_set_verify_cb(ctx, s->internal->verify_callback);

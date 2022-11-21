@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_constraints.c,v 1.28 2022/06/27 15:03:11 beck Exp $ */
+/* $OpenBSD: x509_constraints.c,v 1.26 2022/03/26 16:34:21 tb Exp $ */
 /*
  * Copyright (c) 2020 Bob Beck <beck@openbsd.org>
  *
@@ -455,15 +455,9 @@ x509_constraints_valid_domain_constraint(uint8_t *constraint, size_t len)
 }
 
 /*
- * Extract the host part of a URI. On failure to parse a valid host part of the
- * URI, 0 is returned indicating an invalid URI. If the host part parses as
- * valid, or is not present, 1 is returned indicating a possibly valid URI.
- *
- * In the case of a valid URI, *hostpart will be set to a copy of the host part
- * of the URI, or the empty string if no URI is present. If memory allocation
- * fails *hostpart will be set to NULL, even though we returned 1. It is the
- * caller's responsibility to indicate an error for memory allocation failure,
- * and the callers responsibility to free *hostpart.
+ * Extract the host part of a URI, returns the host part as a c string
+ * the caller must free, or or NULL if it could not be found or is
+ * invalid.
  *
  * RFC 3986:
  * the authority part of a uri starts with // and is terminated with
@@ -495,17 +489,8 @@ x509_constraints_uri_host(uint8_t *uri, size_t len, char **hostpart)
 			break;
 		}
 	}
-	if (authority == NULL) {
-		/*
-		 * There is no authority, so no host part in this
-		 * URI. This might be ok or might not, but it must
-		 * fail if we run into a name constraint later, so
-		 * we indicate that we have a URI with an empty
-		 * host part, and succeed.
-		 */
-		*hostpart = strdup("");
-		return 1;
-	}
+	if (authority == NULL)
+		return 0;
 	for (i = authority - uri; i < len; i++) {
 		if (!isascii(uri[i]))
 			return 0;
