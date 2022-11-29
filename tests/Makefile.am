@@ -4,6 +4,7 @@ AM_CPPFLAGS += -DLIBRESSL_CRYPTO_INTERNAL
 
 AM_CPPFLAGS += -I $(top_srcdir)/crypto/asn1
 AM_CPPFLAGS += -I $(top_srcdir)/crypto/bio
+AM_CPPFLAGS += -I $(top_srcdir)/crypto/bn
 AM_CPPFLAGS += -I $(top_srcdir)/crypto/evp
 AM_CPPFLAGS += -I $(top_srcdir)/crypto/modes
 AM_CPPFLAGS += -I $(top_srcdir)/crypto/x509
@@ -33,6 +34,11 @@ check_PROGRAMS += aeadtest
 aeadtest_SOURCES = aeadtest.c
 EXTRA_DIST += aeadtest.sh
 EXTRA_DIST += aeadtests.txt
+EXTRA_DIST += aes_128_gcm_tests.txt
+EXTRA_DIST += aes_192_gcm_tests.txt
+EXTRA_DIST += aes_256_gcm_tests.txt
+EXTRA_DIST += chacha20_poly1305_tests.txt
+EXTRA_DIST += xchacha20_poly1305_tests.txt
 
 # aes_wrap
 TESTS += aes_wrap
@@ -47,6 +53,11 @@ check_PROGRAMS += arc4randomforktest
 arc4randomforktest_SOURCES = arc4randomforktest.c
 endif
 EXTRA_DIST += arc4randomforktest.sh
+
+# asn1_string_to_utf8
+TESTS += asn1_string_to_utf8
+check_PROGRAMS += asn1_string_to_utf8
+asn1_string_to_utf8_SOURCES = asn1_string_to_utf8.c
 
 # asn1api
 TESTS += asn1api
@@ -116,6 +127,11 @@ TESTS += bnaddsub
 check_PROGRAMS += bnaddsub
 bnaddsub_SOURCES = bnaddsub.c
 
+# bn_isqrt
+TESTS += bn_isqrt
+check_PROGRAMS += bn_isqrt
+bn_isqrt_SOURCES = bn_isqrt.c
+
 # bn_mod_exp2_mont
 TESTS += bn_mod_exp2_mont
 check_PROGRAMS += bn_mod_exp2_mont
@@ -125,6 +141,11 @@ bn_mod_exp2_mont_SOURCES = bn_mod_exp2_mont.c
 TESTS += bn_mod_sqrt
 check_PROGRAMS += bn_mod_sqrt
 bn_mod_sqrt_SOURCES = bn_mod_sqrt.c
+
+# bn_primes
+TESTS += bn_primes
+check_PROGRAMS += bn_primes
+bn_primes_SOURCES = bn_primes.c
 
 # bn_rand_interval
 TESTS += bn_rand_interval
@@ -339,15 +360,10 @@ check_PROGRAMS += keypairtest
 keypairtest_SOURCES = keypairtest.c
 EXTRA_DIST += keypairtest.sh
 
-# md4test
-TESTS += md4test
-check_PROGRAMS += md4test
-md4test_SOURCES = md4test.c
-
-# md5test
-TESTS += md5test
-check_PROGRAMS += md5test
-md5test_SOURCES = md5test.c
+# md_test
+TESTS += md_test
+check_PROGRAMS += md_test
+md_test_SOURCES = md_test.c
 
 # mont
 TESTS += mont
@@ -404,20 +420,26 @@ pq_test_SOURCES = pq_test.c
 EXTRA_DIST += pq_test.sh pq_test.bat
 EXTRA_DIST += pq_expected.txt
 
+# quictest
+TESTS += quictest.sh
+check_PROGRAMS += quictest
+quictest_SOURCES = quictest.c
+EXTRA_DIST += quictest.sh quictest.bat
+
 # randtest
 TESTS += randtest
 check_PROGRAMS += randtest
 randtest_SOURCES = randtest.c
 
-# rc2test
-TESTS += rc2test
-check_PROGRAMS += rc2test
-rc2test_SOURCES = rc2test.c
+# rc2_test
+TESTS += rc2_test
+check_PROGRAMS += rc2_test
+rc2_test_SOURCES = rc2_test.c
 
-# rc4test
-TESTS += rc4test
-check_PROGRAMS += rc4test
-rc4test_SOURCES = rc4test.c
+# rc4_test
+TESTS += rc4_test
+check_PROGRAMS += rc4_test
+rc4_test_SOURCES = rc4_test.c
 
 # recordtest
 TESTS += recordtest
@@ -445,10 +467,10 @@ TESTS += rfc5280time
 endif
 EXTRA_DIST += rfc5280time_small.test
 
-# rmdtest
-TESTS += rmdtest
-check_PROGRAMS += rmdtest
-rmdtest_SOURCES = rmdtest.c
+# rmd_test
+TESTS += rmd_test
+check_PROGRAMS += rmd_test
+rmd_test_SOURCES = rmd_test.c
 
 # rsa_test
 TESTS += rsa_test
@@ -461,20 +483,10 @@ check_PROGRAMS += servertest
 servertest_SOURCES = servertest.c
 EXTRA_DIST += servertest.sh servertest.bat
 
-# sha1test
-TESTS += sha1test
-check_PROGRAMS += sha1test
-sha1test_SOURCES = sha1test.c
-
-# sha256test
-TESTS += sha256test
-check_PROGRAMS += sha256test
-sha256test_SOURCES = sha256test.c
-
-# sha512test
-TESTS += sha512test
-check_PROGRAMS += sha512test
-sha512test_SOURCES = sha512test.c
+# sha_test
+TESTS += sha_test
+check_PROGRAMS += sha_test
+sha_test_SOURCES = sha_test.c
 
 # sm3test
 TESTS += sm3test
@@ -497,6 +509,11 @@ TESTS += ssl_methods
 check_PROGRAMS += ssl_methods
 ssl_methods_SOURCES = ssl_methods.c
 
+# ssl_set_alpn_protos
+TESTS += ssl_set_alpn_protos
+check_PROGRAMS += ssl_set_alpn_protos
+ssl_set_alpn_protos_SOURCES = ssl_set_alpn_protos.c
+
 # ssl_versions
 TESTS += ssl_versions
 check_PROGRAMS += ssl_versions
@@ -507,7 +524,19 @@ TESTS += ssltest.sh
 check_PROGRAMS += ssltest
 ssltest_SOURCES = ssltest.c
 EXTRA_DIST += ssltest.sh ssltest.bat
-EXTRA_DIST += testssl testssl.bat ca.pem server.pem
+EXTRA_DIST += testssl testssl.bat
+EXTRA_DIST += ca-int-ecdsa.crl ca-int-ecdsa.pem ca-int-rsa.crl ca-int-rsa.pem
+EXTRA_DIST += ca-root-ecdsa.pem ca-root-rsa.pem ca.pem client.pem
+EXTRA_DIST += client1-ecdsa-chain.pem client1-ecdsa.pem client1-rsa-chain.pem
+EXTRA_DIST += client1-rsa.pem client2-ecdsa-chain.pem client2-ecdsa.pem
+EXTRA_DIST += client2-rsa-chain.pem client2-rsa.pem client3-ecdsa-chain.pem
+EXTRA_DIST += client3-ecdsa.pem client3-rsa-chain.pem client3-rsa.pem
+EXTRA_DIST += server.pem server1-ecdsa-chain.pem server1-ecdsa.pem
+EXTRA_DIST += server1-rsa-chain.pem server1-rsa.pem server2-ecdsa-chain.pem
+EXTRA_DIST += server2-ecdsa.pem server2-rsa-chain.pem server2-rsa.pem
+EXTRA_DIST += server3-ecdsa-chain.pem server3-ecdsa.pem server3-rsa-chain.pem
+EXTRA_DIST += server3-rsa.pem
+
 
 # string_table
 TESTS += string_table

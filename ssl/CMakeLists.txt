@@ -23,6 +23,7 @@ set(
 	ssl_packet.c
 	ssl_pkt.c
 	ssl_rsa.c
+	ssl_seclevel.c
 	ssl_sess.c
 	ssl_sigalgs.c
 	ssl_srvr.c
@@ -36,6 +37,7 @@ set(
 	tls_buffer.c
 	tls_content.c
 	tls_key_share.c
+	tls_lib.c
 	tls12_key_schedule.c
 	tls12_lib.c
 	tls12_record_layer.c
@@ -46,6 +48,7 @@ set(
 	tls13_key_schedule.c
 	tls13_legacy.c
 	tls13_lib.c
+	tls13_quic.c
 	tls13_record.c
 	tls13_record_layer.c
 	tls13_server.c

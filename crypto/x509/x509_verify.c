@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_verify.c,v 1.54 2021/11/24 05:38:12 beck Exp $ */
+/* $OpenBSD: x509_verify.c,v 1.60.2.1 2022/10/20 09:45:18 tb Exp $ */
 /*
  * Copyright (c) 2020-2021 Bob Beck <beck@openbsd.org>
  *
@@ -32,8 +32,10 @@
 
 static int x509_verify_cert_valid(struct x509_verify_ctx *ctx, X509 *cert,
     struct x509_verify_chain *current_chain);
+static int x509_verify_cert_hostname(struct x509_verify_ctx *ctx, X509 *cert,
+    char *name);
 static void x509_verify_build_chains(struct x509_verify_ctx *ctx, X509 *cert,
-    struct x509_verify_chain *current_chain, int full_chain);
+    struct x509_verify_chain *current_chain, int full_chain, char *name);
 static int x509_verify_cert_error(struct x509_verify_ctx *ctx, X509 *cert,
     size_t depth, int error, int ok);
 static void x509_verify_chain_free(struct x509_verify_chain *chain);
@@ -233,11 +235,12 @@ x509_verify_ctx_clear(struct x509_verify_ctx *ctx)
 	x509_verify_ctx_reset(ctx);
 	sk_X509_pop_free(ctx->intermediates, X509_free);
 	free(ctx->chains);
-	memset(ctx, 0, sizeof(*ctx));
+
 }
 
 static int
-x509_verify_cert_cache_extensions(X509 *cert) {
+x509_verify_cert_cache_extensions(X509 *cert)
+{
 	if (!(cert->ex_flags & EXFLAG_SET)) {
 		CRYPTO_w_lock(CRYPTO_LOCK_X509);
 		x509v3_cache_extensions(cert);
@@ -255,6 +258,15 @@ x509_verify_cert_self_signed(X509 *cert)
 	return (cert->ex_flags & EXFLAG_SS) ? 1 : 0;
 }
 
+/* XXX beck - clean up this mess of is_root */
+static int
+x509_verify_check_chain_end(X509 *cert, int full_chain)
+{
+	if (full_chain)
+		return x509_verify_cert_self_signed(cert);
+	return 1;
+}
+
 static int
 x509_verify_ctx_cert_is_root(struct x509_verify_ctx *ctx, X509 *cert,
     int full_chain)
@@ -270,15 +282,15 @@ x509_verify_ctx_cert_is_root(struct x509_verify_ctx *ctx, X509 *cert,
 		if ((match = x509_vfy_lookup_cert_match(ctx->xsc,
 		    cert)) != NULL) {
 			X509_free(match);
-			return !full_chain ||
-			    x509_verify_cert_self_signed(cert);
+			return x509_verify_check_chain_end(cert, full_chain);
+
 		}
 	} else {
 		/* Check the provided roots */
 		for (i = 0; i < sk_X509_num(ctx->roots); i++) {
 			if (X509_cmp(sk_X509_value(ctx->roots, i), cert) == 0)
-				return !full_chain ||
-				    x509_verify_cert_self_signed(cert);
+				return x509_verify_check_chain_end(cert,
+				    full_chain);
 		}
 	}
 
@@ -390,12 +402,21 @@ x509_verify_ctx_validate_legacy_chain(struct x509_verify_ctx *ctx,
 	ctx->xsc->error = X509_V_OK;
 	ctx->xsc->error_depth = 0;
 
-	trust = x509_vfy_check_trust(ctx->xsc);
-	if (trust == X509_TRUST_REJECTED)
-		goto err;
-
 	if (!x509_verify_ctx_set_xsc_chain(ctx, chain, 0, 1))
 		goto err;
+
+	/*
+	 * Call the legacy code to walk the chain and check trust
+	 * in the legacy way to handle partial chains and get the
+	 * callback fired correctly.
+	 */
+	trust = x509_vfy_check_trust(ctx->xsc);
+	if (trust == X509_TRUST_REJECTED)
+		goto err; /* callback was called in x509_vfy_check_trust */
+	if (trust != X509_TRUST_TRUSTED) {
+		/* NOTREACHED */
+		goto err;  /* should not happen if we get in here - abort? */
+	}
 
 	/*
 	 * XXX currently this duplicates some work done in chain
@@ -412,6 +433,9 @@ x509_verify_ctx_validate_legacy_chain(struct x509_verify_ctx *ctx,
 		goto err;
 #endif
 
+	if (!x509_vfy_check_security_level(ctx->xsc))
+		goto err;
+
 	if (!x509_constraints_chain(ctx->xsc->chain,
 		&ctx->xsc->error, &ctx->xsc->error_depth)) {
 		X509 *cert = sk_X509_value(ctx->xsc->chain, depth);
@@ -424,10 +448,6 @@ x509_verify_ctx_validate_legacy_chain(struct x509_verify_ctx *ctx,
 		goto err;
 
 	if (!x509_vfy_check_policy(ctx->xsc))
-		goto err;
-
-	if ((!(ctx->xsc->param->flags & X509_V_FLAG_PARTIAL_CHAIN)) &&
-	    trust != X509_TRUST_TRUSTED)
 		goto err;
 
 	ret = 1;
@@ -452,10 +472,11 @@ x509_verify_ctx_validate_legacy_chain(struct x509_verify_ctx *ctx,
 /* Add a validated chain to our list of valid chains */
 static int
 x509_verify_ctx_add_chain(struct x509_verify_ctx *ctx,
-    struct x509_verify_chain *chain)
+    struct x509_verify_chain *chain, char *name)
 {
 	size_t depth;
 	X509 *last = x509_verify_chain_last(chain);
+	X509 *leaf = x509_verify_chain_leaf(chain);
 
 	depth = sk_X509_num(chain->certs);
 	if (depth > 0)
@@ -473,6 +494,15 @@ x509_verify_ctx_add_chain(struct x509_verify_ctx *ctx,
 	if (!x509_verify_ctx_validate_legacy_chain(ctx, chain, depth))
 		return 0;
 
+	/* Verify the leaf certificate and store any resulting error. */
+	if (!x509_verify_cert_valid(ctx, leaf, NULL))
+		return 0;
+	if (!x509_verify_cert_hostname(ctx, leaf, name))
+		return 0;
+	if (ctx->error_depth == 0 &&
+	    ctx->error != X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY)
+		chain->cert_errors[0] = ctx->error;
+
 	/*
 	 * In the non-legacy code, extensions and purpose are dealt
 	 * with as the chain is built.
@@ -488,8 +518,10 @@ x509_verify_ctx_add_chain(struct x509_verify_ctx *ctx,
 		    X509_V_ERR_OUT_OF_MEM, 0);
 	}
 	ctx->chains_count++;
+
 	ctx->error = X509_V_OK;
 	ctx->error_depth = depth;
+
 	return 1;
 }
 
@@ -538,7 +570,7 @@ x509_verify_parent_signature(X509 *parent, X509 *child, int *error)
 static int
 x509_verify_consider_candidate(struct x509_verify_ctx *ctx, X509 *cert,
     int is_root_cert, X509 *candidate, struct x509_verify_chain *current_chain,
-    int full_chain)
+    int full_chain, char *name)
 {
 	int depth = sk_X509_num(current_chain->certs);
 	struct x509_verify_chain *new_chain;
@@ -589,14 +621,14 @@ x509_verify_consider_candidate(struct x509_verify_ctx *ctx, X509 *cert,
 			x509_verify_chain_free(new_chain);
 			return 0;
 		}
-		if (!x509_verify_ctx_add_chain(ctx, new_chain)) {
+		if (!x509_verify_ctx_add_chain(ctx, new_chain, name)) {
 			x509_verify_chain_free(new_chain);
 			return 0;
 		}
 		goto done;
 	}
 
-	x509_verify_build_chains(ctx, candidate, new_chain, full_chain);
+	x509_verify_build_chains(ctx, candidate, new_chain, full_chain, name);
 
  done:
 	x509_verify_chain_free(new_chain);
@@ -620,7 +652,7 @@ x509_verify_cert_error(struct x509_verify_ctx *ctx, X509 *cert, size_t depth,
 
 static void
 x509_verify_build_chains(struct x509_verify_ctx *ctx, X509 *cert,
-    struct x509_verify_chain *current_chain, int full_chain)
+    struct x509_verify_chain *current_chain, int full_chain, char *name)
 {
 	X509 *candidate;
 	int i, depth, count, ret, is_root;
@@ -674,11 +706,11 @@ x509_verify_build_chains(struct x509_verify_ctx *ctx, X509 *cert,
 		}
 		if (ret > 0) {
 			if (x509_verify_potential_parent(ctx, candidate, cert)) {
-				is_root = !full_chain ||
-				    x509_verify_cert_self_signed(candidate);
+				is_root = x509_verify_check_chain_end(candidate,
+				    full_chain);
 				x509_verify_consider_candidate(ctx, cert,
 				    is_root, candidate, current_chain,
-				    full_chain);
+				    full_chain, name);
 			}
 			X509_free(candidate);
 		}
@@ -687,11 +719,11 @@ x509_verify_build_chains(struct x509_verify_ctx *ctx, X509 *cert,
 		for (i = 0; i < sk_X509_num(ctx->roots); i++) {
 			candidate = sk_X509_value(ctx->roots, i);
 			if (x509_verify_potential_parent(ctx, candidate, cert)) {
-				is_root = !full_chain ||
-				    x509_verify_cert_self_signed(candidate);
+				is_root = x509_verify_check_chain_end(candidate,
+				    full_chain);
 				x509_verify_consider_candidate(ctx, cert,
 				    is_root, candidate, current_chain,
-				    full_chain);
+				    full_chain, name);
 			}
 		}
 	}
@@ -703,7 +735,7 @@ x509_verify_build_chains(struct x509_verify_ctx *ctx, X509 *cert,
 			if (x509_verify_potential_parent(ctx, candidate, cert)) {
 				x509_verify_consider_candidate(ctx, cert,
 				    0, candidate, current_chain,
-				    full_chain);
+				    full_chain, name);
 			}
 		}
 	}
@@ -1115,16 +1147,18 @@ x509_verify(struct x509_verify_ctx *ctx, X509 *leaf, char *name)
 		ctx->xsc->current_cert = leaf;
 	}
 
-	if (!x509_verify_cert_valid(ctx, leaf, NULL))
-		goto err;
-
-	if (!x509_verify_cert_hostname(ctx, leaf, name))
-		goto err;
-
 	if ((current_chain = x509_verify_chain_new()) == NULL) {
 		ctx->error = X509_V_ERR_OUT_OF_MEM;
 		goto err;
 	}
+
+	/*
+	 * Add the leaf to the chain and try to build chains from it.
+	 * Note that unlike Go's verifier, we have not yet checked
+	 * anything about the leaf, This is intentional, so that we
+	 * report failures in chain building before we report problems
+	 * with the leaf.
+	 */
 	if (!x509_verify_chain_append(current_chain, leaf, &ctx->error)) {
 		x509_verify_chain_free(current_chain);
 		goto err;
@@ -1132,13 +1166,14 @@ x509_verify(struct x509_verify_ctx *ctx, X509 *leaf, char *name)
 	do {
 		retry_chain_build = 0;
 		if (x509_verify_ctx_cert_is_root(ctx, leaf, full_chain)) {
-			if (!x509_verify_ctx_add_chain(ctx, current_chain)) {
+			if (!x509_verify_ctx_add_chain(ctx, current_chain,
+			    name)) {
 				x509_verify_chain_free(current_chain);
 				goto err;
 			}
 		} else {
 			x509_verify_build_chains(ctx, leaf, current_chain,
-			    full_chain);
+			    full_chain, name);
 			if (full_chain && ctx->chains_count == 0) {
 				/*
 				 * Save the error state from the xsc
@@ -1151,6 +1186,7 @@ x509_verify(struct x509_verify_ctx *ctx, X509 *leaf, char *name)
 				 * on failure and will be needed for
 				 * that.
 				 */
+				ctx->xsc->error_depth = ctx->error_depth;
 				if (!x509_verify_ctx_save_xsc_error(ctx)) {
 					x509_verify_chain_free(current_chain);
 					goto err;
@@ -1259,4 +1295,3 @@ x509_verify(struct x509_verify_ctx *ctx, X509 *leaf, char *name)
 
 	return 0;
 }
-

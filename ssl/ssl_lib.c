@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_lib.c,v 1.290 2022/03/18 18:01:17 jsing Exp $ */
+/* $OpenBSD: ssl_lib.c,v 1.305 2022/09/10 15:29:33 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -162,6 +162,7 @@
 #include "dtls_locl.h"
 #include "ssl_locl.h"
 #include "ssl_sigalgs.h"
+#include "ssl_tlsext.h"
 
 const char *SSL_version_str = OPENSSL_VERSION_TEXT;
 
@@ -226,7 +227,8 @@ SSL_CTX_set_ssl_version(SSL_CTX *ctx, const SSL_METHOD *meth)
 	ctx->method = meth;
 
 	ciphers = ssl_create_cipher_list(ctx->method, &ctx->cipher_list,
-	    ctx->internal->cipher_list_tls13, SSL_DEFAULT_CIPHER_LIST);
+	    ctx->internal->cipher_list_tls13, SSL_DEFAULT_CIPHER_LIST,
+	    ctx->internal->cert);
 	if (ciphers == NULL || sk_SSL_CIPHER_num(ciphers) <= 0) {
 		SSLerrorx(SSL_R_SSL_LIBRARY_HAS_NO_CIPHERS);
 		return (0);
@@ -238,6 +240,7 @@ SSL *
 SSL_new(SSL_CTX *ctx)
 {
 	SSL *s;
+	CBS cbs;
 
 	if (ctx == NULL) {
 		SSLerrorx(SSL_R_NULL_SSL_CTX);
@@ -327,21 +330,16 @@ SSL_new(SSL_CTX *ctx)
 		    ctx->internal->tlsext_supportedgroups_length;
 	}
 
-	if (s->ctx->internal->alpn_client_proto_list != NULL) {
-		s->internal->alpn_client_proto_list =
-		    malloc(s->ctx->internal->alpn_client_proto_list_len);
-		if (s->internal->alpn_client_proto_list == NULL)
-			goto err;
-		memcpy(s->internal->alpn_client_proto_list,
-		    s->ctx->internal->alpn_client_proto_list,
-		    s->ctx->internal->alpn_client_proto_list_len);
-		s->internal->alpn_client_proto_list_len =
-		    s->ctx->internal->alpn_client_proto_list_len;
-	}
+	CBS_init(&cbs, ctx->internal->alpn_client_proto_list,
+	    ctx->internal->alpn_client_proto_list_len);
+	if (!CBS_stow(&cbs, &s->internal->alpn_client_proto_list,
+	    &s->internal->alpn_client_proto_list_len))
+		goto err;
 
 	s->verify_result = X509_V_OK;
 
 	s->method = ctx->method;
+	s->quic_method = ctx->quic_method;
 
 	if (!s->method->ssl_new(s))
 		goto err;
@@ -572,6 +570,8 @@ SSL_free(SSL *s)
 	SSL_CTX_free(s->ctx);
 
 	free(s->internal->alpn_client_proto_list);
+
+	free(s->internal->quic_transport_params);
 
 #ifndef OPENSSL_NO_SRTP
 	sk_SRTP_PROTECTION_PROFILE_free(s->internal->srtp_profiles);
@@ -881,14 +881,17 @@ SSL_get_peer_certificate(const SSL *s)
 STACK_OF(X509) *
 SSL_get_peer_cert_chain(const SSL *s)
 {
-	if (s == NULL || s->session == NULL)
+	if (s == NULL)
 		return NULL;
 
 	/*
-	 * If we are a client, cert_chain includes the peer's own
-	 * certificate; if we are a server, it does not.
+	 * Achtung! Due to API inconsistency, a client includes the peer's leaf
+	 * certificate in the peer certificate chain, while a server does not.
 	 */
-	return s->session->cert_chain;
+	if (!s->server)
+		return s->s3->hs.peer_certs;
+
+	return s->s3->hs.peer_certs_no_leaf;
 }
 
 STACK_OF(X509) *
@@ -1027,6 +1030,11 @@ SSL_read(SSL *s, void *buf, int num)
 		return -1;
 	}
 
+	if (SSL_is_quic(s)) {
+		SSLerror(s, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED);
+		return (-1);
+	}
+
 	if (s->internal->handshake_func == NULL) {
 		SSLerror(s, SSL_R_UNINITIALIZED);
 		return (-1);
@@ -1066,6 +1074,11 @@ SSL_peek(SSL *s, void *buf, int num)
 		return -1;
 	}
 
+	if (SSL_is_quic(s)) {
+		SSLerror(s, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED);
+		return (-1);
+	}
+
 	if (s->internal->handshake_func == NULL) {
 		SSLerror(s, SSL_R_UNINITIALIZED);
 		return (-1);
@@ -1102,6 +1115,11 @@ SSL_write(SSL *s, const void *buf, int num)
 	if (num < 0) {
 		SSLerror(s, SSL_R_BAD_LENGTH);
 		return -1;
+	}
+
+	if (SSL_is_quic(s)) {
+		SSLerror(s, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED);
+		return (-1);
 	}
 
 	if (s->internal->handshake_func == NULL) {
@@ -1449,7 +1467,7 @@ STACK_OF(SSL_CIPHER) *
 SSL_get1_supported_ciphers(SSL *s)
 {
 	STACK_OF(SSL_CIPHER) *supported_ciphers = NULL, *ciphers;
-	const SSL_CIPHER *cipher;
+	SSL_CIPHER *cipher;
 	uint16_t min_vers, max_vers;
 	int i;
 
@@ -1467,6 +1485,8 @@ SSL_get1_supported_ciphers(SSL *s)
 			goto err;
 		if (!ssl_cipher_allowed_in_tls_version_range(cipher, min_vers,
 		    max_vers))
+			continue;
+		if (!ssl_security_supported_cipher(s, cipher))
 			continue;
 		if (!sk_SSL_CIPHER_push(supported_ciphers, cipher))
 			goto err;
@@ -1542,7 +1562,7 @@ SSL_CTX_set_cipher_list(SSL_CTX *ctx, const char *str)
 	 * ctx->cipher_list has been updated.
 	 */
 	ciphers = ssl_create_cipher_list(ctx->method, &ctx->cipher_list,
-	    ctx->internal->cipher_list_tls13, str);
+	    ctx->internal->cipher_list_tls13, str, ctx->internal->cert);
 	if (ciphers == NULL) {
 		return (0);
 	} else if (sk_SSL_CIPHER_num(ciphers) == 0) {
@@ -1577,7 +1597,7 @@ SSL_set_cipher_list(SSL *s, const char *str)
 
 	/* See comment in SSL_CTX_set_cipher_list. */
 	ciphers = ssl_create_cipher_list(s->ctx->method, &s->cipher_list,
-	    ciphers_tls13, str);
+	    ciphers_tls13, str, s->cert);
 	if (ciphers == NULL) {
 		return (0);
 	} else if (sk_SSL_CIPHER_num(ciphers) == 0) {
@@ -1758,27 +1778,28 @@ int
 SSL_CTX_set_alpn_protos(SSL_CTX *ctx, const unsigned char *protos,
     unsigned int protos_len)
 {
+	CBS cbs;
 	int failed = 1;
 
-	if (protos == NULL || protos_len == 0)
+	if (protos == NULL)
+		protos_len = 0;
+
+	CBS_init(&cbs, protos, protos_len);
+
+	if (protos_len > 0) {
+		if (!tlsext_alpn_check_format(&cbs))
+			goto err;
+	}
+
+	if (!CBS_stow(&cbs, &ctx->internal->alpn_client_proto_list,
+	    &ctx->internal->alpn_client_proto_list_len))
 		goto err;
-
-	free(ctx->internal->alpn_client_proto_list);
-	ctx->internal->alpn_client_proto_list = NULL;
-	ctx->internal->alpn_client_proto_list_len = 0;
-
-	if ((ctx->internal->alpn_client_proto_list = malloc(protos_len))
-	    == NULL)
-		goto err;
-	ctx->internal->alpn_client_proto_list_len = protos_len;
-
-	memcpy(ctx->internal->alpn_client_proto_list, protos, protos_len);
 
 	failed = 0;
 
  err:
 	/* NOTE: Return values are the reverse of what you expect. */
-	return (failed);
+	return failed;
 }
 
 /*
@@ -1790,27 +1811,28 @@ int
 SSL_set_alpn_protos(SSL *ssl, const unsigned char *protos,
     unsigned int protos_len)
 {
+	CBS cbs;
 	int failed = 1;
 
-	if (protos == NULL || protos_len == 0)
+	if (protos == NULL)
+		protos_len = 0;
+
+	CBS_init(&cbs, protos, protos_len);
+
+	if (protos_len > 0) {
+		if (!tlsext_alpn_check_format(&cbs))
+			goto err;
+	}
+
+	if (!CBS_stow(&cbs, &ssl->internal->alpn_client_proto_list,
+	    &ssl->internal->alpn_client_proto_list_len))
 		goto err;
-
-	free(ssl->internal->alpn_client_proto_list);
-	ssl->internal->alpn_client_proto_list = NULL;
-	ssl->internal->alpn_client_proto_list_len = 0;
-
-	if ((ssl->internal->alpn_client_proto_list = malloc(protos_len))
-	    == NULL)
-		goto err;
-	ssl->internal->alpn_client_proto_list_len = protos_len;
-
-	memcpy(ssl->internal->alpn_client_proto_list, protos, protos_len);
 
 	failed = 0;
 
  err:
 	/* NOTE: Return values are the reverse of what you expect. */
-	return (failed);
+	return failed;
 }
 
 /*
@@ -2006,7 +2028,7 @@ SSL_CTX_new(const SSL_METHOD *meth)
 		goto err;
 
 	ssl_create_cipher_list(ret->method, &ret->cipher_list,
-	    NULL, SSL_DEFAULT_CIPHER_LIST);
+	    NULL, SSL_DEFAULT_CIPHER_LIST, ret->internal->cert);
 	if (ret->cipher_list == NULL ||
 	    sk_SSL_CIPHER_num(ret->cipher_list) <= 0) {
 		SSLerrorx(SSL_R_LIBRARY_HAS_NO_CIPHERS);
@@ -2564,6 +2586,127 @@ SSL_get_error(const SSL *s, int i)
 }
 
 int
+SSL_CTX_set_quic_method(SSL_CTX *ctx, const SSL_QUIC_METHOD *quic_method)
+{
+	if (ctx->method->dtls)
+		return 0;
+
+	ctx->quic_method = quic_method;
+
+	return 1;
+}
+
+int
+SSL_set_quic_method(SSL *ssl, const SSL_QUIC_METHOD *quic_method)
+{
+	if (ssl->method->dtls)
+		return 0;
+
+	ssl->quic_method = quic_method;
+
+	return 1;
+}
+
+size_t
+SSL_quic_max_handshake_flight_len(const SSL *ssl,
+    enum ssl_encryption_level_t level)
+{
+	size_t flight_len;
+
+	/* Limit flights to 16K when there are no large certificate messages. */
+	flight_len = 16384;
+
+	switch (level) {
+	case ssl_encryption_initial:
+		return flight_len;
+
+	case ssl_encryption_early_data:
+		/* QUIC does not send EndOfEarlyData. */
+		return 0;
+
+	case ssl_encryption_handshake:
+		if (ssl->server) {
+			/*
+			 * Servers may receive Certificate message if configured
+			 * to request client certificates.
+			 */
+			if ((SSL_get_verify_mode(ssl) & SSL_VERIFY_PEER) != 0 &&
+			    ssl->internal->max_cert_list > flight_len)
+				flight_len = ssl->internal->max_cert_list;
+		} else {
+			/*
+			 * Clients may receive both Certificate message and a
+			 * CertificateRequest message.
+			 */
+			if (ssl->internal->max_cert_list * 2 > flight_len)
+				flight_len = ssl->internal->max_cert_list * 2;
+		}
+		return flight_len;
+	case ssl_encryption_application:
+		/*
+		 * Note there is not actually a bound on the number of
+		 * NewSessionTickets one may send in a row. This level may need
+		 * more involved flow control.
+		 */
+		return flight_len;
+	}
+
+	return 0;
+}
+
+enum ssl_encryption_level_t
+SSL_quic_read_level(const SSL *ssl)
+{
+	return ssl->s3->hs.tls13.quic_read_level;
+}
+
+enum ssl_encryption_level_t
+SSL_quic_write_level(const SSL *ssl)
+{
+	return ssl->s3->hs.tls13.quic_write_level;
+}
+
+int
+SSL_provide_quic_data(SSL *ssl, enum ssl_encryption_level_t level,
+    const uint8_t *data, size_t len)
+{
+	if (!SSL_is_quic(ssl)) {
+		SSLerror(ssl, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED);
+		return 0;
+	}
+
+	if (level != SSL_quic_read_level(ssl)) {
+		SSLerror(ssl, SSL_R_WRONG_ENCRYPTION_LEVEL_RECEIVED);
+		return 0;
+	}
+
+	if (ssl->s3->hs.tls13.quic_read_buffer == NULL) {
+		ssl->s3->hs.tls13.quic_read_buffer = tls_buffer_new(0);
+		if (ssl->s3->hs.tls13.quic_read_buffer == NULL) {
+			SSLerror(ssl, ERR_R_MALLOC_FAILURE);
+			return 0;
+		}
+	}
+
+	/* XXX - note that this does not currently downsize. */
+	tls_buffer_set_capacity_limit(ssl->s3->hs.tls13.quic_read_buffer,
+	    SSL_quic_max_handshake_flight_len(ssl, level));
+
+	/*
+	 * XXX - an append that fails due to exceeding capacity should set
+	 * SSL_R_EXCESSIVE_MESSAGE_SIZE.
+	 */
+	return tls_buffer_append(ssl->s3->hs.tls13.quic_read_buffer, data, len);
+}
+
+int
+SSL_process_quic_post_handshake(SSL *ssl)
+{
+	/* XXX - this needs to run PHH received. */
+	return 1;
+}
+
+int
 SSL_do_handshake(SSL *s)
 {
 	if (s->internal->handshake_func == NULL) {
@@ -2796,9 +2939,17 @@ void
 ssl_msg_callback(SSL *s, int is_write, int content_type,
     const void *msg_buf, size_t msg_len)
 {
-	if (s->internal->msg_callback != NULL)
-		s->internal->msg_callback(is_write, s->version, content_type,
-		    msg_buf, msg_len, s, s->internal->msg_callback_arg);
+	if (s->internal->msg_callback == NULL)
+		return;
+
+	s->internal->msg_callback(is_write, s->version, content_type,
+	    msg_buf, msg_len, s, s->internal->msg_callback_arg);
+}
+
+void
+ssl_msg_callback_cbs(SSL *s, int is_write, int content_type, CBS *cbs)
+{
+	ssl_msg_callback(s, is_write, content_type, CBS_data(cbs), CBS_len(cbs));
 }
 
 /* Fix this function so that it takes an optional type parameter */
@@ -3269,6 +3420,68 @@ const SSL_METHOD *
 SSL_CTX_get_ssl_method(const SSL_CTX *ctx)
 {
 	return ctx->method;
+}
+
+int
+SSL_CTX_get_security_level(const SSL_CTX *ctx)
+{
+	return ctx->internal->cert->security_level;
+}
+
+void
+SSL_CTX_set_security_level(SSL_CTX *ctx, int level)
+{
+	ctx->internal->cert->security_level = level;
+}
+
+int
+SSL_get_security_level(const SSL *ssl)
+{
+	return ssl->cert->security_level;
+}
+
+void
+SSL_set_security_level(SSL *ssl, int level)
+{
+	ssl->cert->security_level = level;
+}
+
+int
+SSL_is_quic(const SSL *ssl)
+{
+	return ssl->quic_method != NULL;
+}
+
+int
+SSL_set_quic_transport_params(SSL *ssl, const uint8_t *params,
+    size_t params_len)
+{
+	freezero(ssl->internal->quic_transport_params,
+	    ssl->internal->quic_transport_params_len);
+	ssl->internal->quic_transport_params = NULL;
+	ssl->internal->quic_transport_params_len = 0;
+
+	if ((ssl->internal->quic_transport_params = malloc(params_len)) == NULL)
+		return 0;
+
+	memcpy(ssl->internal->quic_transport_params, params, params_len);
+	ssl->internal->quic_transport_params_len = params_len;
+
+	return 1;
+}
+
+void
+SSL_get_peer_quic_transport_params(const SSL *ssl, const uint8_t **out_params,
+    size_t *out_params_len)
+{
+	*out_params = ssl->s3->peer_quic_transport_params;
+	*out_params_len = ssl->s3->peer_quic_transport_params_len;
+}
+
+void
+SSL_set_quic_use_legacy_codepoint(SSL *ssl, int use_legacy)
+{
+	/* Not supported. */
 }
 
 static int

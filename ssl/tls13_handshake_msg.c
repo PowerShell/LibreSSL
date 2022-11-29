@@ -1,4 +1,4 @@
-/* $OpenBSD: tls13_handshake_msg.c,v 1.4 2021/10/23 13:12:14 jsing Exp $ */
+/* $OpenBSD: tls13_handshake_msg.c,v 1.6 2022/07/22 19:33:53 jsing Exp $ */
 /*
  * Copyright (c) 2018, 2019 Joel Sing <jsing@openbsd.org>
  *
@@ -71,12 +71,6 @@ tls13_handshake_msg_data(struct tls13_handshake_msg *msg, CBS *cbs)
 	CBS_init(cbs, msg->data, msg->data_len);
 }
 
-int
-tls13_handshake_msg_set_buffer(struct tls13_handshake_msg *msg, CBS *cbs)
-{
-	return tls_buffer_set_data(msg->buf, cbs);
-}
-
 uint8_t
 tls13_handshake_msg_type(struct tls13_handshake_msg *msg)
 {
@@ -142,7 +136,8 @@ tls13_handshake_msg_recv(struct tls13_handshake_msg *msg,
 		    tls13_handshake_msg_read_cb, rl)) <= 0)
 			return ret;
 
-		tls_buffer_cbs(msg->buf, &cbs);
+		if (!tls_buffer_data(msg->buf, &cbs))
+			return TLS13_IO_FAILURE;
 
 		if (!CBS_get_u8(&cbs, &msg_type))
 			return TLS13_IO_FAILURE;

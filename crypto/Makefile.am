@@ -15,6 +15,7 @@ AM_CPPFLAGS += -I$(top_srcdir)/crypto/evp
 AM_CPPFLAGS += -I$(top_srcdir)/crypto/hmac
 AM_CPPFLAGS += -I$(top_srcdir)/crypto/modes
 AM_CPPFLAGS += -I$(top_srcdir)/crypto/ocsp
+AM_CPPFLAGS += -I$(top_srcdir)/crypto/pkcs12
 AM_CPPFLAGS += -I$(top_srcdir)/crypto/rsa
 AM_CPPFLAGS += -I$(top_srcdir)/crypto/x509
 AM_CPPFLAGS += -I$(top_srcdir)/crypto
@@ -412,6 +413,7 @@ noinst_HEADERS += bio/bio_local.h
 libcrypto_la_SOURCES += bn/bn_add.c
 libcrypto_la_SOURCES += bn/bn_asm.c
 libcrypto_la_SOURCES += bn/bn_blind.c
+libcrypto_la_SOURCES += bn/bn_bpsw.c
 libcrypto_la_SOURCES += bn/bn_const.c
 libcrypto_la_SOURCES += bn/bn_ctx.c
 libcrypto_la_SOURCES += bn/bn_depr.c
@@ -421,6 +423,7 @@ libcrypto_la_SOURCES += bn/bn_exp.c
 libcrypto_la_SOURCES += bn/bn_exp2.c
 libcrypto_la_SOURCES += bn/bn_gcd.c
 libcrypto_la_SOURCES += bn/bn_gf2m.c
+libcrypto_la_SOURCES += bn/bn_isqrt.c
 libcrypto_la_SOURCES += bn/bn_kron.c
 libcrypto_la_SOURCES += bn/bn_lib.c
 libcrypto_la_SOURCES += bn/bn_mod.c
@@ -760,6 +763,10 @@ libcrypto_la_SOURCES += idea/i_ofb64.c
 libcrypto_la_SOURCES += idea/i_skey.c
 noinst_HEADERS += idea/idea_lcl.h
 
+# kdf
+libcrypto_la_SOURCES += kdf/hkdf_evp.c
+libcrypto_la_SOURCES += kdf/kdf_err.c
+
 # lhash
 libcrypto_la_SOURCES += lhash/lh_stats.c
 libcrypto_la_SOURCES += lhash/lhash.c
@@ -833,8 +840,10 @@ libcrypto_la_SOURCES += pkcs12/p12_mutl.c
 libcrypto_la_SOURCES += pkcs12/p12_npas.c
 libcrypto_la_SOURCES += pkcs12/p12_p8d.c
 libcrypto_la_SOURCES += pkcs12/p12_p8e.c
+libcrypto_la_SOURCES += pkcs12/p12_sbag.c
 libcrypto_la_SOURCES += pkcs12/p12_utl.c
 libcrypto_la_SOURCES += pkcs12/pk12err.c
+noinst_HEADERS += pkcs12/pkcs12_local.h
 
 # pkcs7
 libcrypto_la_SOURCES += pkcs7/bio_pk7.c
@@ -923,6 +932,7 @@ libcrypto_la_SOURCES += ts/ts_rsp_sign.c
 libcrypto_la_SOURCES += ts/ts_rsp_utils.c
 libcrypto_la_SOURCES += ts/ts_rsp_verify.c
 libcrypto_la_SOURCES += ts/ts_verify_ctx.c
+noinst_HEADERS += ts/ts_local.h
 
 # txt_db
 libcrypto_la_SOURCES += txt_db/txt_db.c
