@@ -1,4 +1,4 @@
-/* $OpenBSD: tls_internal.h,v 1.5 2022/01/11 18:28:41 jsing Exp $ */
+/* $OpenBSD: tls_internal.h,v 1.9 2022/07/24 14:28:16 jsing Exp $ */
 /*
  * Copyright (c) 2018, 2019, 2021 Joel Sing <jsing@openbsd.org>
  *
@@ -33,6 +33,10 @@ __BEGIN_HIDDEN_DECLS
 #define TLS_IO_WANT_POLLOUT		-4
 #define TLS_IO_WANT_RETRY		-5 /* Retry the previous call immediately. */
 
+enum ssl_encryption_level_t;
+
+struct tls13_secret;
+
 /*
  * Callbacks.
  */
@@ -41,17 +45,29 @@ typedef ssize_t (*tls_write_cb)(const void *_buf, size_t _buflen,
     void *_cb_arg);
 typedef ssize_t (*tls_flush_cb)(void *_cb_arg);
 
+typedef ssize_t (*tls_handshake_read_cb)(void *_buf, size_t _buflen,
+    void *_cb_arg);
+typedef ssize_t (*tls_handshake_write_cb)(const void *_buf, size_t _buflen,
+    void *_cb_arg);
+typedef int (*tls_traffic_key_cb)(struct tls13_secret *key,
+    enum ssl_encryption_level_t level, void *_cb_arg);
+typedef int (*tls_alert_send_cb)(int _alert_desc, void *_cb_arg);
+
 /*
  * Buffers.
  */
 struct tls_buffer;
 
 struct tls_buffer *tls_buffer_new(size_t init_size);
-int tls_buffer_set_data(struct tls_buffer *buf, CBS *data);
+void tls_buffer_clear(struct tls_buffer *buf);
 void tls_buffer_free(struct tls_buffer *buf);
+void tls_buffer_set_capacity_limit(struct tls_buffer *buf, size_t limit);
 ssize_t tls_buffer_extend(struct tls_buffer *buf, size_t len,
     tls_read_cb read_cb, void *cb_arg);
-void tls_buffer_cbs(struct tls_buffer *buf, CBS *cbs);
+ssize_t tls_buffer_read(struct tls_buffer *buf, uint8_t *rbuf, size_t n);
+ssize_t tls_buffer_write(struct tls_buffer *buf, const uint8_t *wbuf, size_t n);
+int tls_buffer_append(struct tls_buffer *buf, const uint8_t *wbuf, size_t n);
+int tls_buffer_data(struct tls_buffer *buf, CBS *cbs);
 int tls_buffer_finish(struct tls_buffer *buf, uint8_t **out, size_t *out_len);
 
 /*
@@ -77,6 +93,7 @@ int tls_key_share_peer_public(struct tls_key_share *ks, CBS *cbs,
     int *decode_error, int *invalid_key);
 int tls_key_share_derive(struct tls_key_share *ks, uint8_t **shared_key,
     size_t *shared_key_len);
+int tls_key_share_peer_security(const SSL *ssl, struct tls_key_share *ks);
 
 __END_HIDDEN_DECLS
 

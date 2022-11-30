@@ -1,4 +1,4 @@
-/* $OpenBSD: tls13_client.c,v 1.94 2022/02/03 16:33:12 jsing Exp $ */
+/* $OpenBSD: tls13_client.c,v 1.99 2022/09/11 14:33:07 jsing Exp $ */
 /*
  * Copyright (c) 2018, 2019 Joel Sing <jsing@openbsd.org>
  *
@@ -148,12 +148,12 @@ tls13_client_hello_send(struct tls13_ctx *ctx, CBB *cbb)
 int
 tls13_client_hello_sent(struct tls13_ctx *ctx)
 {
-	tls13_record_layer_allow_ccs(ctx->rl, 1);
-
 	tls1_transcript_freeze(ctx->ssl);
 
-	if (ctx->middlebox_compat)
+	if (ctx->middlebox_compat) {
+		tls13_record_layer_allow_ccs(ctx->rl, 1);
 		ctx->send_dummy_ccs = 1;
+	}
 
 	return 1;
 }
@@ -382,10 +382,10 @@ tls13_client_engage_record_protection(struct tls13_ctx *ctx)
 	tls13_record_layer_set_hash(ctx->rl, ctx->hash);
 
 	if (!tls13_record_layer_set_read_traffic_key(ctx->rl,
-	    &secrets->server_handshake_traffic))
+	    &secrets->server_handshake_traffic, ssl_encryption_handshake))
 		goto err;
 	if (!tls13_record_layer_set_write_traffic_key(ctx->rl,
-	    &secrets->client_handshake_traffic))
+	    &secrets->client_handshake_traffic, ssl_encryption_handshake))
 		goto err;
 
 	ret = 1;
@@ -440,7 +440,7 @@ tls13_client_hello_retry_send(struct tls13_ctx *ctx, CBB *cbb)
 	 * supported groups and is not the same as the key share we previously
 	 * offered.
 	 */
-	if (!tls1_check_curve(ctx->ssl, ctx->hs->tls13.server_group))
+	if (!tls1_check_group(ctx->ssl, ctx->hs->tls13.server_group))
 		return 0; /* XXX alert */
 	if (ctx->hs->tls13.server_group == tls_key_share_group(ctx->hs->key_share))
 		return 0; /* XXX alert */
@@ -504,16 +504,10 @@ tls13_server_encrypted_extensions_recv(struct tls13_ctx *ctx, CBS *cbs)
 
 	if (!tlsext_client_parse(ctx->ssl, SSL_TLSEXT_MSG_EE, cbs, &alert_desc)) {
 		ctx->alert = alert_desc;
-		goto err;
+		return 0;
 	}
 
 	return 1;
-
- err:
-	if (ctx->alert == 0)
-		ctx->alert = TLS13_ALERT_DECODE_ERROR;
-
-	return 0;
 }
 
 int
@@ -559,9 +553,8 @@ tls13_server_certificate_recv(struct tls13_ctx *ctx, CBS *cbs)
 	struct stack_st_X509 *certs = NULL;
 	SSL *s = ctx->ssl;
 	X509 *cert = NULL;
-	EVP_PKEY *pkey;
 	const uint8_t *p;
-	int alert_desc, cert_type;
+	int alert_desc;
 	int ret = 0;
 
 	if ((certs = sk_X509_new_null()) == NULL)
@@ -616,28 +609,11 @@ tls13_server_certificate_recv(struct tls13_ctx *ctx, CBS *cbs)
 		    "failed to verify peer certificate", NULL);
 		goto err;
 	}
+	s->session->verify_result = s->verify_result;
 	ERR_clear_error();
 
-	cert = sk_X509_value(certs, 0);
-	X509_up_ref(cert);
-
-	if ((pkey = X509_get0_pubkey(cert)) == NULL)
+	if (!tls_process_peer_certs(s, certs))
 		goto err;
-	if (EVP_PKEY_missing_parameters(pkey))
-		goto err;
-	if ((cert_type = ssl_cert_type(pkey)) < 0)
-		goto err;
-
-	X509_up_ref(cert);
-	X509_free(s->session->peer_cert);
-	s->session->peer_cert = cert;
-	s->session->peer_cert_type = cert_type;
-
-	s->session->verify_result = s->verify_result;
-
-	sk_X509_pop_free(s->session->cert_chain, X509_free);
-	s->session->cert_chain = certs;
-	certs = NULL;
 
 	if (ctx->ocsp_status_recv_cb != NULL &&
 	    !ctx->ocsp_status_recv_cb(ctx))
@@ -807,7 +783,7 @@ tls13_server_finished_recv(struct tls13_ctx *ctx, CBS *cbs)
 	 * using the server application traffic keys.
 	 */
 	if (!tls13_record_layer_set_read_traffic_key(ctx->rl,
-	    &secrets->server_application_traffic))
+	    &secrets->server_application_traffic, ssl_encryption_application))
 		goto err;
 
 	tls13_record_layer_allow_ccs(ctx->rl, 0);
@@ -1086,5 +1062,5 @@ tls13_client_finished_sent(struct tls13_ctx *ctx)
 	 * using the client application traffic keys.
 	 */
 	return tls13_record_layer_set_write_traffic_key(ctx->rl,
-	    &secrets->client_application_traffic);
+	    &secrets->client_application_traffic, ssl_encryption_application);
 }

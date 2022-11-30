@@ -1,4 +1,4 @@
-/* $OpenBSD: ec_ameth.c,v 1.31 2022/01/10 12:10:26 tb Exp $ */
+/* $OpenBSD: ec_ameth.c,v 1.33 2022/06/27 12:36:05 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2006.
  */
@@ -384,6 +384,25 @@ ec_bits(const EVP_PKEY * pkey)
 	ret = BN_num_bits(order);
 	BN_free(order);
 	return ret;
+}
+
+static int
+ec_security_bits(const EVP_PKEY *pkey)
+{
+	int ecbits = ec_bits(pkey);
+
+	if (ecbits >= 512)
+		return 256;
+	if (ecbits >= 384)
+		return 192;
+	if (ecbits >= 256)
+		return 128;
+	if (ecbits >= 224)
+		return 112;
+	if (ecbits >= 160)
+		return 80;
+
+	return ecbits / 2;
 }
 
 static int 
@@ -888,8 +907,8 @@ ecdh_cms_encrypt(CMS_RecipientInfo *ri)
 		if (penclen <= 0)
 			goto err;
 		ASN1_STRING_set0(pubkey, penc, penclen);
-		pubkey->flags &= ~(ASN1_STRING_FLAG_BITS_LEFT | 0x07);
-		pubkey->flags |= ASN1_STRING_FLAG_BITS_LEFT;
+		if (!asn1_abs_set_unused_bits(pubkey, 0))
+			goto err;
 		penc = NULL;
 
 		X509_ALGOR_set0(talg, OBJ_nid2obj(NID_X9_62_id_ecPublicKey),
@@ -1006,6 +1025,7 @@ const EVP_PKEY_ASN1_METHOD eckey_asn1_meth = {
 
 	.pkey_size = int_ec_size,
 	.pkey_bits = ec_bits,
+	.pkey_security_bits = ec_security_bits,
 
 	.param_decode = eckey_param_decode,
 	.param_encode = eckey_param_encode,

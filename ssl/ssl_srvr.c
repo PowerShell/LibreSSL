@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_srvr.c,v 1.141 2022/02/05 14:54:10 jsing Exp $ */
+/* $OpenBSD: ssl_srvr.c,v 1.149 2022/08/17 07:39:19 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -219,6 +219,13 @@ ssl3_accept(SSL *s)
 			    &s->s3->hs.our_min_tls_version,
 			    &s->s3->hs.our_max_tls_version)) {
 				SSLerror(s, SSL_R_NO_PROTOCOLS_AVAILABLE);
+				ret = -1;
+				goto end;
+			}
+
+			if (!ssl_security_version(s,
+			    s->s3->hs.our_min_tls_version)) {
+				SSLerror(s, SSL_R_VERSION_TOO_LOW);
 				ret = -1;
 				goto end;
 			}
@@ -518,7 +525,7 @@ ssl3_accept(SSL *s)
 
 		case SSL3_ST_SR_CERT_A:
 		case SSL3_ST_SR_CERT_B:
-			if (s->s3->hs.tls12.cert_request) {
+			if (s->s3->hs.tls12.cert_request != 0) {
 				ret = ssl3_get_client_certificate(s);
 				if (ret <= 0)
 					goto end;
@@ -1055,34 +1062,42 @@ ssl3_get_client_hello(SSL *s)
 		}
 	}
 
-	if (!s->internal->hit && s->internal->tls_session_secret_cb) {
+	if (!s->internal->hit && s->internal->tls_session_secret_cb != NULL) {
 		SSL_CIPHER *pref_cipher = NULL;
+		int master_key_length = sizeof(s->session->master_key);
 
-		s->session->master_key_length = sizeof(s->session->master_key);
-		if (s->internal->tls_session_secret_cb(s, s->session->master_key,
-		    &s->session->master_key_length, ciphers, &pref_cipher,
-		    s->internal->tls_session_secret_cb_arg)) {
-			s->internal->hit = 1;
-			s->session->ciphers = ciphers;
-			s->session->verify_result = X509_V_OK;
-
-			ciphers = NULL;
-
-			/* check if some cipher was preferred by call back */
-			pref_cipher = pref_cipher ? pref_cipher :
-			    ssl3_choose_cipher(s, s->session->ciphers,
-			    SSL_get_ciphers(s));
-			if (pref_cipher == NULL) {
-				al = SSL_AD_HANDSHAKE_FAILURE;
-				SSLerror(s, SSL_R_NO_SHARED_CIPHER);
-				goto fatal_err;
-			}
-
-			s->session->cipher = pref_cipher;
-
-			sk_SSL_CIPHER_free(s->cipher_list);
-			s->cipher_list = sk_SSL_CIPHER_dup(s->session->ciphers);
+		if (!s->internal->tls_session_secret_cb(s,
+		    s->session->master_key, &master_key_length, ciphers,
+		    &pref_cipher, s->internal->tls_session_secret_cb_arg)) {
+			SSLerror(s, ERR_R_INTERNAL_ERROR);
+			goto err;
 		}
+		if (master_key_length <= 0) {
+			SSLerror(s, ERR_R_INTERNAL_ERROR);
+			goto err;
+		}
+		s->session->master_key_length = master_key_length;
+
+		s->internal->hit = 1;
+		s->session->verify_result = X509_V_OK;
+
+		sk_SSL_CIPHER_free(s->session->ciphers);
+		s->session->ciphers = ciphers;
+		ciphers = NULL;
+
+		/* Check if some cipher was preferred by the callback. */
+		if (pref_cipher == NULL)
+			pref_cipher = ssl3_choose_cipher(s, s->session->ciphers,
+			    SSL_get_ciphers(s));
+		if (pref_cipher == NULL) {
+			al = SSL_AD_HANDSHAKE_FAILURE;
+			SSLerror(s, SSL_R_NO_SHARED_CIPHER);
+			goto fatal_err;
+		}
+		s->session->cipher = pref_cipher;
+
+		sk_SSL_CIPHER_free(s->cipher_list);
+		s->cipher_list = sk_SSL_CIPHER_dup(s->session->ciphers);
 	}
 
 	/*
@@ -1091,18 +1106,17 @@ ssl3_get_client_hello(SSL *s)
 	 */
 
 	if (!s->internal->hit) {
-		sk_SSL_CIPHER_free(s->session->ciphers);
-		s->session->ciphers = ciphers;
 		if (ciphers == NULL) {
 			al = SSL_AD_ILLEGAL_PARAMETER;
 			SSLerror(s, SSL_R_NO_CIPHERS_PASSED);
 			goto fatal_err;
 		}
+		sk_SSL_CIPHER_free(s->session->ciphers);
+		s->session->ciphers = ciphers;
 		ciphers = NULL;
-		c = ssl3_choose_cipher(s, s->session->ciphers,
-		SSL_get_ciphers(s));
 
-		if (c == NULL) {
+		if ((c = ssl3_choose_cipher(s, s->session->ciphers,
+		    SSL_get_ciphers(s))) == NULL) {
 			al = SSL_AD_HANDSHAKE_FAILURE;
 			SSLerror(s, SSL_R_NO_SHARED_CIPHER);
 			goto fatal_err;
@@ -1348,6 +1362,12 @@ ssl3_send_server_kex_dhe(SSL *s, CBB *cbb)
 	if (!tls_key_share_public(s->s3->hs.key_share, cbb))
 		goto err;
 
+	if (!tls_key_share_peer_security(s, s->s3->hs.key_share)) {
+		SSLerror(s, SSL_R_DH_KEY_TOO_SMALL);
+		ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_HANDSHAKE_FAILURE);
+		return 0;
+	}
+
 	return 1;
 
  err:
@@ -1360,7 +1380,7 @@ ssl3_send_server_kex_ecdhe(SSL *s, CBB *cbb)
 	CBB public;
 	int nid;
 
-	if ((nid = tls1_get_shared_curve(s)) == NID_undef) {
+	if (!tls1_get_supported_group(s, &nid)) {
 		SSLerror(s, SSL_R_UNSUPPORTED_ELLIPTIC_CURVE);
 		ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_HANDSHAKE_FAILURE);
 		goto err;
@@ -1560,8 +1580,8 @@ ssl3_send_certificate_request(SSL *s)
 			if (!CBB_add_u16_length_prefixed(&cert_request,
 			    &sigalgs))
 				goto err;
-			if (!ssl_sigalgs_build(
-			    s->s3->hs.negotiated_tls_version, &sigalgs))
+			if (!ssl_sigalgs_build(s->s3->hs.negotiated_tls_version,
+			    &sigalgs, SSL_get_security_level(s)))
 				goto err;
 		}
 
@@ -2136,11 +2156,11 @@ ssl3_get_cert_verify(SSL *s)
 int
 ssl3_get_client_certificate(SSL *s)
 {
-	CBS cbs, client_certs;
-	X509 *x = NULL;
-	const unsigned char *q;
-	STACK_OF(X509) *sk = NULL;
-	int i, al, ret;
+	CBS cbs, cert_list, cert_data;
+	STACK_OF(X509) *certs = NULL;
+	X509 *cert = NULL;
+	const uint8_t *p;
+	int al, ret;
 
 	if ((ret = ssl3_get_message(s, SSL3_ST_SR_CERT_A, SSL3_ST_SR_CERT_B,
 	    -1, s->internal->max_cert_list)) <= 0)
@@ -2155,13 +2175,13 @@ ssl3_get_client_certificate(SSL *s)
 			al = SSL_AD_HANDSHAKE_FAILURE;
 			goto fatal_err;
 		}
+
 		/*
-		 * If tls asked for a client cert,
-		 * the client must return a 0 list.
+		 * If we asked for a client certificate and the client has none,
+		 * it must respond with a certificate list of length zero.
 		 */
-		if (s->s3->hs.tls12.cert_request) {
-			SSLerror(s, SSL_R_TLS_PEER_DID_NOT_RESPOND_WITH_CERTIFICATE_LIST
-			    );
+		if (s->s3->hs.tls12.cert_request != 0) {
+			SSLerror(s, SSL_R_TLS_PEER_DID_NOT_RESPOND_WITH_CERTIFICATE_LIST);
 			al = SSL_AD_UNEXPECTED_MESSAGE;
 			goto fatal_err;
 		}
@@ -2180,47 +2200,17 @@ ssl3_get_client_certificate(SSL *s)
 
 	CBS_init(&cbs, s->internal->init_msg, s->internal->init_num);
 
-	if ((sk = sk_X509_new_null()) == NULL) {
-		SSLerror(s, ERR_R_MALLOC_FAILURE);
-		goto err;
-	}
-
-	if (!CBS_get_u24_length_prefixed(&cbs, &client_certs) ||
-	    CBS_len(&cbs) != 0)
+	if (!CBS_get_u24_length_prefixed(&cbs, &cert_list))
+		goto decode_err;
+	if (CBS_len(&cbs) != 0)
 		goto decode_err;
 
-	while (CBS_len(&client_certs) > 0) {
-		CBS cert;
-
-		if (!CBS_get_u24_length_prefixed(&client_certs, &cert)) {
-			al = SSL_AD_DECODE_ERROR;
-			SSLerror(s, SSL_R_CERT_LENGTH_MISMATCH);
-			goto fatal_err;
-		}
-
-		q = CBS_data(&cert);
-		x = d2i_X509(NULL, &q, CBS_len(&cert));
-		if (x == NULL) {
-			SSLerror(s, ERR_R_ASN1_LIB);
-			goto err;
-		}
-		if (q != CBS_data(&cert) + CBS_len(&cert)) {
-			al = SSL_AD_DECODE_ERROR;
-			SSLerror(s, SSL_R_CERT_LENGTH_MISMATCH);
-			goto fatal_err;
-		}
-		if (!sk_X509_push(sk, x)) {
-			SSLerror(s, ERR_R_MALLOC_FAILURE);
-			goto err;
-		}
-		x = NULL;
-	}
-
-	if (sk_X509_num(sk) <= 0) {
-		/*
-		 * TLS does not mind 0 certs returned.
-		 * Fail for TLS only if we required a certificate.
-		 */
+	/*
+	 * A TLS client must send an empty certificate list, if no suitable
+	 * certificate is available (rather than omitting the Certificate
+	 * handshake message) - see RFC 5246 section 7.4.6.
+	 */
+	if (CBS_len(&cert_list) == 0) {
 		if ((s->verify_mode & SSL_VERIFY_PEER) &&
 		    (s->verify_mode & SSL_VERIFY_FAIL_IF_NO_PEER_CERT)) {
 			SSLerror(s, SSL_R_PEER_DID_NOT_RETURN_A_CERTIFICATE);
@@ -2229,28 +2219,43 @@ ssl3_get_client_certificate(SSL *s)
 		}
 		/* No client certificate so free transcript. */
 		tls1_transcript_free(s);
-	} else {
-		i = ssl_verify_cert_chain(s, sk);
-		if (i <= 0) {
-			al = ssl_verify_alarm_type(s->verify_result);
-			SSLerror(s, SSL_R_NO_CERTIFICATE_RETURNED);
-			goto fatal_err;
-		}
+		goto done;
 	}
 
-	X509_free(s->session->peer_cert);
-	s->session->peer_cert = sk_X509_shift(sk);
+	if ((certs = sk_X509_new_null()) == NULL) {
+		SSLerror(s, ERR_R_MALLOC_FAILURE);
+		goto err;
+	}
 
-	/*
-	 * Inconsistency alert: cert_chain does *not* include the
-	 * peer's own certificate, while we do include it in s3_clnt.c
-	 */
-	sk_X509_pop_free(s->session->cert_chain, X509_free);
-	s->session->cert_chain = sk;
-	sk = NULL;
+	while (CBS_len(&cert_list) > 0) {
+		if (!CBS_get_u24_length_prefixed(&cert_list, &cert_data))
+			goto decode_err;
+		p = CBS_data(&cert_data);
+		if ((cert = d2i_X509(NULL, &p, CBS_len(&cert_data))) == NULL) {
+			SSLerror(s, ERR_R_ASN1_LIB);
+			goto err;
+		}
+		if (p != CBS_data(&cert_data) + CBS_len(&cert_data))
+			goto decode_err;
+		if (!sk_X509_push(certs, cert)) {
+			SSLerror(s, ERR_R_MALLOC_FAILURE);
+			goto err;
+		}
+		cert = NULL;
+	}
 
+	if (ssl_verify_cert_chain(s, certs) <= 0) {
+		al = ssl_verify_alarm_type(s->verify_result);
+		SSLerror(s, SSL_R_NO_CERTIFICATE_RETURNED);
+		goto fatal_err;
+	}
 	s->session->verify_result = s->verify_result;
+	ERR_clear_error();
 
+	if (!tls_process_peer_certs(s, certs))
+		goto err;
+
+ done:
 	ret = 1;
 	if (0) {
  decode_err:
@@ -2260,8 +2265,8 @@ ssl3_get_client_certificate(SSL *s)
 		ssl3_send_alert(s, SSL3_AL_FATAL, al);
 	}
  err:
-	X509_free(x);
-	sk_X509_pop_free(sk, X509_free);
+	sk_X509_pop_free(certs, X509_free);
+	X509_free(cert);
 
 	return (ret);
 }

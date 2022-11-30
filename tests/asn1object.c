@@ -1,4 +1,4 @@
-/* $OpenBSD: asn1object.c,v 1.6 2022/03/19 17:37:10 jsing Exp $ */
+/* $OpenBSD: asn1object.c,v 1.9 2022/09/05 21:06:31 tb Exp $ */
 /*
  * Copyright (c) 2017, 2021, 2022 Joel Sing <jsing@openbsd.org>
  *
@@ -41,7 +41,7 @@ asn1_compare_bytes(const char *label, const unsigned char *d1, int len1,
 {
 	if (len1 != len2) {
 		fprintf(stderr, "FAIL: %s - byte lengths differ "
-		    "(%i != %i)\n", label, len1, len2);
+		    "(%d != %d)\n", label, len1, len2);
 		fprintf(stderr, "Got:\n");
 		hexdump(d1, len1);
 		fprintf(stderr, "Want:\n");
@@ -276,6 +276,11 @@ do_asn1_object_test(struct asn1_object_test *aot)
 		fprintf(stderr, "FAIL: d2i_ASN1_OBJECT() failed\n");
 		goto failed;
 	}
+	if (p != aot->der + aot->der_len) {
+		fprintf(stderr, "FAIL: d2i_ASN1_OBJECT() p = %p, want %p\n",
+		    p, aot->der + aot->der_len);
+		goto failed;
+	}
 
 	if (aot->txt != NULL) {
 		ret = i2t_ASN1_OBJECT(buf, sizeof(buf), aobj);
@@ -388,7 +393,7 @@ asn1_object_txt_test(void)
 	ret = i2t_ASN1_OBJECT(small_buf, sizeof(small_buf), aobj);
 	if (ret < 0 || (unsigned long)ret != strlen(obj_txt)) {
 		fprintf(stderr, "FAIL: i2t_ASN1_OBJECT() with small buffer "
-		    "returned %d, want %lu\n", ret, strlen(obj_txt));
+		    "returned %d, want %zu\n", ret, strlen(obj_txt));
 		goto failed;
 	}
 
@@ -416,7 +421,7 @@ asn1_object_txt_test(void)
 	ret = i2a_ASN1_OBJECT(bio, aobj);
 	if (ret < 0 || (unsigned long)ret != strlen(obj_txt)) {
 		fprintf(stderr, "FAIL: i2a_ASN1_OBJECT() returned %d, "
-		    "want %lu\n", ret, strlen(obj_txt));
+		    "want %zu\n", ret, strlen(obj_txt));
 		goto failed;
 	}
 	data_len = BIO_get_mem_data(bio, &data);

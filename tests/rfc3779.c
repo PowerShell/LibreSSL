@@ -1,4 +1,4 @@
-/*	$OpenBSD: rfc3779.c,v 1.6 2022/01/07 22:46:05 tb Exp $ */
+/*	$OpenBSD: rfc3779.c,v 1.8 2022/05/12 19:58:45 tb Exp $ */
 /*
  * Copyright (c) 2021 Theo Buehler <tb@openbsd.org>
  *
@@ -1495,10 +1495,6 @@ struct ASIdentifiers_subset_test {
 	int			 is_subset_if_canonized;
 };
 
-/*
- * XXX: X509v3_asid_subset() assumes that both asnum and rdi are present
- * while they are both marked OPTIONAL in RFC 3779, 3.2.3...
- */
 const struct ASIdentifiers_subset_test ASIdentifiers_subset_data[] = {
 	{
 		.description = "simple subset relation",
@@ -1514,6 +1510,147 @@ const struct ASIdentifiers_subset_test ASIdentifiers_subset_data[] = {
 				.inherit = 0,
 				.min = "2",
 				.max = NULL,
+			},
+			{
+				.type = V3_ASID_END,
+			},
+		},
+		.delegationsB = {
+			{
+				.type = V3_ASID_ASNUM,
+				.inherit = 0,
+				.min = "1",
+				.max = "5",
+			},
+			{
+				.type = V3_ASID_RDI,
+				.inherit = 0,
+				.min = "1",
+				.max = "5",
+			},
+			{
+				.type = V3_ASID_END,
+			},
+		},
+		.is_subset = 1,
+		.is_subset_if_canonized = 1,
+	},
+	{
+		.description = "only asnums",
+		.delegationsA = {
+			{
+				.type = V3_ASID_ASNUM,
+				.inherit = 0,
+				.min = "2",
+				.max = "4",
+			},
+			{
+				.type = V3_ASID_END,
+			},
+		},
+		.delegationsB = {
+			{
+				.type = V3_ASID_ASNUM,
+				.inherit = 0,
+				.min = "1",
+				.max = "5",
+			},
+			{
+				.type = V3_ASID_END,
+			},
+		},
+		.is_subset = 1,
+		.is_subset_if_canonized = 1,
+	},
+	{
+		.description = "only rdis",
+		.delegationsA = {
+			{
+				.type = V3_ASID_RDI,
+				.inherit = 0,
+				.min = "2",
+				.max = NULL,
+			},
+			{
+				.type = V3_ASID_END,
+			},
+		},
+		.delegationsB = {
+			{
+				.type = V3_ASID_RDI,
+				.inherit = 0,
+				.min = "1",
+				.max = "5",
+			},
+			{
+				.type = V3_ASID_END,
+			},
+		},
+		.is_subset = 1,
+		.is_subset_if_canonized = 1,
+	},
+	{
+		.description = "child only has asnums, parent only has rdis",
+		.delegationsA = {
+			{
+				.type = V3_ASID_ASNUM,
+				.inherit = 0,
+				.min = "2",
+				.max = "4",
+			},
+			{
+				.type = V3_ASID_END,
+			},
+		},
+		.delegationsB = {
+			{
+				.type = V3_ASID_RDI,
+				.inherit = 0,
+				.min = "1",
+				.max = "5",
+			},
+			{
+				.type = V3_ASID_END,
+			},
+		},
+		.is_subset = 0,
+		.is_subset_if_canonized = 0,
+	},
+	{
+		.description = "child only has rdis, parent only has asnums",
+		.delegationsA = {
+			{
+				.type = V3_ASID_RDI,
+				.inherit = 0,
+				.min = "2",
+				.max = "4",
+			},
+			{
+				.type = V3_ASID_END,
+			},
+		},
+		.delegationsB = {
+			{
+				.type = V3_ASID_ASNUM,
+				.inherit = 0,
+				.min = "1",
+				.max = "5",
+			},
+			{
+				.type = V3_ASID_END,
+			},
+		},
+		.is_subset = 0,
+		.is_subset_if_canonized = 0,
+	},
+	{
+		.description = "child only has rdis, parent has both",
+		.delegationsA = {
+			{
+				.type = V3_ASID_RDI,
+				.inherit = 0,
+				.min = "2",
+				.max = "4",
 			},
 			{
 				.type = V3_ASID_END,

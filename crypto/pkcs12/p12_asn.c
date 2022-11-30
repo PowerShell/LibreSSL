@@ -1,4 +1,4 @@
-/* $OpenBSD: p12_asn.c,v 1.10 2022/01/14 08:16:13 tb Exp $ */
+/* $OpenBSD: p12_asn.c,v 1.12 2022/08/20 09:16:18 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 1999.
  */
@@ -60,6 +60,8 @@
 
 #include <openssl/asn1t.h>
 #include <openssl/pkcs12.h>
+
+#include "pkcs12_local.h"
 
 /* PKCS#12 ASN1 module */
 
@@ -323,7 +325,7 @@ static const ASN1_ADB_TABLE PKCS12_SAFEBAG_adbtbl[] = {
 	{
 		.value = NID_safeContentsBag,
 		.tt = {
-			.flags = ASN1_TFLG_EXPLICIT | ASN1_TFLG_SET_OF,
+			.flags = ASN1_TFLG_EXPLICIT | ASN1_TFLG_SEQUENCE_OF,
 			.tag = 0,
 			.offset = offsetof(PKCS12_SAFEBAG, value.safes),
 			.field_name = "value.safes",

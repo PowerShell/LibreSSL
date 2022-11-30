@@ -1,4 +1,4 @@
-/* x509_lcl.h */
+/*	$OpenBSD: x509_lcl.h,v 1.16 2022/08/15 11:52:37 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2013.
  */
@@ -10,7 +10,7 @@
  * are met:
  *
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer. 
+ *    notice, this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in
@@ -109,12 +109,7 @@ struct X509_extension_st {
 
 struct x509_attributes_st {
 	ASN1_OBJECT *object;
-	int single; /* 0 for a set, 1 for a single item (which is wrong) */
-	union {
-		char		*ptr;
-/* 0 */		STACK_OF(ASN1_TYPE) *set;
-/* 1 */		ASN1_TYPE	*single;
-	} value;
+	STACK_OF(ASN1_TYPE) *set;
 } /* X509_ATTRIBUTE */;
 
 struct X509_req_info_st {
@@ -277,6 +272,7 @@ struct X509_VERIFY_PARAM_st {
 	int purpose;		/* purpose to check untrusted certificates */
 	int trust;		/* trust setting to check */
 	int depth;		/* Verify depth */
+	int security_level;	/* 'Security level', see SP800-57. */
 	STACK_OF(ASN1_OBJECT) *policies;	/* Permissible policies */
 	X509_VERIFY_PARAM_ID *id;	/* opaque ID data */
 } /* X509_VERIFY_PARAM */;
