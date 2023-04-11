@@ -1,4 +1,4 @@
-/* $OpenBSD: tlsexttest.c,v 1.75 2022/08/21 19:46:19 jsing Exp $ */
+/* $OpenBSD: tlsexttest.c,v 1.79 2022/11/26 16:08:57 tb Exp $ */
 /*
  * Copyright (c) 2017 Joel Sing <jsing@openbsd.org>
  * Copyright (c) 2017 Doug Hogan <doug@openbsd.org>
@@ -22,7 +22,7 @@
 
 #include <openssl/tls1.h>
 
-#include "ssl_locl.h"
+#include "ssl_local.h"
 
 #include "bytestring.h"
 #include "ssl_tlsext.h"
@@ -187,7 +187,7 @@ test_tlsext_alpn_client(void)
 
 	/*
 	 * Prereqs:
-	 * 1) Set s->internal->alpn_client_proto_list
+	 * 1) Set s->alpn_client_proto_list
 	 *    - Using SSL_set_alpn_protos()
 	 * 2) We have not finished or renegotiated.
 	 *    - s->s3->tmp.finish_md_len == 0
@@ -245,18 +245,18 @@ test_tlsext_alpn_client(void)
 		goto err;
 	}
 
-	if (ssl->internal->alpn_client_proto_list_len !=
+	if (ssl->alpn_client_proto_list_len !=
 	    sizeof(tlsext_alpn_single_proto_val)) {
 		FAIL("got client ALPN with length %zu, "
 		    "want length %zu\n", dlen,
 		    sizeof(tlsext_alpn_single_proto_val));
-		compare_data(ssl->internal->alpn_client_proto_list,
-		    ssl->internal->alpn_client_proto_list_len,
+		compare_data(ssl->alpn_client_proto_list,
+		    ssl->alpn_client_proto_list_len,
 		    tlsext_alpn_single_proto_val,
 		    sizeof(tlsext_alpn_single_proto_val));
 		goto err;
 	}
-	if (memcmp(ssl->internal->alpn_client_proto_list,
+	if (memcmp(ssl->alpn_client_proto_list,
 	    tlsext_alpn_single_proto_val,
 	    sizeof(tlsext_alpn_single_proto_val)) != 0) {
 		FAIL("client ALPN differs:\n");
@@ -312,18 +312,18 @@ test_tlsext_alpn_client(void)
 		goto err;
 	}
 
-	if (ssl->internal->alpn_client_proto_list_len !=
+	if (ssl->alpn_client_proto_list_len !=
 	    sizeof(tlsext_alpn_multiple_protos_val)) {
 		FAIL("got client ALPN with length %zu, "
 		    "want length %zu\n", dlen,
 		    sizeof(tlsext_alpn_multiple_protos_val));
-		compare_data(ssl->internal->alpn_client_proto_list,
-		    ssl->internal->alpn_client_proto_list_len,
+		compare_data(ssl->alpn_client_proto_list,
+		    ssl->alpn_client_proto_list_len,
 		    tlsext_alpn_multiple_protos_val,
 		    sizeof(tlsext_alpn_multiple_protos_val));
 		goto err;
 	}
-	if (memcmp(ssl->internal->alpn_client_proto_list,
+	if (memcmp(ssl->alpn_client_proto_list,
 	    tlsext_alpn_multiple_protos_val,
 	    sizeof(tlsext_alpn_multiple_protos_val)) != 0) {
 		FAIL("client ALPN differs:\n");
@@ -334,9 +334,9 @@ test_tlsext_alpn_client(void)
 
 	/* Make sure we can remove the list and avoid ALPN */
 
-	free(ssl->internal->alpn_client_proto_list);
-	ssl->internal->alpn_client_proto_list = NULL;
-	ssl->internal->alpn_client_proto_list_len = 0;
+	free(ssl->alpn_client_proto_list);
+	ssl->alpn_client_proto_list = NULL;
+	ssl->alpn_client_proto_list_len = 0;
 
 	if (client_funcs->needs(ssl, SSL_TLSEXT_MSG_CH)) {
 		FAIL("client should need ALPN by default\n");
@@ -517,7 +517,7 @@ test_tlsext_alpn_server(void)
  * This extension is only used by the client.
  */
 
-static uint8_t tlsext_supportedgroups_client_default[] = {
+static const uint8_t tlsext_supportedgroups_client_default[] = {
 	0x00, 0x08,
 	0x00, 0x1d,  /* X25519 (29) */
 	0x00, 0x17,  /* secp256r1 (23) */
@@ -525,20 +525,20 @@ static uint8_t tlsext_supportedgroups_client_default[] = {
 	0x00, 0x19,  /* secp521r1 (25) */
 };
 
-static uint16_t tlsext_supportedgroups_client_secp384r1_val[] = {
+static const uint16_t tlsext_supportedgroups_client_secp384r1_val[] = {
 	0x0018   /* tls1_ec_nid2group_id(NID_secp384r1) */
 };
-static uint8_t tlsext_supportedgroups_client_secp384r1[] = {
+static const uint8_t tlsext_supportedgroups_client_secp384r1[] = {
 	0x00, 0x02,
 	0x00, 0x18  /* secp384r1 (24) */
 };
 
 /* Example from RFC 4492 section 5.1.1 */
-static uint16_t tlsext_supportedgroups_client_nistp192and224_val[] = {
+static const uint16_t tlsext_supportedgroups_client_nistp192and224_val[] = {
 	0x0013,  /* tls1_ec_nid2group_id(NID_X9_62_prime192v1) */
 	0x0015   /* tls1_ec_nid2group_id(NID_secp224r1) */
 };
-static uint8_t tlsext_supportedgroups_client_nistp192and224[] = {
+static const uint8_t tlsext_supportedgroups_client_nistp192and224[] = {
 	0x00, 0x04,
 	0x00, 0x13, /* secp192r1 aka NIST P-192 */
 	0x00, 0x15  /* secp224r1 aka NIST P-224 */
@@ -703,17 +703,17 @@ test_tlsext_supportedgroups_client(void)
 	if ((ssl->session = SSL_SESSION_new()) == NULL)
 		errx(1, "failed to create session");
 
-	if ((ssl->internal->tlsext_supportedgroups = malloc(sizeof(uint16_t) * 2)) == NULL) {
+	if ((ssl->tlsext_supportedgroups = malloc(sizeof(uint16_t) * 2)) == NULL) {
 		FAIL("client could not malloc\n");
 		goto err;
 	}
 	if (!tls1_ec_nid2group_id(NID_X9_62_prime192v1,
-	    &ssl->internal->tlsext_supportedgroups[0]))
+	    &ssl->tlsext_supportedgroups[0]))
 		goto err;
 	if (!tls1_ec_nid2group_id(NID_secp224r1,
-	    &ssl->internal->tlsext_supportedgroups[1]))
+	    &ssl->tlsext_supportedgroups[1]))
 		goto err;
-	ssl->internal->tlsext_supportedgroups_length = 2;
+	ssl->tlsext_supportedgroups_length = 2;
 
 	if (!client_funcs->needs(ssl, SSL_TLSEXT_MSG_CH)) {
 		FAIL("client should need Ellipticcurves\n");
@@ -764,9 +764,9 @@ test_tlsext_supportedgroups_client(void)
 		errx(1, "failed to create session");
 
 	/* Reset back to the default list. */
-	free(ssl->internal->tlsext_supportedgroups);
-	ssl->internal->tlsext_supportedgroups = NULL;
-	ssl->internal->tlsext_supportedgroups_length = 0;
+	free(ssl->tlsext_supportedgroups);
+	ssl->tlsext_supportedgroups = NULL;
+	ssl->tlsext_supportedgroups_length = 0;
 
 	CBS_init(&cbs, tlsext_supportedgroups_client_nistp192and224,
 	    sizeof(tlsext_supportedgroups_client_nistp192and224));
@@ -859,25 +859,25 @@ test_tlsext_supportedgroups_server(void)
  * parse but the needs differ.
  */
 
-static uint8_t tlsext_ecpf_hello_uncompressed_val[] = {
+static const uint8_t tlsext_ecpf_hello_uncompressed_val[] = {
 	TLSEXT_ECPOINTFORMAT_uncompressed
 };
-static uint8_t tlsext_ecpf_hello_uncompressed[] = {
+static const uint8_t tlsext_ecpf_hello_uncompressed[] = {
 	0x01,
 	0x00 /* TLSEXT_ECPOINTFORMAT_uncompressed */
 };
 
-static uint8_t tlsext_ecpf_hello_prime[] = {
+static const uint8_t tlsext_ecpf_hello_prime[] = {
 	0x01,
 	0x01 /* TLSEXT_ECPOINTFORMAT_ansiX962_compressed_prime */
 };
 
-static uint8_t tlsext_ecpf_hello_prefer_order_val[] = {
+static const uint8_t tlsext_ecpf_hello_prefer_order_val[] = {
 	TLSEXT_ECPOINTFORMAT_ansiX962_compressed_prime,
 	TLSEXT_ECPOINTFORMAT_uncompressed,
 	TLSEXT_ECPOINTFORMAT_ansiX962_compressed_char2
 };
-static uint8_t tlsext_ecpf_hello_prefer_order[] = {
+static const uint8_t tlsext_ecpf_hello_prefer_order[] = {
 	0x03,
 	0x01, /* TLSEXT_ECPOINTFORMAT_ansiX962_compressed_prime */
 	0x00, /* TLSEXT_ECPOINTFORMAT_uncompressed */
@@ -1025,14 +1025,14 @@ test_tlsext_ecpf_client(void)
 	if ((ssl->session = SSL_SESSION_new()) == NULL)
 		errx(1, "failed to create session");
 
-	if ((ssl->internal->tlsext_ecpointformatlist = malloc(sizeof(uint8_t) * 3)) == NULL) {
+	if ((ssl->tlsext_ecpointformatlist = malloc(sizeof(uint8_t) * 3)) == NULL) {
 		FAIL("client could not malloc\n");
 		goto err;
 	}
-	ssl->internal->tlsext_ecpointformatlist[0] = TLSEXT_ECPOINTFORMAT_ansiX962_compressed_prime;
-	ssl->internal->tlsext_ecpointformatlist[1] = TLSEXT_ECPOINTFORMAT_uncompressed;
-	ssl->internal->tlsext_ecpointformatlist[2] = TLSEXT_ECPOINTFORMAT_ansiX962_compressed_char2;
-	ssl->internal->tlsext_ecpointformatlist_length = 3;
+	ssl->tlsext_ecpointformatlist[0] = TLSEXT_ECPOINTFORMAT_ansiX962_compressed_prime;
+	ssl->tlsext_ecpointformatlist[1] = TLSEXT_ECPOINTFORMAT_uncompressed;
+	ssl->tlsext_ecpointformatlist[2] = TLSEXT_ECPOINTFORMAT_ansiX962_compressed_char2;
+	ssl->tlsext_ecpointformatlist_length = 3;
 
 	if (!client_funcs->needs(ssl, SSL_TLSEXT_MSG_CH)) {
 		FAIL("client should need ECPointFormats with a custom "
@@ -1078,9 +1078,9 @@ test_tlsext_ecpf_client(void)
 		errx(1, "failed to create session");
 
 	/* Reset the custom list so we go back to the default uncompressed. */
-	free(ssl->internal->tlsext_ecpointformatlist);
-	ssl->internal->tlsext_ecpointformatlist = NULL;
-	ssl->internal->tlsext_ecpointformatlist_length = 0;
+	free(ssl->tlsext_ecpointformatlist);
+	ssl->tlsext_ecpointformatlist = NULL;
+	ssl->tlsext_ecpointformatlist_length = 0;
 
 	CBS_init(&cbs, tlsext_ecpf_hello_prefer_order,
 	    sizeof(tlsext_ecpf_hello_prefer_order));
@@ -1244,14 +1244,14 @@ test_tlsext_ecpf_server(void)
 	ssl->session->tlsext_ecpointformatlist_length = 1;
 
 	/* Replace the default list with a custom one. */
-	if ((ssl->internal->tlsext_ecpointformatlist = malloc(sizeof(uint8_t) * 3)) == NULL) {
+	if ((ssl->tlsext_ecpointformatlist = malloc(sizeof(uint8_t) * 3)) == NULL) {
 		FAIL("server could not malloc\n");
 		goto err;
 	}
-	ssl->internal->tlsext_ecpointformatlist[0] = TLSEXT_ECPOINTFORMAT_ansiX962_compressed_prime;
-	ssl->internal->tlsext_ecpointformatlist[1] = TLSEXT_ECPOINTFORMAT_uncompressed;
-	ssl->internal->tlsext_ecpointformatlist[2] = TLSEXT_ECPOINTFORMAT_ansiX962_compressed_char2;
-	ssl->internal->tlsext_ecpointformatlist_length = 3;
+	ssl->tlsext_ecpointformatlist[0] = TLSEXT_ECPOINTFORMAT_ansiX962_compressed_prime;
+	ssl->tlsext_ecpointformatlist[1] = TLSEXT_ECPOINTFORMAT_uncompressed;
+	ssl->tlsext_ecpointformatlist[2] = TLSEXT_ECPOINTFORMAT_ansiX962_compressed_char2;
+	ssl->tlsext_ecpointformatlist_length = 3;
 
 	if (!server_funcs->needs(ssl, SSL_TLSEXT_MSG_SH)) {
 		FAIL("server should need ECPointFormats\n");
@@ -1296,9 +1296,9 @@ test_tlsext_ecpf_server(void)
 		errx(1, "failed to create session");
 
 	/* Reset back to the default (uncompressed) */
-	free(ssl->internal->tlsext_ecpointformatlist);
-	ssl->internal->tlsext_ecpointformatlist = NULL;
-	ssl->internal->tlsext_ecpointformatlist_length = 0;
+	free(ssl->tlsext_ecpointformatlist);
+	ssl->tlsext_ecpointformatlist = NULL;
+	ssl->tlsext_ecpointformatlist_length = 0;
 
 	CBS_init(&cbs, tlsext_ecpf_hello_prefer_order,
 	    sizeof(tlsext_ecpf_hello_prefer_order));
@@ -1340,23 +1340,23 @@ test_tlsext_ecpf_server(void)
  * Renegotiation Indication - RFC 5746.
  */
 
-static unsigned char tlsext_ri_prev_client[] = {
+static const unsigned char tlsext_ri_prev_client[] = {
 	0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
 	0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff,
 };
 
-static unsigned char tlsext_ri_prev_server[] = {
+static const unsigned char tlsext_ri_prev_server[] = {
 	0xff, 0xee, 0xdd, 0xcc, 0xbb, 0xaa, 0x99, 0x88,
 	0x77, 0x66, 0x55, 0x44, 0x33, 0x22, 0x11, 0x00,
 };
 
-static unsigned char tlsext_ri_client[] = {
+static const unsigned char tlsext_ri_client[] = {
 	0x10,
 	0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
 	0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff,
 };
 
-static unsigned char tlsext_ri_server[] = {
+static const unsigned char tlsext_ri_server[] = {
 	0x20,
 	0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77,
 	0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff,
@@ -1608,7 +1608,7 @@ test_tlsext_ri_server(void)
  * Signature Algorithms - RFC 5246 section 7.4.1.4.1.
  */
 
-static unsigned char tlsext_sigalgs_client[] = {
+static const unsigned char tlsext_sigalgs_client[] = {
 	0x00, 0x16, 0x08, 0x06, 0x06, 0x01, 0x06, 0x03,
 	0x08, 0x05, 0x05, 0x01, 0x05, 0x03, 0x08, 0x04,
 	0x04, 0x01, 0x04, 0x03, 0x02, 0x01, 0x02, 0x03,
@@ -1766,13 +1766,13 @@ test_tlsext_sigalgs_server(void)
 
 #define TEST_SNI_SERVERNAME "www.libressl.org"
 
-static unsigned char tlsext_sni_client[] = {
+static const unsigned char tlsext_sni_client[] = {
 	0x00, 0x13, 0x00, 0x00, 0x10, 0x77, 0x77, 0x77,
 	0x2e, 0x6c, 0x69, 0x62, 0x72, 0x65, 0x73, 0x73,
 	0x6c, 0x2e, 0x6f, 0x72, 0x67,
 };
 
-static unsigned char tlsext_sni_server[] = {
+static const unsigned char tlsext_sni_server[] = {
 	0x00
 };
 const size_t sizeof_tlsext_sni_server = 0;
@@ -1864,7 +1864,7 @@ test_tlsext_sni_client(void)
 		goto err;
 	}
 
-	ssl->internal->hit = 0;
+	ssl->hit = 0;
 
 	CBS_init(&cbs, tlsext_sni_client, sizeof(tlsext_sni_client));
 	if (!server_funcs->parse(ssl, SSL_TLSEXT_MSG_CH, &cbs, &alert)) {
@@ -1889,7 +1889,7 @@ test_tlsext_sni_client(void)
 		goto err;
 	}
 
-	ssl->internal->hit = 1;
+	ssl->hit = 1;
 
 	free(ssl->session->tlsext_hostname);
 	if ((ssl->session->tlsext_hostname = strdup("notthesame.libressl.org")) ==
@@ -2030,9 +2030,7 @@ test_tlsext_sni_server(void)
  * QUIC transport parameters extension - RFC 90210 :)
  */
 
-#define TEST_QUIC_TRANSPORT_DATA "0123456789abcdef"
-
-static unsigned char tlsext_quic_transport_data[] = {
+static const unsigned char tlsext_quic_transport_data[] = {
 	0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37,
 	0x38, 0x39, 0x61, 0x62, 0x63, 0x64, 0x65, 0x66,
 };
@@ -2074,7 +2072,7 @@ test_tlsext_quic_transport_parameters_client(void)
 	}
 
 	if (!SSL_set_quic_transport_params(ssl,
-	    TEST_QUIC_TRANSPORT_DATA, strlen(TEST_QUIC_TRANSPORT_DATA))) {
+	    tlsext_quic_transport_data, sizeof(tlsext_quic_transport_data))) {
 		FAIL("client failed to set QUIC parametes\n");
 		goto err;
 	}
@@ -2140,14 +2138,14 @@ test_tlsext_quic_transport_parameters_client(void)
 
 	SSL_get_peer_quic_transport_params(ssl, &out_bytes, &out_bytes_len);
 
-	if (out_bytes_len != strlen(TEST_QUIC_TRANSPORT_DATA)) {
+	if (out_bytes_len != sizeof(tlsext_quic_transport_data)) {
 		FAIL("server_parse QUIC length differs, got %zu want %zu\n",
 		    out_bytes_len,
 		    sizeof(tlsext_quic_transport_data));
 		goto err;
 	}
 
-	if (memcmp(out_bytes, TEST_QUIC_TRANSPORT_DATA,
+	if (memcmp(out_bytes, tlsext_quic_transport_data,
 	    out_bytes_len) != 0) {
 		FAIL("server_parse QUIC differs from sent:\n");
 		fprintf(stderr, "received:\n");
@@ -2206,7 +2204,7 @@ test_tlsext_quic_transport_parameters_server(void)
 	}
 
 	if (!SSL_set_quic_transport_params(ssl,
-	    TEST_QUIC_TRANSPORT_DATA, strlen(TEST_QUIC_TRANSPORT_DATA))) {
+	    tlsext_quic_transport_data, sizeof(tlsext_quic_transport_data))) {
 		FAIL("server failed to set QUIC parametes\n");
 		goto err;
 	}
@@ -2270,14 +2268,14 @@ test_tlsext_quic_transport_parameters_server(void)
 
 	SSL_get_peer_quic_transport_params(ssl, &out_bytes, &out_bytes_len);
 
-	if (out_bytes_len != strlen(TEST_QUIC_TRANSPORT_DATA)) {
+	if (out_bytes_len != sizeof(tlsext_quic_transport_data)) {
 		FAIL("client QUIC length differs, got %zu want %zu\n",
 		    out_bytes_len,
 		    sizeof(tlsext_quic_transport_data));
 		goto err;
 	}
 
-	if (memcmp(out_bytes, TEST_QUIC_TRANSPORT_DATA, out_bytes_len) != 0) {
+	if (memcmp(out_bytes, tlsext_quic_transport_data, out_bytes_len) != 0) {
 		FAIL("client QUIC differs from sent:\n");
 		fprintf(stderr, "received:\n");
 		hexdump(data, dlen);
@@ -2298,7 +2296,7 @@ test_tlsext_quic_transport_parameters_server(void)
 	return (failure);
 }
 
-static unsigned char tls_ocsp_client_default[] = {
+static const unsigned char tls_ocsp_client_default[] = {
 	0x01, 0x00, 0x00, 0x00, 0x00
 };
 
@@ -2415,7 +2413,7 @@ test_tlsext_ocsp_server(void)
 		goto err;
 	}
 
-	ssl->internal->tlsext_status_expected = 1;
+	ssl->tlsext_status_expected = 1;
 
 	if (!server_funcs->needs(ssl, SSL_TLSEXT_MSG_SH)) {
 		FAIL("server should need TLSEXT_TYPE_status_request\n");
@@ -2618,8 +2616,8 @@ test_tlsext_sessionticket_client(void)
 	 * If you want to remove the tlsext_session_ticket behavior, you have
 	 * to do it manually.
 	 */
-	free(ssl->internal->tlsext_session_ticket);
-	ssl->internal->tlsext_session_ticket = NULL;
+	free(ssl->tlsext_session_ticket);
+	ssl->tlsext_session_ticket = NULL;
 
 	if (!client_funcs->needs(ssl, SSL_TLSEXT_MSG_CH)) {
 		FAIL("Should need a session ticket again when the custom one is removed\n");
@@ -2726,7 +2724,7 @@ test_tlsext_sessionticket_server(void)
 	}
 
 	/* Set expected to require it. */
-	ssl->internal->tlsext_ticket_expected = 1;
+	ssl->tlsext_ticket_expected = 1;
 	if (!server_funcs->needs(ssl, SSL_TLSEXT_MSG_SH)) {
 		FAIL("server should now be required for SessionTicket\n");
 		goto err;
@@ -2953,7 +2951,7 @@ test_tlsext_srtp_client(void)
 
 	/* Make sure we can parse multiple profiles (selects server preferred) */
 
-	ssl->internal->srtp_profile = NULL;
+	ssl->srtp_profile = NULL;
 
 	CBS_init(&cbs, tlsext_srtp_multiple,
 	    sizeof(tlsext_srtp_multiple));
@@ -2984,7 +2982,7 @@ test_tlsext_srtp_client(void)
 	 * Make sure we can parse the clienthello with multiple entries
 	 * where one is unknown.
 	 */
-	ssl->internal->srtp_profile = NULL;
+	ssl->srtp_profile = NULL;
 
 	CBS_init(&cbs, tlsext_srtp_multiple_one_valid,
 	    sizeof(tlsext_srtp_multiple_one_valid));
@@ -3013,7 +3011,7 @@ test_tlsext_srtp_client(void)
 
 	/* Make sure we fall back to negotiated when none work. */
 
-	ssl->internal->srtp_profile = NULL;
+	ssl->srtp_profile = NULL;
 
 	CBS_init(&cbs, tlsext_srtp_multiple_invalid,
 	    sizeof(tlsext_srtp_multiple_invalid));
@@ -3087,7 +3085,7 @@ test_tlsext_srtp_server(void)
 		FAIL("should be able to find the given profile\n");
 		goto err;
 	}
-	ssl->internal->srtp_profile = prof;
+	ssl->srtp_profile = prof;
 	if (!server_funcs->needs(ssl, SSL_TLSEXT_MSG_SH)) {
 		FAIL("server should need SRTP by now\n");
 		goto err;
@@ -3124,7 +3122,7 @@ test_tlsext_srtp_server(void)
 	data = NULL;
 
 	/* Make sure we can parse the single profile. */
-	ssl->internal->srtp_profile = NULL;
+	ssl->srtp_profile = NULL;
 
 	if (SSL_get_selected_srtp_profile(ssl) != NULL) {
 		FAIL("SRTP profile should not be set yet\n");
@@ -3157,7 +3155,7 @@ test_tlsext_srtp_server(void)
 	}
 
 	/* Make sure we cannot parse multiple profiles */
-	ssl->internal->srtp_profile = NULL;
+	ssl->srtp_profile = NULL;
 
 	CBS_init(&cbs, tlsext_srtp_multiple,
 	    sizeof(tlsext_srtp_multiple));
@@ -3167,7 +3165,7 @@ test_tlsext_srtp_server(void)
 	}
 
 	/* Make sure we cannot parse a server with unknown profile */
-	ssl->internal->srtp_profile = NULL;
+	ssl->srtp_profile = NULL;
 
 	CBS_init(&cbs, tlsext_srtp_single_invalid,
 	    sizeof(tlsext_srtp_single_invalid));
@@ -3390,8 +3388,8 @@ test_tlsext_serverhello_build(void)
 	ssl->s3->send_connection_binding = 1;
 	ssl->s3->hs.cipher =
 	    ssl3_get_cipher_by_id(TLS1_CK_ECDHE_RSA_WITH_AES_128_SHA256);
-	ssl->internal->tlsext_status_expected = 1;
-	ssl->internal->tlsext_ticket_expected = 1;
+	ssl->tlsext_status_expected = 1;
+	ssl->tlsext_ticket_expected = 1;
 	if ((ssl->session->tlsext_ecpointformatlist = malloc(1)) == NULL) {
 		FAIL("malloc failed");
 		goto err;

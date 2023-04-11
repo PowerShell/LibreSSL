@@ -1,4 +1,4 @@
-/* $OpenBSD: rsa_lib.c,v 1.43 2022/06/27 12:30:28 tb Exp $ */
+/* $OpenBSD: rsa_lib.c,v 1.46 2023/03/11 21:14:26 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -67,8 +67,8 @@
 #include <openssl/lhash.h>
 #include <openssl/rsa.h>
 
-#include "evp_locl.h"
-#include "rsa_locl.h"
+#include "evp_local.h"
+#include "rsa_local.h"
 
 #ifndef OPENSSL_NO_ENGINE
 #include <openssl/engine.h>
@@ -200,14 +200,14 @@ RSA_free(RSA *r)
 
 	CRYPTO_free_ex_data(CRYPTO_EX_INDEX_RSA, r, &r->ex_data);
 
-	BN_clear_free(r->n);
-	BN_clear_free(r->e);
-	BN_clear_free(r->d);
-	BN_clear_free(r->p);
-	BN_clear_free(r->q);
-	BN_clear_free(r->dmp1);
-	BN_clear_free(r->dmq1);
-	BN_clear_free(r->iqmp);
+	BN_free(r->n);
+	BN_free(r->e);
+	BN_free(r->d);
+	BN_free(r->p);
+	BN_free(r->q);
+	BN_free(r->dmp1);
+	BN_free(r->dmq1);
+	BN_free(r->iqmp);
 	BN_BLINDING_free(r->blinding);
 	BN_BLINDING_free(r->mt_blinding);
 	RSA_PSS_PARAMS_free(r->pss);
@@ -298,7 +298,7 @@ RSA_set0_crt_params(RSA *r, BIGNUM *dmp1, BIGNUM *dmq1, BIGNUM *iqmp)
 	if ((r->dmp1 == NULL && dmp1 == NULL) ||
 	    (r->dmq1 == NULL && dmq1 == NULL) ||
 	    (r->iqmp == NULL && iqmp == NULL))
-	       	return 0;
+		return 0;
 
 	if (dmp1 != NULL) {
 		BN_free(r->dmp1);

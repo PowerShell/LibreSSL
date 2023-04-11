@@ -191,7 +191,7 @@ am__define_uniq_tagged_files = \
   unique=`for i in $$list; do \
     if test -f "$$i"; then echo $$i; else echo $(srcdir)/$$i; fi; \
   done | $(am__uniquify_input)`
-DIST_SUBDIRS = crypto ssl tls include apps man tests
+DIST_SUBDIRS = include crypto ssl tls apps man tests
 am__DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/libcrypto.pc.in \
 	$(srcdir)/libssl.pc.in $(srcdir)/libtls.pc.in \
 	$(srcdir)/openssl.pc.in COPYING ChangeLog INSTALL README.md \
@@ -368,7 +368,7 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-SUBDIRS = crypto ssl tls include apps man $(am__append_1)
+SUBDIRS = include crypto ssl tls apps man $(am__append_1)
 ACLOCAL_AMFLAGS = -I m4
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = libtls.pc $(am__append_2)

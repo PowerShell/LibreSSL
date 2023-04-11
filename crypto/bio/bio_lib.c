@@ -1,4 +1,4 @@
-/* $OpenBSD: bio_lib.c,v 1.36 2022/08/15 10:48:45 tb Exp $ */
+/* $OpenBSD: bio_lib.c,v 1.44 2023/03/15 06:14:02 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -323,11 +323,18 @@ BIO_read(BIO *b, void *out, int outl)
 	size_t readbytes = 0;
 	int ret;
 
-	if (b == NULL)
+	if (b == NULL) {
+		BIOerror(ERR_R_PASSED_NULL_PARAMETER);
+		return (-1);
+	}
+
+	if (outl <= 0)
 		return (0);
 
-	if (out == NULL || outl <= 0)
-		return (0);
+	if (out == NULL) {
+		BIOerror(ERR_R_PASSED_NULL_PARAMETER);
+		return (-1);
+	}
 
 	if (b->method == NULL || b->method->bread == NULL) {
 		BIOerror(BIO_R_UNSUPPORTED_METHOD);
@@ -373,11 +380,17 @@ BIO_write(BIO *b, const void *in, int inl)
 	size_t writebytes = 0;
 	int ret;
 
+	/* Not an error. Things like SMIME_text() assume that this succeeds. */
 	if (b == NULL)
 		return (0);
 
-	if (in == NULL || inl <= 0)
+	if (inl <= 0)
 		return (0);
+
+	if (in == NULL) {
+		BIOerror(ERR_R_PASSED_NULL_PARAMETER);
+		return (-1);
+	}
 
 	if (b->method == NULL || b->method->bwrite == NULL) {
 		BIOerror(BIO_R_UNSUPPORTED_METHOD);
@@ -611,7 +624,11 @@ BIO_ctrl_wpending(BIO *bio)
 }
 
 
-/* put the 'bio' on the end of b's list of operators */
+/*
+ * Append "bio" to the end of the chain containing "b":
+ * Two chains "b -> lb" and "oldhead -> bio"
+ * become two chains "b -> lb -> bio" and "oldhead".
+ */
 BIO *
 BIO_push(BIO *b, BIO *bio)
 {
@@ -623,8 +640,11 @@ BIO_push(BIO *b, BIO *bio)
 	while (lb->next_bio != NULL)
 		lb = lb->next_bio;
 	lb->next_bio = bio;
-	if (bio != NULL)
+	if (bio != NULL) {
+		if (bio->prev_bio != NULL)
+			bio->prev_bio->next_bio = NULL;
 		bio->prev_bio = lb;
+	}
 	/* called to do internal processing */
 	BIO_ctrl(b, BIO_CTRL_PUSH, 0, lb);
 	return (b);
@@ -713,10 +733,25 @@ BIO_next(BIO *b)
 	return b->next_bio;
 }
 
+/*
+ * Two chains "bio -> oldtail" and "oldhead -> next" become
+ * three chains "oldtail", "bio -> next", and "oldhead".
+ */
 void
-BIO_set_next(BIO *b, BIO *next)
+BIO_set_next(BIO *bio, BIO *next)
 {
-	b->next_bio = next;
+	/* Cut off the tail of the chain containing bio after bio. */
+	if (bio->next_bio != NULL)
+		bio->next_bio->prev_bio = NULL;
+
+	/* Cut off the head of the chain containing next before next. */
+	if (next != NULL && next->prev_bio != NULL)
+		next->prev_bio->next_bio = NULL;
+
+	/* Append the chain starting at next to the chain ending at bio. */
+	bio->next_bio = next;
+	if (next != NULL)
+		next->prev_bio = bio;
 }
 
 void

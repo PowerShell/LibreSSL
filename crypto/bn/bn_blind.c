@@ -1,4 +1,4 @@
-/* $OpenBSD: bn_blind.c,v 1.17 2017/01/29 17:49:22 beck Exp $ */
+/* $OpenBSD: bn_blind.c,v 1.20 2023/03/07 09:27:10 jsing Exp $ */
 /* ====================================================================
  * Copyright (c) 1998-2006 The OpenSSL Project.  All rights reserved.
  *
@@ -115,7 +115,7 @@
 
 #include <openssl/err.h>
 
-#include "bn_lcl.h"
+#include "bn_local.h"
 
 #define BN_BLINDING_COUNTER	32
 
@@ -141,7 +141,6 @@ BN_BLINDING_new(const BIGNUM *A, const BIGNUM *Ai, BIGNUM *mod)
 {
 	BN_BLINDING *ret = NULL;
 
-	bn_check_top(mod);
 
 	if ((ret = calloc(1, sizeof(BN_BLINDING))) == NULL) {
 		BNerror(ERR_R_MALLOC_FAILURE);
@@ -181,10 +180,10 @@ BN_BLINDING_free(BN_BLINDING *r)
 	if (r == NULL)
 		return;
 
-	BN_clear_free(r->A);
-	BN_clear_free(r->Ai);
-	BN_clear_free(r->e);
-	BN_clear_free(r->mod);
+	BN_free(r->A);
+	BN_free(r->Ai);
+	BN_free(r->e);
+	BN_free(r->mod);
 	free(r);
 }
 
@@ -232,7 +231,6 @@ BN_BLINDING_convert_ex(BIGNUM *n, BIGNUM *r, BN_BLINDING *b, BN_CTX *ctx)
 {
 	int ret = 1;
 
-	bn_check_top(n);
 
 	if ((b->A == NULL) || (b->Ai == NULL)) {
 		BNerror(BN_R_NOT_INITIALIZED);
@@ -267,7 +265,6 @@ BN_BLINDING_invert_ex(BIGNUM *n, const BIGNUM *r, BN_BLINDING *b, BN_CTX *ctx)
 {
 	int ret;
 
-	bn_check_top(n);
 
 	if (r != NULL)
 		ret = BN_mod_mul(n, n, r, b->mod, ctx);
@@ -279,7 +276,6 @@ BN_BLINDING_invert_ex(BIGNUM *n, const BIGNUM *r, BN_BLINDING *b, BN_CTX *ctx)
 		ret = BN_mod_mul(n, n, b->Ai, b->mod, ctx);
 	}
 
-	bn_check_top(n);
 	return (ret);
 }
 

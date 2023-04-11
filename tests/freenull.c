@@ -102,6 +102,7 @@ main(int argc, char **argv)
 	ESS_SIGNING_CERT_free(NULL);
 	EVP_AEAD_CTX_free(NULL);
 	EVP_CIPHER_CTX_free(NULL);
+	EVP_CIPHER_meth_free(NULL);
 	EVP_ENCODE_CTX_free(NULL);
 	EVP_MD_CTX_free(NULL);
 	EVP_MD_meth_free(NULL);

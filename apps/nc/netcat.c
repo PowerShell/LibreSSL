@@ -1,4 +1,4 @@
-/* $OpenBSD: netcat.c,v 1.219 2022/06/08 20:07:31 tb Exp $ */
+/* $OpenBSD: netcat.c,v 1.225 2023/01/04 12:53:38 deraadt Exp $ */
 /*
  * Copyright (c) 2001 Eric Jackson <ericj@monkey.org>
  * Copyright (c) 2015 Bob Beck.  All rights reserved.
@@ -107,7 +107,7 @@ const char    *Kflag;				/* Private key file */
 const char    *oflag;				/* OCSP stapling file */
 const char    *Rflag;				/* Root CA file */
 int	tls_cachanged;				/* Using non-default CA file */
-int     TLSopt;					/* TLS options */
+int	TLSopt;					/* TLS options */
 char	*tls_expectname;			/* required name in peer cert */
 char	*tls_expecthash;			/* required hash of peer cert */
 char	*tls_ciphers;				/* TLS ciphers */
@@ -135,6 +135,7 @@ int	timeout_connect(int, const struct sockaddr *, socklen_t);
 int	socks_connect(const char *, const char *, struct addrinfo,
 	    const char *, const char *, struct addrinfo, int, const char *);
 int	udptest(int);
+void	connection_info(const char *, const char *, const char *, const char *);
 int	unix_bind(char *, int);
 int	unix_connect(char *);
 int	unix_listen(char *);
@@ -157,7 +158,6 @@ main(int argc, char *argv[])
 	char *host, *uport;
 	char ipaddr[NI_MAXHOST];
 	struct addrinfo hints;
-	struct servent *sv;
 	socklen_t len;
 	struct sockaddr_storage cliaddr;
 	char *proxy = NULL, *proxyport = NULL;
@@ -172,7 +172,6 @@ main(int argc, char *argv[])
 	socksv = 5;
 	host = NULL;
 	uport = NULL;
-	sv = NULL;
 	Rflag = tls_default_ca_cert_file();
 
 	signal(SIGPIPE, SIG_IGN);
@@ -711,36 +710,19 @@ main(int argc, char *argv[])
 
 			ret = 0;
 			if (vflag || zflag) {
+				int print_info = 1;
+
 				/* For UDP, make sure we are connected. */
 				if (uflag) {
-					if (udptest(s) == -1) {
+					/* No info on failed or skipped test. */
+					if ((print_info = udptest(s)) == -1) {
 						ret = 1;
 						continue;
 					}
 				}
-
-				/* Don't look up port if -n. */
-				if (nflag)
-					sv = NULL;
-				else {
-					sv = getservbyport(
-					    ntohs(atoi(portlist[i])),
-					    uflag ? "udp" : "tcp");
-				}
-
-				fprintf(stderr, "Connection to %s", host);
-
-				/*
-				 * if we aren't connecting thru a proxy and
-				 * there is something to report, print IP
-				 */
-				if (!nflag && !xflag &&
-				    strcmp(host, ipaddr) != 0)
-					fprintf(stderr, " (%s)", ipaddr);
-
-				fprintf(stderr, " %s port [%s/%s] succeeded!\n",
-				    portlist[i], uflag ? "udp" : "tcp",
-				    sv ? sv->s_name : "*");
+				if (print_info == 1)
+					connection_info(host, portlist[i],
+					    uflag ? "udp" : "tcp", ipaddr);
 			}
 			if (Fflag)
 				fdpass(s);
@@ -1551,6 +1533,10 @@ udptest(int s)
 {
 	int i, ret;
 
+	/* Only write to the socket in scan mode or interactive mode. */
+	if (!zflag && !isatty(STDIN_FILENO))
+		return 0;
+
 	for (i = 0; i <= 3; i++) {
 		if (write(s, "X", 1) == 1)
 			ret = 1;
@@ -1558,6 +1544,32 @@ udptest(int s)
 			ret = -1;
 	}
 	return ret;
+}
+
+void
+connection_info(const char *host, const char *port, const char *proto,
+    const char *ipaddr)
+{
+	struct servent *sv;
+	char *service = "*";
+
+	/* Look up service name unless -n. */
+	if (!nflag) {
+		sv = getservbyport(ntohs(atoi(port)), proto);
+		if (sv != NULL)
+			service = sv->s_name;
+	}
+
+	fprintf(stderr, "Connection to %s", host);
+
+	/*
+	 * if we aren't connecting thru a proxy and
+	 * there is something to report, print IP
+	 */
+	if (!nflag && !xflag && strcmp(host, ipaddr) != 0)
+		fprintf(stderr, " (%s)", ipaddr);
+
+	fprintf(stderr, " %s port [%s/%s] succeeded!\n", port, proto, service);
 }
 
 void

@@ -1,4 +1,4 @@
-/* $OpenBSD: dsa_ameth.c,v 1.37 2022/06/27 12:36:05 tb Exp $ */
+/* $OpenBSD: dsa_ameth.c,v 1.42 2023/03/04 21:42:49 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2006.
  */
@@ -67,10 +67,10 @@
 #include <openssl/err.h>
 #include <openssl/x509.h>
 
-#include "asn1_locl.h"
-#include "bn_lcl.h"
-#include "dsa_locl.h"
-#include "evp_locl.h"
+#include "asn1_local.h"
+#include "bn_local.h"
+#include "dsa_local.h"
+#include "evp_local.h"
 
 static int
 dsa_pub_decode(EVP_PKEY *pkey, X509_PUBKEY *pubkey)
@@ -116,6 +116,12 @@ dsa_pub_decode(EVP_PKEY *pkey, X509_PUBKEY *pubkey)
 	if (!(dsa->pub_key = ASN1_INTEGER_to_BN(public_key, NULL))) {
 		DSAerror(DSA_R_BN_DECODE_ERROR);
 		goto err;
+	}
+
+	/* We can only check for key consistency if we have parameters. */
+	if (ptype == V_ASN1_SEQUENCE) {
+		if (!dsa_check_key(dsa))
+			goto err;
 	}
 
 	ASN1_INTEGER_free(public_key);
@@ -192,7 +198,6 @@ dsa_priv_decode(EVP_PKEY *pkey, const PKCS8_PRIV_KEY_INFO *p8)
 	ASN1_INTEGER *privkey = NULL;
 	BN_CTX *ctx = NULL;
 	DSA *dsa = NULL;
-
 	int ret = 0;
 
 	if (!PKCS8_pkey_get0(NULL, &p, &pklen, &palg, p8))
@@ -216,15 +221,23 @@ dsa_priv_decode(EVP_PKEY *pkey, const PKCS8_PRIV_KEY_INFO *p8)
 		DSAerror(DSA_R_BN_ERROR);
 		goto dsaerr;
 	}
+
+	/* Check the key for basic consistency before doing expensive things. */
+	if (!dsa_check_key(dsa))
+		goto dsaerr;
+
 	/* Calculate public key */
 	if (!(dsa->pub_key = BN_new())) {
 		DSAerror(ERR_R_MALLOC_FAILURE);
 		goto dsaerr;
 	}
-	if (!(ctx = BN_CTX_new())) {
+
+	if ((ctx = BN_CTX_new()) == NULL) {
 		DSAerror(ERR_R_MALLOC_FAILURE);
 		goto dsaerr;
 	}
+
+	BN_CTX_start(ctx);
 
 	if (!BN_mod_exp_ct(dsa->pub_key, dsa->g, dsa->priv_key, dsa->p, ctx)) {
 		DSAerror(DSA_R_BN_ERROR);
@@ -242,8 +255,10 @@ decerr:
 dsaerr:
 	DSA_free(dsa);
 done:
+	BN_CTX_end(ctx);
 	BN_CTX_free(ctx);
 	ASN1_INTEGER_free(privkey);
+
 	return ret;
 }
 
@@ -452,6 +467,10 @@ dsa_param_decode(EVP_PKEY *pkey, const unsigned char **pder, int derlen)
 		DSAerror(ERR_R_DSA_LIB);
 		return 0;
 	}
+	if (!dsa_check_key(dsa)) {
+		DSA_free(dsa);
+		return 0;
+	}
 	EVP_PKEY_assign_DSA(pkey, dsa);
 	return 1;
 }
@@ -485,56 +504,34 @@ old_dsa_priv_decode(EVP_PKEY *pkey, const unsigned char **pder, int derlen)
 {
 	DSA *dsa;
 	BN_CTX *ctx = NULL;
-	BIGNUM *j, *p1, *newp1, *powg;
-	int qbits;
+	BIGNUM *result;
 
-	if (!(dsa = d2i_DSAPrivateKey(NULL, pder, derlen))) {
+	if ((dsa = d2i_DSAPrivateKey(NULL, pder, derlen)) == NULL) {
 		DSAerror(ERR_R_DSA_LIB);
-		return 0;
-	}
-
-	/* FIPS 186-3 allows only three different sizes for q. */
-	qbits = BN_num_bits(dsa->q);
-	if (qbits != 160 && qbits != 224 && qbits != 256) {
-		DSAerror(DSA_R_BAD_Q_VALUE);
-		goto err;
-	}
-	if (BN_num_bits(dsa->p) > OPENSSL_DSA_MAX_MODULUS_BITS) {
-		DSAerror(DSA_R_MODULUS_TOO_LARGE);
 		goto err;
 	}
 
-	/* Check that 1 < g < p. */
-	if (BN_cmp(dsa->g, BN_value_one()) <= 0 ||
-	    BN_cmp(dsa->g, dsa->p) >= 0) {
-		DSAerror(DSA_R_PARAMETER_ENCODING_ERROR); /* XXX */
+	if (!dsa_check_key(dsa))
 		goto err;
-	}
 
-	ctx = BN_CTX_new();
-	if (ctx == NULL)
+	if ((ctx = BN_CTX_new()) == NULL)
+		goto err;
+
+	BN_CTX_start(ctx);
+
+	if ((result = BN_CTX_get(ctx)) == NULL)
 		goto err;
 
 	/*
-	 * Check that p and q are consistent with each other.
+	 * Check that p and q are consistent with each other. dsa_check_key()
+	 * ensures that 1 < q < p. Now check that q divides p - 1.
 	 */
 
-	j = BN_CTX_get(ctx);
-	p1 = BN_CTX_get(ctx);
-	newp1 = BN_CTX_get(ctx);
-	powg = BN_CTX_get(ctx);
-	if (j == NULL || p1 == NULL || newp1 == NULL || powg == NULL)
+	if (!BN_sub(result, dsa->p, BN_value_one()))
 		goto err;
-	/* p1 = p - 1 */
-	if (BN_sub(p1, dsa->p, BN_value_one()) == 0)
+	if (!BN_mod_ct(result, result, dsa->q, ctx))
 		goto err;
-	/* j = (p - 1) / q */
-	if (BN_div_ct(j, NULL, p1, dsa->q, ctx) == 0)
-		goto err;
-	/* q * j should == p - 1 */
-	if (BN_mul(newp1, dsa->q, j, ctx) == 0)
-		goto err;
-	if (BN_cmp(newp1, p1) != 0) {
+	if (!BN_is_zero(result)) {
 		DSAerror(DSA_R_BAD_Q_VALUE);
 		goto err;
 	}
@@ -545,10 +542,10 @@ old_dsa_priv_decode(EVP_PKEY *pkey, const unsigned char **pder, int derlen)
 	 * Once we know that q is prime, this is enough.
 	 */
 
-	if (!BN_mod_exp_ct(powg, dsa->g, dsa->q, dsa->p, ctx))
+	if (!BN_mod_exp_ct(result, dsa->g, dsa->q, dsa->p, ctx))
 		goto err;
-	if (BN_cmp(powg, BN_value_one()) != 0) {
-		DSAerror(DSA_R_PARAMETER_ENCODING_ERROR); /* XXX */
+	if (BN_cmp(result, BN_value_one()) != 0) {
+		DSAerror(DSA_R_INVALID_PARAMETERS);
 		goto err;
 	}
 
@@ -561,12 +558,14 @@ old_dsa_priv_decode(EVP_PKEY *pkey, const unsigned char **pder, int derlen)
 		goto err;
 	}
 
+	BN_CTX_end(ctx);
 	BN_CTX_free(ctx);
 
 	EVP_PKEY_assign_DSA(pkey, dsa);
 	return 1;
 
  err:
+	BN_CTX_end(ctx);
 	BN_CTX_free(ctx);
 	DSA_free(dsa);
 	return 0;

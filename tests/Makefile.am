@@ -1,10 +1,15 @@
 include $(top_srcdir)/Makefile.am.common
 
+-include $(abs_top_builddir)/crypto/libcrypto_la_objects.mk
+-include $(abs_top_builddir)/ssl/libssl_la_objects.mk
+-include $(abs_top_builddir)/tls/libtls_la_objects.mk
+
 AM_CPPFLAGS += -DLIBRESSL_CRYPTO_INTERNAL
 
 AM_CPPFLAGS += -I $(top_srcdir)/crypto/asn1
 AM_CPPFLAGS += -I $(top_srcdir)/crypto/bio
 AM_CPPFLAGS += -I $(top_srcdir)/crypto/bn
+AM_CPPFLAGS += -I $(top_srcdir)/crypto/curve25519
 AM_CPPFLAGS += -I $(top_srcdir)/crypto/evp
 AM_CPPFLAGS += -I $(top_srcdir)/crypto/modes
 AM_CPPFLAGS += -I $(top_srcdir)/crypto/x509
@@ -13,13 +18,15 @@ AM_CPPFLAGS += -I $(top_srcdir)/apps/openssl
 AM_CPPFLAGS += -I $(top_srcdir)/apps/openssl/compat
 AM_CPPFLAGS += -D_PATH_SSL_CA_FILE=\"$(top_srcdir)/cert.pem\"
 
-LDADD = $(abs_top_builddir)/tls/.libs/libtls.a
-LDADD += $(abs_top_builddir)/ssl/.libs/libssl.a
-LDADD += $(abs_top_builddir)/crypto/.libs/libcrypto.a
-LDADD += $(PLATFORM_LDADD) $(PROG_LDADD)
-if HOST_ASM_MACOSX_X86_64
-LDADD += $(abs_top_builddir)/crypto/.libs/libcrypto_la-cpuid-macosx-x86_64.o
-endif
+noinst_LTLIBRARIES = libtest.la
+libtest_la_LIBADD = $(libcrypto_la_objects)
+libtest_la_LIBADD += $(libcompat_la_objects)
+libtest_la_LIBADD += $(libcompatnoopt_la_objects)
+libtest_la_LIBADD += $(libssl_la_objects)
+libtest_la_LIBADD += $(libtls_la_objects)
+libtest_la_SOURCES = empty.c
+
+LDADD = libtest.la $(PLATFORM_LDADD) $(PROG_LDADD)
 
 TEST_LOG_DRIVER = env AM_TAP_AWK='$(AWK)' $(SHELL) $(top_srcdir)/tap-driver.sh
 
@@ -39,6 +46,11 @@ EXTRA_DIST += aes_192_gcm_tests.txt
 EXTRA_DIST += aes_256_gcm_tests.txt
 EXTRA_DIST += chacha20_poly1305_tests.txt
 EXTRA_DIST += xchacha20_poly1305_tests.txt
+
+# aes
+TESTS += aes_test
+check_PROGRAMS += aes_test
+aes_test_SOURCES = aes_test.c
 
 # aes_wrap
 TESTS += aes_wrap
@@ -109,28 +121,49 @@ TESTS += base64test
 check_PROGRAMS += base64test
 base64test_SOURCES = base64test.c
 
-# bftest
-TESTS += bftest
-check_PROGRAMS += bftest
-bftest_SOURCES = bftest.c
+# bf_test
+TESTS += bf_test
+check_PROGRAMS += bf_test
+bf_test_SOURCES = bf_test.c
 
-# biotest
-# the BIO tests rely on resolver results that are OS and environment-specific
+# bio_chain
+TESTS += bio_chain
+check_PROGRAMS += bio_chain
+bio_chain_SOURCES = bio_chain.c
+
+# bio_host
+# this test relies on resolver results that are OS and environment-specific
 if ENABLE_EXTRATESTS
-TESTS += biotest
-check_PROGRAMS += biotest
-biotest_SOURCES = biotest.c
+TESTS += bio_host
+check_PROGRAMS += bio_host
+bio_host_SOURCES = bio_host.c
 endif
 
-# bnaddsub
-TESTS += bnaddsub
-check_PROGRAMS += bnaddsub
-bnaddsub_SOURCES = bnaddsub.c
+# bio_mem
+TESTS += bio_mem
+check_PROGRAMS += bio_mem
+bio_mem_SOURCES = bio_mem.c
+
+# bn_add_sub
+TESTS += bn_add_sub
+check_PROGRAMS += bn_add_sub
+bn_add_sub_SOURCES = bn_add_sub.c
+
+# bn_cmp
+TESTS += bn_cmp
+check_PROGRAMS += bn_cmp
+bn_cmp_SOURCES = bn_cmp.c
 
 # bn_isqrt
 TESTS += bn_isqrt
 check_PROGRAMS += bn_isqrt
 bn_isqrt_SOURCES = bn_isqrt.c
+
+# bn_mod_exp
+TESTS += bn_mod_exp
+check_PROGRAMS += bn_mod_exp
+bn_mod_exp_CPPFLAGS = $(AM_CPPFLAGS) -ULIBRESSL_INTERNAL
+bn_mod_exp_SOURCES = bn_mod_exp.c
 
 # bn_mod_exp2_mont
 TESTS += bn_mod_exp2_mont
@@ -142,6 +175,11 @@ TESTS += bn_mod_sqrt
 check_PROGRAMS += bn_mod_sqrt
 bn_mod_sqrt_SOURCES = bn_mod_sqrt.c
 
+# bn_mont
+TESTS += bn_mont
+check_PROGRAMS += bn_mont
+bn_mont_SOURCES = bn_mont.c
+
 # bn_primes
 TESTS += bn_primes
 check_PROGRAMS += bn_primes
@@ -152,16 +190,31 @@ TESTS += bn_rand_interval
 check_PROGRAMS += bn_rand_interval
 bn_rand_interval_SOURCES = bn_rand_interval.c
 
-# bntest
-TESTS += bntest
-bntest_CPPFLAGS = $(AM_CPPFLAGS) -ULIBRESSL_INTERNAL
-check_PROGRAMS += bntest
-bntest_SOURCES = bntest.c
+# bn_shift
+TESTS += bn_shift
+check_PROGRAMS += bn_shift
+bn_shift_SOURCES = bn_shift.c
+
+# bn_test
+TESTS += bn_test
+bn_test_CPPFLAGS = $(AM_CPPFLAGS) -ULIBRESSL_INTERNAL
+check_PROGRAMS += bn_test
+bn_test_SOURCES = bn_test.c
 
 # bn_to_string
 TESTS += bn_to_string
 check_PROGRAMS += bn_to_string
 bn_to_string_SOURCES = bn_to_string.c
+
+# bn_unit
+TESTS += bn_unit
+check_PROGRAMS += bn_unit
+bn_unit_SOURCES = bn_unit.c
+
+# bn_word
+TESTS += bn_word
+check_PROGRAMS += bn_word
+bn_word_SOURCES = bn_word.c
 
 # buffertest
 TESTS += buffertest
@@ -234,13 +287,14 @@ TESTS += dsatest
 check_PROGRAMS += dsatest
 dsatest_SOURCES = dsatest.c
 
-# dtlstest
-if !HOST_WIN
-TESTS += dtlstest.sh
-check_PROGRAMS += dtlstest
-dtlstest_SOURCES = dtlstest.c
-endif
-EXTRA_DIST += dtlstest.sh
+# XXX this test is too flaky for CI. Disable it until it is fixed.
+## dtlstest
+#if !HOST_WIN
+#TESTS += dtlstest.sh
+#check_PROGRAMS += dtlstest
+#dtlstest_SOURCES = dtlstest.c
+#endif
+#EXTRA_DIST += dtlstest.sh
 
 # ec_asn1_test
 TESTS += ec_asn1_test
@@ -267,10 +321,20 @@ TESTS += ectest
 check_PROGRAMS += ectest
 ectest_SOURCES = ectest.c
 
+# ed25519test
+TESTS += ed25519test
+check_PROGRAMS += ed25519test
+ed25519test_SOURCES = ed25519test.c
+
 # enginetest
 TESTS += enginetest
 check_PROGRAMS += enginetest
 enginetest_SOURCES = enginetest.c
+
+# evp_ecx_test
+TESTS += evp_ecx_test
+check_PROGRAMS += evp_ecx_test
+evp_ecx_test_SOURCES = evp_ecx_test.c
 
 # evp_pkey_check
 TESTS += evp_pkey_check
@@ -302,14 +366,9 @@ endif
 endif
 endif
 
-# exptest
-TESTS += exptest
-check_PROGRAMS += exptest
-exptest_CPPFLAGS = $(AM_CPPFLAGS) -ULIBRESSL_INTERNAL
-exptest_SOURCES = exptest.c
-
 # freenull
 TESTS += freenull
+freenull_CPPFLAGS = $(AM_CPPFLAGS) -ULIBRESSL_INTERNAL
 check_PROGRAMS += freenull
 freenull_SOURCES = freenull.c
 
@@ -364,11 +423,6 @@ EXTRA_DIST += keypairtest.sh
 TESTS += md_test
 check_PROGRAMS += md_test
 md_test_SOURCES = md_test.c
-
-# mont
-TESTS += mont
-check_PROGRAMS += mont
-mont_SOURCES = mont.c
 
 # objectstest
 TESTS += objectstest

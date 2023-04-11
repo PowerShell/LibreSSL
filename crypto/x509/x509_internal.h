@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_internal.h,v 1.19 2022/06/27 14:10:22 tb Exp $ */
+/* $OpenBSD: x509_internal.h,v 1.25 2023/01/28 19:08:09 tb Exp $ */
 /*
  * Copyright (c) 2020 Bob Beck <beck@openbsd.org>
  *
@@ -20,9 +20,9 @@
 /* Internal use only, not public API */
 #include <netinet/in.h>
 
-#include <openssl/x509_verify.h>
-
-#include "x509_lcl.h"
+#include "bytestring.h"
+#include "x509_local.h"
+#include "x509_verify.h"
 
 /* Hard limits on structure size and number of signature checks. */
 #define X509_VERIFY_MAX_CHAINS		8	/* Max validated chains */
@@ -93,7 +93,7 @@ int x509_vfy_check_policy(X509_STORE_CTX *ctx);
 int x509_vfy_check_trust(X509_STORE_CTX *ctx);
 int x509_vfy_check_chain_extensions(X509_STORE_CTX *ctx);
 int x509_vfy_callback_indicate_completion(X509_STORE_CTX *ctx);
-void x509v3_cache_extensions(X509 *x);
+int x509v3_cache_extensions(X509 *x);
 X509 *x509_vfy_lookup_cert_match(X509_STORE_CTX *ctx, X509 *x);
 
 time_t x509_verify_asn1_time_to_time_t(const ASN1_TIME *atime, int notafter);
@@ -111,14 +111,13 @@ struct x509_constraints_names *x509_constraints_names_new(size_t names_max);
 int x509_constraints_general_to_bytes(GENERAL_NAME *name, uint8_t **bytes,
     size_t *len);
 void x509_constraints_names_free(struct x509_constraints_names *names);
-int x509_constraints_valid_host(uint8_t *name, size_t len);
-int x509_constraints_valid_sandns(uint8_t *name, size_t len);
+int x509_constraints_valid_host(CBS *cbs);
+int x509_constraints_valid_sandns(CBS *cbs);
 int x509_constraints_domain(char *domain, size_t dlen, char *constraint,
     size_t len);
-int x509_constraints_parse_mailbox(uint8_t *candidate, size_t len,
+int x509_constraints_parse_mailbox(CBS *candidate,
     struct x509_constraints_name *name);
-int x509_constraints_valid_domain_constraint(uint8_t *constraint,
-    size_t len);
+int x509_constraints_valid_domain_constraint(CBS *cbs);
 int x509_constraints_uri_host(uint8_t *uri, size_t len, char **hostp);
 int x509_constraints_uri(uint8_t *uri, size_t ulen, uint8_t *constraint,
     size_t len, int *error);

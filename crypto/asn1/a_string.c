@@ -1,4 +1,4 @@
-/* $OpenBSD: a_string.c,v 1.11 2022/05/20 08:04:21 tb Exp $ */
+/* $OpenBSD: a_string.c,v 1.13 2022/11/28 07:50:47 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -63,7 +63,7 @@
 #include <openssl/asn1.h>
 #include <openssl/err.h>
 
-#include "asn1_locl.h"
+#include "asn1_local.h"
 
 ASN1_STRING *
 ASN1_STRING_new(void)
@@ -197,12 +197,6 @@ ASN1_STRING_set0(ASN1_STRING *astr, void *data, int len)
 
 	astr->data = data;
 	astr->length = len;
-}
-
-void
-asn1_add_error(const unsigned char *address, int offset)
-{
-	ERR_asprintf_error_data("offset=%d", offset);
 }
 
 int

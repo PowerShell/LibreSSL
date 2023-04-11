@@ -1,4 +1,4 @@
-/*	$OpenBSD: bn_mod_sqrt.c,v 1.1 2022/03/15 16:28:42 tb Exp $ */
+/*	$OpenBSD: bn_mod_sqrt.c,v 1.2 2022/12/06 18:23:29 tb Exp $ */
 /*
  * Copyright (c) 2022 Theo Buehler <tb@openbsd.org>
  *
@@ -14,6 +14,8 @@
  * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+
+#include <stdio.h>
 
 #include <openssl/bn.h>
 
@@ -124,9 +126,6 @@ main(void)
 
 	for (i = 0; i < N_TESTS; i++)
 		failed |= mod_sqrt_test(&mod_sqrt_test_data[i]);
-
-	if (!failed)
-		printf("SUCCESS\n");
 
 	return failed;
 }

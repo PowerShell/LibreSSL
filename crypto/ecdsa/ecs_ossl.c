@@ -1,4 +1,4 @@
-/* $OpenBSD: ecs_ossl.c,v 1.25 2022/06/30 11:14:47 tb Exp $ */
+/* $OpenBSD: ecs_ossl.c,v 1.29 2023/03/07 09:27:10 jsing Exp $ */
 /*
  * Written by Nils Larsch for the OpenSSL project
  */
@@ -64,8 +64,8 @@
 #include <openssl/err.h>
 #include <openssl/objects.h>
 
-#include "bn_lcl.h"
-#include "ecs_locl.h"
+#include "bn_local.h"
+#include "ecs_local.h"
 
 static int ecdsa_prepare_digest(const unsigned char *dgst, int dgst_len,
     BIGNUM *order, BIGNUM *ret);
@@ -168,8 +168,13 @@ ecdsa_sign_setup(EC_KEY *eckey, BN_CTX *ctx_in, BIGNUM **kinvp, BIGNUM **rp)
 		goto err;
 	}
 
+	/* Reject curves with an order that is smaller than 80 bits. */
+	if ((order_bits = BN_num_bits(order)) < 80) {
+		ECDSAerror(EC_R_INVALID_GROUP_ORDER);
+		goto err;
+	}
+
 	/* Preallocate space. */
-	order_bits = BN_num_bits(order);
 	if (!BN_set_bit(k, order_bits) ||
 	    !BN_set_bit(r, order_bits) ||
 	    !BN_set_bit(X, order_bits))
@@ -225,22 +230,22 @@ ecdsa_sign_setup(EC_KEY *eckey, BN_CTX *ctx_in, BIGNUM **kinvp, BIGNUM **rp)
 		ECDSAerror(ERR_R_BN_LIB);
 		goto err;
 	}
-	BN_clear_free(*rp);
-	BN_clear_free(*kinvp);
+	BN_free(*rp);
+	BN_free(*kinvp);
 	*rp = r;
 	*kinvp = k;
 	ret = 1;
 
  err:
 	if (ret == 0) {
-		BN_clear_free(k);
-		BN_clear_free(r);
+		BN_free(k);
+		BN_free(r);
 	}
 	if (ctx_in == NULL)
 		BN_CTX_free(ctx);
 	BN_free(order);
 	EC_POINT_free(point);
-	BN_clear_free(X);
+	BN_free(X);
 	return (ret);
 }
 
@@ -255,6 +260,14 @@ ossl_ecdsa_sign_setup(EC_KEY *eckey, BN_CTX *ctx_in, BIGNUM **kinvp, BIGNUM **rp
 	return ecdsa->meth->ecdsa_sign_setup(eckey, ctx_in, kinvp, rp);
 }
 
+
+/*
+ * It is too expensive to check curve parameters on every sign operation.
+ * Instead, cap the number of retries. A single retry is very unlikely, so
+ * allowing 32 retries is amply enough.
+ */
+#define ECDSA_MAX_SIGN_ITERATIONS		32
+
 static ECDSA_SIG *
 ecdsa_do_sign(const unsigned char *dgst, int dgst_len,
     const BIGNUM *in_kinv, const BIGNUM *in_r, EC_KEY *eckey)
@@ -266,6 +279,7 @@ ecdsa_do_sign(const unsigned char *dgst, int dgst_len,
 	const EC_GROUP *group;
 	ECDSA_SIG  *ret;
 	ECDSA_DATA *ecdsa;
+	int attempts = 0;
 	int ok = 0;
 
 	ecdsa = ecdsa_check(eckey);
@@ -380,6 +394,11 @@ ecdsa_do_sign(const unsigned char *dgst, int dgst_len,
 				ECDSAerror(ECDSA_R_NEED_NEW_SETUP_VALUES);
 				goto err;
 			}
+
+			if (++attempts > ECDSA_MAX_SIGN_ITERATIONS) {
+				ECDSAerror(EC_R_WRONG_CURVE_PARAMETERS);
+				goto err;
+			}
 		} else
 			/* s != 0 => we have a valid signature */
 			break;
@@ -393,12 +412,12 @@ ecdsa_do_sign(const unsigned char *dgst, int dgst_len,
 		ret = NULL;
 	}
 	BN_CTX_free(ctx);
-	BN_clear_free(b);
-	BN_clear_free(binv);
-	BN_clear_free(bm);
-	BN_clear_free(bxr);
-	BN_clear_free(kinv);
-	BN_clear_free(m);
+	BN_free(b);
+	BN_free(binv);
+	BN_free(bm);
+	BN_free(bxr);
+	BN_free(kinv);
+	BN_free(m);
 	BN_free(order);
 	BN_free(range);
 	return ret;

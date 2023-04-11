@@ -1,4 +1,4 @@
-/* $OpenBSD: ecp_oct.c,v 1.14 2021/04/20 17:32:57 tb Exp $ */
+/* $OpenBSD: ecp_oct.c,v 1.19 2022/11/26 16:08:52 tb Exp $ */
 /* Includes code written by Lenka Fibikova <fibikova@exp-math.uni-essen.de>
  * for the OpenSSL project.
  * Includes code written by Bodo Moeller for the OpenSSL project.
@@ -64,11 +64,11 @@
 
 #include <openssl/err.h>
 
-#include "ec_lcl.h"
+#include "ec_local.h"
 
-int 
-ec_GFp_simple_set_compressed_coordinates(const EC_GROUP * group,
-    EC_POINT * point, const BIGNUM * x_, int y_bit, BN_CTX * ctx)
+int
+ec_GFp_simple_set_compressed_coordinates(const EC_GROUP *group,
+    EC_POINT *point, const BIGNUM *x_, int y_bit, BN_CTX *ctx)
 {
 	BN_CTX *new_ctx = NULL;
 	BIGNUM *tmp1, *tmp2, *x, *y;
@@ -162,28 +162,15 @@ ec_GFp_simple_set_compressed_coordinates(const EC_GROUP * group,
 	}
 	if (y_bit != BN_is_odd(y)) {
 		if (BN_is_zero(y)) {
-			int kron;
-
-			kron = BN_kronecker(x, &group->field, ctx);
-			if (kron == -2)
-				goto err;
-
-			if (kron == 1)
-				ECerror(EC_R_INVALID_COMPRESSION_BIT);
-			else
-				/*
-				 * BN_mod_sqrt() should have cought this
-				 * error (not a square)
-				 */
-				ECerror(EC_R_INVALID_COMPRESSED_POINT);
+			ECerror(EC_R_INVALID_COMPRESSION_BIT);
 			goto err;
 		}
 		if (!BN_usub(y, &group->field, y))
 			goto err;
-	}
-	if (y_bit != BN_is_odd(y)) {
-		ECerror(ERR_R_INTERNAL_ERROR);
-		goto err;
+		if (y_bit != BN_is_odd(y)) {
+			ECerror(ERR_R_INTERNAL_ERROR);
+			goto err;
+		}
 	}
 	if (!EC_POINT_set_affine_coordinates(group, point, x, y, ctx))
 		goto err;
@@ -197,9 +184,9 @@ ec_GFp_simple_set_compressed_coordinates(const EC_GROUP * group,
 }
 
 
-size_t 
-ec_GFp_simple_point2oct(const EC_GROUP * group, const EC_POINT * point, point_conversion_form_t form,
-    unsigned char *buf, size_t len, BN_CTX * ctx)
+size_t
+ec_GFp_simple_point2oct(const EC_GROUP *group, const EC_POINT *point, point_conversion_form_t form,
+    unsigned char *buf, size_t len, BN_CTX *ctx)
 {
 	size_t ret;
 	BN_CTX *new_ctx = NULL;
@@ -302,9 +289,9 @@ ec_GFp_simple_point2oct(const EC_GROUP * group, const EC_POINT * point, point_co
 }
 
 
-int 
-ec_GFp_simple_oct2point(const EC_GROUP * group, EC_POINT * point,
-    const unsigned char *buf, size_t len, BN_CTX * ctx)
+int
+ec_GFp_simple_oct2point(const EC_GROUP *group, EC_POINT *point,
+    const unsigned char *buf, size_t len, BN_CTX *ctx)
 {
 	point_conversion_form_t form;
 	int y_bit;

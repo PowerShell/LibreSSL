@@ -1,4 +1,4 @@
-/* $OpenBSD: rsa_prn.c,v 1.7 2017/01/29 17:49:23 beck Exp $ */
+/* $OpenBSD: rsa_prn.c,v 1.9 2022/11/08 19:19:08 tobhe Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2006.
  */
@@ -82,12 +82,16 @@ int
 RSA_print(BIO *bp, const RSA *x, int off)
 {
 	EVP_PKEY *pk;
-	int ret;
+	int ret = 0;
 
-	pk = EVP_PKEY_new();
-	if (!pk || !EVP_PKEY_set1_RSA(pk, (RSA *)x))
-		return 0;
+	if ((pk = EVP_PKEY_new()) == NULL)
+		goto err;
+
+	if (!EVP_PKEY_set1_RSA(pk, (RSA *)x))
+		goto err;
+
 	ret = EVP_PKEY_print_private(bp, pk, off, NULL);
+ err:
 	EVP_PKEY_free(pk);
 	return ret;
 }

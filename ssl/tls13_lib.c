@@ -1,4 +1,4 @@
-/*	$OpenBSD: tls13_lib.c,v 1.71 2022/09/10 15:29:33 jsing Exp $ */
+/*	$OpenBSD: tls13_lib.c,v 1.76 2022/11/26 16:08:56 tb Exp $ */
 /*
  * Copyright (c) 2018, 2019 Joel Sing <jsing@openbsd.org>
  * Copyright (c) 2019 Bob Beck <beck@openbsd.org>
@@ -20,9 +20,16 @@
 
 #include <openssl/evp.h>
 
-#include "ssl_locl.h"
+#include "ssl_local.h"
 #include "ssl_tlsext.h"
 #include "tls13_internal.h"
+
+/*
+ * RFC 8446, section 4.6.1. Servers must not indicate a lifetime longer than
+ * 7 days and clients must not cache tickets for longer than 7 days.
+ */
+
+#define TLS13_MAX_TICKET_LIFETIME	(7 * 24 * 3600)
 
 /*
  * Downgrade sentinels - RFC 8446 section 4.1.3, magic values which must be set
@@ -110,7 +117,7 @@ tls13_alert_received_cb(uint8_t alert_desc, void *arg)
 
 	if (alert_desc == TLS13_ALERT_CLOSE_NOTIFY) {
 		ctx->close_notify_recv = 1;
-		ctx->ssl->internal->shutdown |= SSL_RECEIVED_SHUTDOWN;
+		ctx->ssl->shutdown |= SSL_RECEIVED_SHUTDOWN;
 		ctx->ssl->s3->warn_alert = alert_desc;
 		return;
 	}
@@ -158,7 +165,7 @@ tls13_legacy_handshake_message_recv_cb(void *arg)
 	SSL *s = ctx->ssl;
 	CBS cbs;
 
-	if (s->internal->msg_callback == NULL)
+	if (s->msg_callback == NULL)
 		return;
 
 	tls13_handshake_msg_data(ctx->hs_msg, &cbs);
@@ -172,7 +179,7 @@ tls13_legacy_handshake_message_sent_cb(void *arg)
 	SSL *s = ctx->ssl;
 	CBS cbs;
 
-	if (s->internal->msg_callback == NULL)
+	if (s->msg_callback == NULL)
 		return;
 
 	tls13_handshake_msg_data(ctx->hs_msg, &cbs);
@@ -195,11 +202,11 @@ tls13_legacy_ocsp_status_recv_cb(void *arg)
 	SSL *s = ctx->ssl;
 	int ret;
 
-	if (s->ctx->internal->tlsext_status_cb == NULL)
+	if (s->ctx->tlsext_status_cb == NULL)
 		return 1;
 
-	ret = s->ctx->internal->tlsext_status_cb(s,
-	    s->ctx->internal->tlsext_status_arg);
+	ret = s->ctx->tlsext_status_cb(s,
+	    s->ctx->tlsext_status_arg);
 	if (ret < 0) {
 		ctx->alert = TLS13_ALERT_INTERNAL_ERROR;
 		SSLerror(s, ERR_R_MALLOC_FAILURE);
@@ -328,6 +335,107 @@ tls13_key_update_recv(struct tls13_ctx *ctx, CBS *cbs)
 	return tls13_send_alert(ctx->rl, alert);
 }
 
+/* RFC 8446 section 4.6.1 */
+static ssize_t
+tls13_new_session_ticket_recv(struct tls13_ctx *ctx, CBS *cbs)
+{
+	struct tls13_secrets *secrets = ctx->hs->tls13.secrets;
+	struct tls13_secret nonce;
+	uint32_t ticket_lifetime, ticket_age_add;
+	CBS ticket_nonce, ticket;
+	SSL_SESSION *sess = NULL;
+	int alert, session_id_length;
+	ssize_t ret = 0;
+
+	memset(&nonce, 0, sizeof(nonce));
+
+	if (ctx->mode != TLS13_HS_CLIENT) {
+		alert = TLS13_ALERT_UNEXPECTED_MESSAGE;
+		goto err;
+	}
+
+	alert = TLS13_ALERT_DECODE_ERROR;
+
+	if (!CBS_get_u32(cbs, &ticket_lifetime))
+		goto err;
+	if (!CBS_get_u32(cbs, &ticket_age_add))
+		goto err;
+	if (!CBS_get_u8_length_prefixed(cbs, &ticket_nonce))
+		goto err;
+	if (!CBS_get_u16_length_prefixed(cbs, &ticket))
+		goto err;
+	/* Extensions can only contain early_data, which we currently ignore. */
+	if (!tlsext_client_parse(ctx->ssl, SSL_TLSEXT_MSG_NST, cbs, &alert))
+		goto err;
+
+	if (CBS_len(cbs) != 0)
+		goto err;
+
+	/* Zero indicates that the ticket should be discarded immediately. */
+	if (ticket_lifetime == 0) {
+		ret = TLS13_IO_SUCCESS;
+		goto done;
+	}
+
+	/* Servers MUST NOT use any value larger than 7 days. */
+	if (ticket_lifetime > TLS13_MAX_TICKET_LIFETIME) {
+		alert = TLS13_ALERT_ILLEGAL_PARAMETER;
+		goto err;
+	}
+
+	alert = TLS13_ALERT_INTERNAL_ERROR;
+
+	/*
+	 * Create new session instead of modifying the current session.
+	 * The current session could already be in the session cache.
+	 */
+	if ((sess = ssl_session_dup(ctx->ssl->session, 0)) == NULL)
+		goto err;
+
+	sess->time = time(NULL);
+
+	sess->tlsext_tick_lifetime_hint = ticket_lifetime;
+	sess->tlsext_tick_age_add = ticket_age_add;
+
+	if (!CBS_stow(&ticket, &sess->tlsext_tick, &sess->tlsext_ticklen))
+		goto err;
+
+	/* XXX - ensure this doesn't overflow session_id if hash is changed. */
+	if (!EVP_Digest(CBS_data(&ticket), CBS_len(&ticket),
+	    sess->session_id, &session_id_length, EVP_sha256(), NULL))
+		goto err;
+	sess->session_id_length = session_id_length;
+
+	if (!CBS_stow(&ticket_nonce, &nonce.data, &nonce.len))
+		goto err;
+
+	if (!tls13_secret_init(&sess->resumption_master_secret, 256))
+		goto err;
+
+	if (!tls13_derive_secret(&sess->resumption_master_secret,
+	    secrets->digest, &secrets->resumption_master, "resumption",
+	    &nonce))
+		goto err;
+
+	SSL_SESSION_free(ctx->ssl->session);
+	ctx->ssl->session = sess;
+	sess = NULL;
+
+	ssl_update_cache(ctx->ssl, SSL_SESS_CACHE_CLIENT);
+
+	ret = TLS13_IO_SUCCESS;
+	goto done;
+
+ err:
+	ret = tls13_send_alert(ctx->rl, alert);
+
+ done:
+	tls13_secret_cleanup(&nonce);
+	SSL_SESSION_free(sess);
+
+	return ret;
+}
+
 ssize_t
 tls13_phh_received_cb(void *cb_arg)
 {
@@ -354,7 +462,7 @@ tls13_phh_received_cb(void *cb_arg)
 		ret = tls13_key_update_recv(ctx, &cbs);
 		break;
 	case TLS13_MT_NEW_SESSION_TICKET:
-		/* XXX do nothing for now and ignore this */
+		ret = tls13_new_session_ticket_recv(ctx, &cbs);
 		break;
 	case TLS13_MT_CERTIFICATE_REQUEST:
 		/* XXX add support if we choose to advertise this */
@@ -413,7 +521,7 @@ tls13_ctx_new(int mode, SSL *ssl)
 
 	ctx->middlebox_compat = 1;
 
-	ssl->internal->tls13 = ctx;
+	ssl->tls13 = ctx;
 
 	if (SSL_is_quic(ssl)) {
 		if (!tls13_quic_init(ctx))
@@ -590,74 +698,4 @@ tls13_clienthello_hash_validate(struct tls13_ctx *ctx)
 		return 0;
 
 	return 1;
-}
-
-int
-tls13_exporter(struct tls13_ctx *ctx, const uint8_t *label, size_t label_len,
-    const uint8_t *context_value, size_t context_value_len, uint8_t *out,
-    size_t out_len)
-{
-	struct tls13_secret context, export_out, export_secret;
-	struct tls13_secrets *secrets = ctx->hs->tls13.secrets;
-	EVP_MD_CTX *md_ctx = NULL;
-	unsigned int md_out_len;
-	int md_len;
-	int ret = 0;
-
-	/*
-	 * RFC 8446 Section 7.5.
-	 */
-
-	memset(&context, 0, sizeof(context));
-	memset(&export_secret, 0, sizeof(export_secret));
-
-	export_out.data = out;
-	export_out.len = out_len;
-
-	if (!ctx->handshake_completed)
-		return 0;
-
-	md_len = EVP_MD_size(secrets->digest);
-	if (md_len <= 0 || md_len > EVP_MAX_MD_SIZE)
-		goto err;
-
-	if (!tls13_secret_init(&export_secret, md_len))
-		goto err;
-	if (!tls13_secret_init(&context, md_len))
-		goto err;
-
-	/* In TLSv1.3 no context is equivalent to an empty context. */
-	if (context_value == NULL) {
-		context_value = "";
-		context_value_len = 0;
-	}
-
-	if ((md_ctx = EVP_MD_CTX_new()) == NULL)
-		goto err;
-	if (!EVP_DigestInit_ex(md_ctx, secrets->digest, NULL))
-		goto err;
-	if (!EVP_DigestUpdate(md_ctx, context_value, context_value_len))
-		goto err;
-	if (!EVP_DigestFinal_ex(md_ctx, context.data, &md_out_len))
-		goto err;
-	if (md_len != md_out_len)
-		goto err;
-
-	if (!tls13_derive_secret_with_label_length(&export_secret,
-	    secrets->digest, &secrets->exporter_master, label, label_len,
-	    &secrets->empty_hash))
-		goto err;
-
-	if (!tls13_hkdf_expand_label(&export_out, secrets->digest,
-	    &export_secret, "exporter", &context))
-		goto err;
-
-	ret = 1;
-
- err:
-	EVP_MD_CTX_free(md_ctx);
-	tls13_secret_cleanup(&context);
-	tls13_secret_cleanup(&export_secret);
-
-	return ret;
 }

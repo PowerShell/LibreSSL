@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_stat.c,v 1.18 2022/02/05 14:54:10 jsing Exp $ */
+/* $OpenBSD: ssl_stat.c,v 1.20 2022/11/26 16:08:56 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -84,7 +84,7 @@
 
 #include <stdio.h>
 
-#include "ssl_locl.h"
+#include "ssl_local.h"
 
 const char *
 SSL_state_string_long(const SSL *s)
@@ -325,7 +325,7 @@ SSL_rstate_string_long(const SSL *s)
 {
 	const char *str;
 
-	switch (s->internal->rstate) {
+	switch (s->rstate) {
 	case SSL_ST_READ_HEADER:
 		str = "read header";
 		break;
@@ -771,7 +771,7 @@ SSL_rstate_string(const SSL *s)
 {
 	const char *str;
 
-	switch (s->internal->rstate) {
+	switch (s->rstate) {
 	case SSL_ST_READ_HEADER:
 		str = "RH";
 		break;

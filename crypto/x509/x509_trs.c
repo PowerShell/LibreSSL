@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_trs.c,v 1.25 2021/11/01 20:53:08 tb Exp $ */
+/* $OpenBSD: x509_trs.c,v 1.31 2023/02/16 08:38:17 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 1999.
  */
@@ -62,7 +62,7 @@
 #include <openssl/err.h>
 #include <openssl/x509v3.h>
 
-#include "x509_lcl.h"
+#include "x509_local.h"
 
 static int tr_cmp(const X509_TRUST * const *a, const X509_TRUST * const *b);
 static void trtable_free(X509_TRUST *p);
@@ -109,6 +109,7 @@ int
 	default_trust = trust;
 	return oldtrust;
 }
+LCRYPTO_ALIAS(X509_TRUST_set_default);
 
 int
 X509_check_trust(X509 *x, int id, int flags)
@@ -140,6 +141,7 @@ X509_check_trust(X509 *x, int id, int flags)
 	pt = X509_TRUST_get0(idx);
 	return pt->check_trust(pt, x, flags);
 }
+LCRYPTO_ALIAS(X509_check_trust);
 
 int
 X509_TRUST_get_count(void)
@@ -148,6 +150,7 @@ X509_TRUST_get_count(void)
 		return X509_TRUST_COUNT;
 	return sk_X509_TRUST_num(trtable) + X509_TRUST_COUNT;
 }
+LCRYPTO_ALIAS(X509_TRUST_get_count);
 
 X509_TRUST *
 X509_TRUST_get0(int idx)
@@ -158,6 +161,7 @@ X509_TRUST_get0(int idx)
 		return trstandard + idx;
 	return sk_X509_TRUST_value(trtable, idx - X509_TRUST_COUNT);
 }
+LCRYPTO_ALIAS(X509_TRUST_get0);
 
 int
 X509_TRUST_get_by_id(int id)
@@ -175,6 +179,7 @@ X509_TRUST_get_by_id(int id)
 		return -1;
 	return idx + X509_TRUST_COUNT;
 }
+LCRYPTO_ALIAS(X509_TRUST_get_by_id);
 
 int
 X509_TRUST_set(int *t, int trust)
@@ -186,6 +191,7 @@ X509_TRUST_set(int *t, int trust)
 	*t = trust;
 	return 1;
 }
+LCRYPTO_ALIAS(X509_TRUST_set);
 
 int
 X509_TRUST_add(int id, int flags, int (*ck)(X509_TRUST *, X509 *, int),
@@ -251,6 +257,7 @@ err:
 	X509error(ERR_R_MALLOC_FAILURE);
 	return 0;
 }
+LCRYPTO_ALIAS(X509_TRUST_add);
 
 static void
 trtable_free(X509_TRUST *p)
@@ -270,24 +277,28 @@ X509_TRUST_cleanup(void)
 	sk_X509_TRUST_pop_free(trtable, trtable_free);
 	trtable = NULL;
 }
+LCRYPTO_ALIAS(X509_TRUST_cleanup);
 
 int
 X509_TRUST_get_flags(const X509_TRUST *xp)
 {
 	return xp->flags;
 }
+LCRYPTO_ALIAS(X509_TRUST_get_flags);
 
 char *
 X509_TRUST_get0_name(const X509_TRUST *xp)
 {
 	return xp->name;
 }
+LCRYPTO_ALIAS(X509_TRUST_get0_name);
 
 int
 X509_TRUST_get_trust(const X509_TRUST *xp)
 {
 	return xp->trust;
 }
+LCRYPTO_ALIAS(X509_TRUST_get_trust);
 
 static int
 trust_1oidany(X509_TRUST *trust, X509 *x, int flags)
@@ -322,7 +333,7 @@ static int
 obj_trust(int id, X509 *x, int flags)
 {
 	ASN1_OBJECT *obj;
-	int i;
+	int i, nid;
 	X509_CERT_AUX *ax;
 
 	ax = x->aux;
@@ -331,14 +342,16 @@ obj_trust(int id, X509 *x, int flags)
 	if (ax->reject) {
 		for (i = 0; i < sk_ASN1_OBJECT_num(ax->reject); i++) {
 			obj = sk_ASN1_OBJECT_value(ax->reject, i);
-			if (OBJ_obj2nid(obj) == id)
+			nid = OBJ_obj2nid(obj);
+			if (nid == id || nid == NID_anyExtendedKeyUsage)
 				return X509_TRUST_REJECTED;
 		}
 	}
 	if (ax->trust) {
 		for (i = 0; i < sk_ASN1_OBJECT_num(ax->trust); i++) {
 			obj = sk_ASN1_OBJECT_value(ax->trust, i);
-			if (OBJ_obj2nid(obj) == id)
+			nid = OBJ_obj2nid(obj);
+			if (nid == id || nid == NID_anyExtendedKeyUsage)
 				return X509_TRUST_TRUSTED;
 		}
 	}

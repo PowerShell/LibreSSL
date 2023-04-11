@@ -1,4 +1,4 @@
-/* $OpenBSD: tls13_server.c,v 1.103 2022/09/17 17:14:06 jsing Exp $ */
+/* $OpenBSD: tls13_server.c,v 1.105 2022/11/26 16:08:56 tb Exp $ */
 /*
  * Copyright (c) 2019, 2020 Joel Sing <jsing@openbsd.org>
  * Copyright (c) 2020 Bob Beck <beck@openbsd.org>
@@ -18,7 +18,7 @@
 
 #include <openssl/x509v3.h>
 
-#include "ssl_locl.h"
+#include "ssl_local.h"
 #include "ssl_sigalgs.h"
 #include "ssl_tlsext.h"
 #include "tls13_handshake.h"
@@ -37,7 +37,7 @@ tls13_server_init(struct tls13_ctx *ctx)
 	s->version = ctx->hs->our_max_tls_version;
 
 	tls13_record_layer_set_retry_after_phh(ctx->rl,
-	    (s->internal->mode & SSL_MODE_AUTO_RETRY) != 0);
+	    (s->mode & SSL_MODE_AUTO_RETRY) != 0);
 
 	if (!ssl_get_new_session(s, 0)) /* XXX */
 		return 0;
@@ -656,7 +656,7 @@ tls13_server_certificate_send(struct tls13_ctx *ctx, CBB *cbb)
 	if ((chain = cpk->chain) == NULL)
 		chain = s->ctx->extra_certs;
 
-	if (chain == NULL && !(s->internal->mode & SSL_MODE_NO_AUTO_CHAIN)) {
+	if (chain == NULL && !(s->mode & SSL_MODE_NO_AUTO_CHAIN)) {
 		if ((xsc = X509_STORE_CTX_new()) == NULL)
 			goto err;
 		if (!X509_STORE_CTX_init(xsc, s->ctx->cert_store, cpk->x509, NULL))

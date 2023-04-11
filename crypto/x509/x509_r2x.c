@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_r2x.c,v 1.13 2021/11/03 14:36:21 schwarze Exp $ */
+/* $OpenBSD: x509_r2x.c,v 1.16 2023/02/16 08:38:17 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -66,7 +66,7 @@
 #include <openssl/objects.h>
 #include <openssl/x509.h>
 
-#include "x509_lcl.h"
+#include "x509_local.h"
 
 X509 *
 X509_REQ_to_X509(X509_REQ *r, int days, EVP_PKEY *pkey)
@@ -116,3 +116,4 @@ err:
 	X509_free(ret);
 	return NULL;
 }
+LCRYPTO_ALIAS(X509_REQ_to_X509);

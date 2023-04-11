@@ -1,4 +1,4 @@
-/*	$OpenBSD: evp_pkey_cleanup.c,v 1.1 2022/03/30 08:57:26 tb Exp $ */
+/*	$OpenBSD: evp_pkey_cleanup.c,v 1.3 2022/12/01 13:49:12 tb Exp $ */
 
 /*
  * Copyright (c) 2022 Theo Buehler <tb@openbsd.org>
@@ -20,7 +20,7 @@
 
 #include <openssl/evp.h>
 
-#include "evp_locl.h"
+#include "evp_local.h"
 
 struct pkey_cleanup_test {
 	const char *name;
@@ -78,9 +78,6 @@ main(void)
 
 	for (i = 0; i < N_PKEY_IDS; i++)
 		failed |= test_evp_pkey_ctx_cleanup(pkey_ids[i]);
-
-	if (!failed)
-		printf("SUCCESS\n");
 
 	return failed;
 }

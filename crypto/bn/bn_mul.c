@@ -1,4 +1,4 @@
-/* $OpenBSD: bn_mul.c,v 1.20 2015/02/09 15:49:22 jsing Exp $ */
+/* $OpenBSD: bn_mul.c,v 1.34 2023/02/22 05:57:19 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -56,364 +56,261 @@
  * [including the GNU Public Licence.]
  */
 
-#ifndef BN_DEBUG
-# undef NDEBUG /* avoid conflicting definitions */
-# define NDEBUG
-#endif
-
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
 
 #include <openssl/opensslconf.h>
 
-#include "bn_lcl.h"
+#include "bn_arch.h"
+#include "bn_internal.h"
+#include "bn_local.h"
 
-#if defined(OPENSSL_NO_ASM) || !defined(OPENSSL_BN_ASM_PART_WORDS)
-/* Here follows specialised variants of bn_add_words() and
-   bn_sub_words().  They have the property performing operations on
-   arrays of different sizes.  The sizes of those arrays is expressed through
-   cl, which is the common length ( basicall, min(len(a),len(b)) ), and dl,
-   which is the delta between the two lengths, calculated as len(a)-len(b).
-   All lengths are the number of BN_ULONGs...  For the operations that require
-   a result array as parameter, it must have the length cl+abs(dl).
-   These functions should probably end up in bn_asm.c as soon as there are
-   assembler counterparts for the systems that use assembler files.  */
-
-BN_ULONG
-bn_sub_part_words(BN_ULONG *r, const BN_ULONG *a, const BN_ULONG *b, int cl,
-    int dl)
+/*
+ * bn_mul_comba4() computes r[] = a[] * b[] using Comba multiplication
+ * (https://everything2.com/title/Comba+multiplication), where a and b are both
+ * four word arrays, producing an eight word array result.
+ */
+#ifndef HAVE_BN_MUL_COMBA4
+void
+bn_mul_comba4(BN_ULONG *r, BN_ULONG *a, BN_ULONG *b)
 {
-	BN_ULONG c, t;
+	BN_ULONG c0, c1, c2;
 
-	assert(cl >= 0);
-	c = bn_sub_words(r, a, b, cl);
+	bn_mulw_addtw(a[0], b[0],  0,  0,  0, &c2, &c1, &r[0]);
 
-	if (dl == 0)
-		return c;
+	bn_mulw_addtw(a[0], b[1],  0, c2, c1, &c2, &c1, &c0);
+	bn_mulw_addtw(a[1], b[0], c2, c1, c0, &c2, &c1, &r[1]);
 
-	r += cl;
-	a += cl;
-	b += cl;
+	bn_mulw_addtw(a[2], b[0],  0, c2, c1, &c2, &c1, &c0);
+	bn_mulw_addtw(a[1], b[1], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[0], b[2], c2, c1, c0, &c2, &c1, &r[2]);
 
-	if (dl < 0) {
-#ifdef BN_COUNT
-		fprintf(stderr,
-		    "  bn_sub_part_words %d + %d (dl < 0, c = %d)\n",
-		    cl, dl, c);
-#endif
-		for (;;) {
-			t = b[0];
-			r[0] = (0 - t - c) & BN_MASK2;
-			if (t != 0)
-				c = 1;
-			if (++dl >= 0)
-				break;
+	bn_mulw_addtw(a[0], b[3],  0, c2, c1, &c2, &c1, &c0);
+	bn_mulw_addtw(a[1], b[2], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[2], b[1], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[3], b[0], c2, c1, c0, &c2, &c1, &r[3]);
 
-			t = b[1];
-			r[1] = (0 - t - c) & BN_MASK2;
-			if (t != 0)
-				c = 1;
-			if (++dl >= 0)
-				break;
+	bn_mulw_addtw(a[3], b[1],  0, c2, c1, &c2, &c1, &c0);
+	bn_mulw_addtw(a[2], b[2], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[1], b[3], c2, c1, c0, &c2, &c1, &r[4]);
 
-			t = b[2];
-			r[2] = (0 - t - c) & BN_MASK2;
-			if (t != 0)
-				c = 1;
-			if (++dl >= 0)
-				break;
+	bn_mulw_addtw(a[2], b[3],  0, c2, c1, &c2, &c1, &c0);
+	bn_mulw_addtw(a[3], b[2], c2, c1, c0, &c2, &c1, &r[5]);
 
-			t = b[3];
-			r[3] = (0 - t - c) & BN_MASK2;
-			if (t != 0)
-				c = 1;
-			if (++dl >= 0)
-				break;
-
-			b += 4;
-			r += 4;
-		}
-	} else {
-		int save_dl = dl;
-#ifdef BN_COUNT
-		fprintf(stderr,
-		    "  bn_sub_part_words %d + %d (dl > 0, c = %d)\n",
-		    cl, dl, c);
-#endif
-		while (c) {
-			t = a[0];
-			r[0] = (t - c) & BN_MASK2;
-			if (t != 0)
-				c = 0;
-			if (--dl <= 0)
-				break;
-
-			t = a[1];
-			r[1] = (t - c) & BN_MASK2;
-			if (t != 0)
-				c = 0;
-			if (--dl <= 0)
-				break;
-
-			t = a[2];
-			r[2] = (t - c) & BN_MASK2;
-			if (t != 0)
-				c = 0;
-			if (--dl <= 0)
-				break;
-
-			t = a[3];
-			r[3] = (t - c) & BN_MASK2;
-			if (t != 0)
-				c = 0;
-			if (--dl <= 0)
-				break;
-
-			save_dl = dl;
-			a += 4;
-			r += 4;
-		}
-		if (dl > 0) {
-#ifdef BN_COUNT
-			fprintf(stderr,
-			    "  bn_sub_part_words %d + %d (dl > 0, c == 0)\n",
-			    cl, dl);
-#endif
-			if (save_dl > dl) {
-				switch (save_dl - dl) {
-				case 1:
-					r[1] = a[1];
-					if (--dl <= 0)
-						break;
-				case 2:
-					r[2] = a[2];
-					if (--dl <= 0)
-						break;
-				case 3:
-					r[3] = a[3];
-					if (--dl <= 0)
-						break;
-				}
-				a += 4;
-				r += 4;
-			}
-		}
-		if (dl > 0) {
-#ifdef BN_COUNT
-			fprintf(stderr,
-			    "  bn_sub_part_words %d + %d (dl > 0, copy)\n",
-			    cl, dl);
-#endif
-			for (;;) {
-				r[0] = a[0];
-				if (--dl <= 0)
-					break;
-				r[1] = a[1];
-				if (--dl <= 0)
-					break;
-				r[2] = a[2];
-				if (--dl <= 0)
-					break;
-				r[3] = a[3];
-				if (--dl <= 0)
-					break;
-
-				a += 4;
-				r += 4;
-			}
-		}
-	}
-	return c;
+	bn_mulw_addtw(a[3], b[3],  0, c2, c1, &c2, &r[7], &r[6]);
 }
 #endif
 
-BN_ULONG
-bn_add_part_words(BN_ULONG *r, const BN_ULONG *a, const BN_ULONG *b, int cl,
-    int dl)
+/*
+ * bn_mul_comba8() computes r[] = a[] * b[] using Comba multiplication
+ * (https://everything2.com/title/Comba+multiplication), where a and b are both
+ * eight word arrays, producing a 16 word array result.
+ */
+#ifndef HAVE_BN_MUL_COMBA8
+void
+bn_mul_comba8(BN_ULONG *r, BN_ULONG *a, BN_ULONG *b)
 {
-	BN_ULONG c, l, t;
+	BN_ULONG c0, c1, c2;
 
-	assert(cl >= 0);
-	c = bn_add_words(r, a, b, cl);
+	bn_mulw_addtw(a[0], b[0],  0,  0,  0, &c2, &c1, &r[0]);
 
-	if (dl == 0)
-		return c;
+	bn_mulw_addtw(a[0], b[1],  0, c2, c1, &c2, &c1, &c0);
+	bn_mulw_addtw(a[1], b[0], c2, c1, c0, &c2, &c1, &r[1]);
 
-	r += cl;
-	a += cl;
-	b += cl;
+	bn_mulw_addtw(a[2], b[0],  0, c2, c1, &c2, &c1, &c0);
+	bn_mulw_addtw(a[1], b[1], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[0], b[2], c2, c1, c0, &c2, &c1, &r[2]);
 
-	if (dl < 0) {
-		int save_dl = dl;
-#ifdef BN_COUNT
-		fprintf(stderr,
-		    "  bn_add_part_words %d + %d (dl < 0, c = %d)\n",
-		    cl, dl, c);
+	bn_mulw_addtw(a[0], b[3],  0, c2, c1, &c2, &c1, &c0);
+	bn_mulw_addtw(a[1], b[2], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[2], b[1], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[3], b[0], c2, c1, c0, &c2, &c1, &r[3]);
+
+	bn_mulw_addtw(a[4], b[0],  0, c2, c1, &c2, &c1, &c0);
+	bn_mulw_addtw(a[3], b[1], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[2], b[2], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[1], b[3], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[0], b[4], c2, c1, c0, &c2, &c1, &r[4]);
+
+	bn_mulw_addtw(a[0], b[5],  0, c2, c1, &c2, &c1, &c0);
+	bn_mulw_addtw(a[1], b[4], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[2], b[3], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[3], b[2], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[4], b[1], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[5], b[0], c2, c1, c0, &c2, &c1, &r[5]);
+
+	bn_mulw_addtw(a[6], b[0],  0, c2, c1, &c2, &c1, &c0);
+	bn_mulw_addtw(a[5], b[1], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[4], b[2], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[3], b[3], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[2], b[4], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[1], b[5], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[0], b[6], c2, c1, c0, &c2, &c1, &r[6]);
+
+	bn_mulw_addtw(a[0], b[7],  0, c2, c1, &c2, &c1, &c0);
+	bn_mulw_addtw(a[1], b[6], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[2], b[5], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[3], b[4], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[4], b[3], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[5], b[2], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[6], b[1], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[7], b[0], c2, c1, c0, &c2, &c1, &r[7]);
+
+	bn_mulw_addtw(a[7], b[1],  0, c2, c1, &c2, &c1, &c0);
+	bn_mulw_addtw(a[6], b[2], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[5], b[3], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[4], b[4], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[3], b[5], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[2], b[6], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[1], b[7], c2, c1, c0, &c2, &c1, &r[8]);
+
+	bn_mulw_addtw(a[2], b[7],  0, c2, c1, &c2, &c1, &c0);
+	bn_mulw_addtw(a[3], b[6], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[4], b[5], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[5], b[4], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[6], b[3], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[7], b[2], c2, c1, c0, &c2, &c1, &r[9]);
+
+	bn_mulw_addtw(a[7], b[3],  0, c2, c1, &c2, &c1, &c0);
+	bn_mulw_addtw(a[6], b[4], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[5], b[5], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[4], b[6], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[3], b[7], c2, c1, c0, &c2, &c1, &r[10]);
+
+	bn_mulw_addtw(a[4], b[7],  0, c2, c1, &c2, &c1, &c0);
+	bn_mulw_addtw(a[5], b[6], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[6], b[5], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[7], b[4], c2, c1, c0, &c2, &c1, &r[11]);
+
+	bn_mulw_addtw(a[7], b[5],  0, c2, c1, &c2, &c1, &c0);
+	bn_mulw_addtw(a[6], b[6], c2, c1, c0, &c2, &c1, &c0);
+	bn_mulw_addtw(a[5], b[7], c2, c1, c0, &c2, &c1, &r[12]);
+
+	bn_mulw_addtw(a[6], b[7],  0, c2, c1, &c2, &c1, &c0);
+	bn_mulw_addtw(a[7], b[6], c2, c1, c0, &c2, &c1, &r[13]);
+
+	bn_mulw_addtw(a[7], b[7],  0, c2, c1, &c2, &r[15], &r[14]);
+}
 #endif
-		while (c) {
-			l = (c + b[0]) & BN_MASK2;
-			c = (l < c);
-			r[0] = l;
-			if (++dl >= 0)
-				break;
 
-			l = (c + b[1]) & BN_MASK2;
-			c = (l < c);
-			r[1] = l;
-			if (++dl >= 0)
-				break;
+/*
+ * bn_mul_words() computes (carry:r[i]) = a[i] * w + carry, where a is an array
+ * of words and w is a single word. This should really be called bn_mulw_words()
+ * since only one input is an array. This is used as a step in the multiplication
+ * of word arrays.
+ */
+#ifndef HAVE_BN_MUL_WORDS
+BN_ULONG
+bn_mul_words(BN_ULONG *r, const BN_ULONG *a, int num, BN_ULONG w)
+{
+	BN_ULONG carry = 0;
 
-			l = (c + b[2]) & BN_MASK2;
-			c = (l < c);
-			r[2] = l;
-			if (++dl >= 0)
-				break;
+	assert(num >= 0);
+	if (num <= 0)
+		return 0;
 
-			l = (c + b[3]) & BN_MASK2;
-			c = (l < c);
-			r[3] = l;
-			if (++dl >= 0)
-				break;
-
-			save_dl = dl;
-			b += 4;
-			r += 4;
-		}
-		if (dl < 0) {
-#ifdef BN_COUNT
-			fprintf(stderr,
-			    "  bn_add_part_words %d + %d (dl < 0, c == 0)\n",
-			    cl, dl);
-#endif
-			if (save_dl < dl) {
-				switch (dl - save_dl) {
-				case 1:
-					r[1] = b[1];
-					if (++dl >= 0)
-						break;
-				case 2:
-					r[2] = b[2];
-					if (++dl >= 0)
-						break;
-				case 3:
-					r[3] = b[3];
-					if (++dl >= 0)
-						break;
-				}
-				b += 4;
-				r += 4;
-			}
-		}
-		if (dl < 0) {
-#ifdef BN_COUNT
-			fprintf(stderr,
-			    "  bn_add_part_words %d + %d (dl < 0, copy)\n",
-			    cl, dl);
-#endif
-			for (;;) {
-				r[0] = b[0];
-				if (++dl >= 0)
-					break;
-				r[1] = b[1];
-				if (++dl >= 0)
-					break;
-				r[2] = b[2];
-				if (++dl >= 0)
-					break;
-				r[3] = b[3];
-				if (++dl >= 0)
-					break;
-
-				b += 4;
-				r += 4;
-			}
-		}
-	} else {
-		int save_dl = dl;
-#ifdef BN_COUNT
-		fprintf(stderr,
-		    "  bn_add_part_words %d + %d (dl > 0)\n", cl, dl);
-#endif
-		while (c) {
-			t = (a[0] + c) & BN_MASK2;
-			c = (t < c);
-			r[0] = t;
-			if (--dl <= 0)
-				break;
-
-			t = (a[1] + c) & BN_MASK2;
-			c = (t < c);
-			r[1] = t;
-			if (--dl <= 0)
-				break;
-
-			t = (a[2] + c) & BN_MASK2;
-			c = (t < c);
-			r[2] = t;
-			if (--dl <= 0)
-				break;
-
-			t = (a[3] + c) & BN_MASK2;
-			c = (t < c);
-			r[3] = t;
-			if (--dl <= 0)
-				break;
-
-			save_dl = dl;
-			a += 4;
-			r += 4;
-		}
-#ifdef BN_COUNT
-		fprintf(stderr,
-		    "  bn_add_part_words %d + %d (dl > 0, c == 0)\n", cl, dl);
-#endif
-		if (dl > 0) {
-			if (save_dl > dl) {
-				switch (save_dl - dl) {
-				case 1:
-					r[1] = a[1];
-					if (--dl <= 0)
-						break;
-				case 2:
-					r[2] = a[2];
-					if (--dl <= 0)
-						break;
-				case 3:
-					r[3] = a[3];
-					if (--dl <= 0)
-						break;
-				}
-				a += 4;
-				r += 4;
-			}
-		}
-		if (dl > 0) {
-#ifdef BN_COUNT
-			fprintf(stderr,
-			    "  bn_add_part_words %d + %d (dl > 0, copy)\n",
-			    cl, dl);
-#endif
-			for (;;) {
-				r[0] = a[0];
-				if (--dl <= 0)
-					break;
-				r[1] = a[1];
-				if (--dl <= 0)
-					break;
-				r[2] = a[2];
-				if (--dl <= 0)
-					break;
-				r[3] = a[3];
-				if (--dl <= 0)
-					break;
-
-				a += 4;
-				r += 4;
-			}
-		}
+#ifndef OPENSSL_SMALL_FOOTPRINT
+	while (num & ~3) {
+		bn_mulw_addw(a[0], w, carry, &carry, &r[0]);
+		bn_mulw_addw(a[1], w, carry, &carry, &r[1]);
+		bn_mulw_addw(a[2], w, carry, &carry, &r[2]);
+		bn_mulw_addw(a[3], w, carry, &carry, &r[3]);
+		a += 4;
+		r += 4;
+		num -= 4;
 	}
-	return c;
+#endif
+	while (num) {
+		bn_mulw_addw(a[0], w, carry, &carry, &r[0]);
+		a++;
+		r++;
+		num--;
+	}
+	return carry;
+}
+#endif
+
+/*
+ * bn_mul_add_words() computes (carry:r[i]) = a[i] * w + r[i] + carry, where
+ * a is an array of words and w is a single word. This should really be called
+ * bn_mulw_add_words() since only one input is an array. This is used as a step
+ * in the multiplication of word arrays.
+ */
+#ifndef HAVE_BN_MUL_ADD_WORDS
+BN_ULONG
+bn_mul_add_words(BN_ULONG *r, const BN_ULONG *a, int num, BN_ULONG w)
+{
+	BN_ULONG carry = 0;
+
+	assert(num >= 0);
+	if (num <= 0)
+		return 0;
+
+#ifndef OPENSSL_SMALL_FOOTPRINT
+	while (num & ~3) {
+		bn_mulw_addw_addw(a[0], w, r[0], carry, &carry, &r[0]);
+		bn_mulw_addw_addw(a[1], w, r[1], carry, &carry, &r[1]);
+		bn_mulw_addw_addw(a[2], w, r[2], carry, &carry, &r[2]);
+		bn_mulw_addw_addw(a[3], w, r[3], carry, &carry, &r[3]);
+		a += 4;
+		r += 4;
+		num -= 4;
+	}
+#endif
+	while (num) {
+		bn_mulw_addw_addw(a[0], w, r[0], carry, &carry, &r[0]);
+		a++;
+		r++;
+		num--;
+	}
+
+	return carry;
+}
+#endif
+
+void
+bn_mul_normal(BN_ULONG *r, BN_ULONG *a, int na, BN_ULONG *b, int nb)
+{
+	BN_ULONG *rr;
+
+
+	if (na < nb) {
+		int itmp;
+		BN_ULONG *ltmp;
+
+		itmp = na;
+		na = nb;
+		nb = itmp;
+		ltmp = a;
+		a = b;
+		b = ltmp;
+
+	}
+	rr = &(r[na]);
+	if (nb <= 0) {
+		(void)bn_mul_words(r, a, na, 0);
+		return;
+	} else
+		rr[0] = bn_mul_words(r, a, na, b[0]);
+
+	for (;;) {
+		if (--nb <= 0)
+			return;
+		rr[1] = bn_mul_add_words(&(r[1]), a, na, b[1]);
+		if (--nb <= 0)
+			return;
+		rr[2] = bn_mul_add_words(&(r[2]), a, na, b[2]);
+		if (--nb <= 0)
+			return;
+		rr[3] = bn_mul_add_words(&(r[3]), a, na, b[3]);
+		if (--nb <= 0)
+			return;
+		rr[4] = bn_mul_add_words(&(r[4]), a, na, b[4]);
+		rr += 4;
+		r += 4;
+		b += 4;
+	}
 }
 
 #ifdef BN_RECURSION
@@ -440,9 +337,6 @@ bn_mul_recursive(BN_ULONG *r, BN_ULONG *a, BN_ULONG *b, int n2, int dna,
 	unsigned int neg, zero;
 	BN_ULONG ln, lo, *p;
 
-# ifdef BN_COUNT
-	fprintf(stderr, " bn_mul_recursive %d%+d * %d%+d\n",n2,dna,n2,dnb);
-# endif
 # ifdef BN_MUL_COMBA
 #  if 0
 	if (n2 == 4) {
@@ -472,15 +366,15 @@ bn_mul_recursive(BN_ULONG *r, BN_ULONG *a, BN_ULONG *b, int n2, int dna,
 	zero = neg = 0;
 	switch (c1 * 3 + c2) {
 	case -4:
-		bn_sub_part_words(t, &(a[n]), a, tna, tna - n); /* - */
-		bn_sub_part_words(&(t[n]), b, &(b[n]), tnb, n - tnb); /* - */
+		bn_sub(t, n, &a[n], tna, a, n);	/* - */
+		bn_sub(&t[n], n, b, n, &b[n], tnb);	/* - */
 		break;
 	case -3:
 		zero = 1;
 		break;
 	case -2:
-		bn_sub_part_words(t, &(a[n]), a, tna, tna - n); /* - */
-		bn_sub_part_words(&(t[n]), &(b[n]), b, tnb, tnb - n); /* + */
+		bn_sub(t, n, &a[n], tna, a, n);	/* - */
+		bn_sub(&t[n], n, &b[n], tnb, b, n);	/* + */
 		neg = 1;
 		break;
 	case -1:
@@ -489,16 +383,16 @@ bn_mul_recursive(BN_ULONG *r, BN_ULONG *a, BN_ULONG *b, int n2, int dna,
 		zero = 1;
 		break;
 	case 2:
-		bn_sub_part_words(t, a, &(a[n]), tna, n - tna); /* + */
-		bn_sub_part_words(&(t[n]), b, &(b[n]), tnb, n - tnb); /* - */
+		bn_sub(t, n, a, n, &a[n], tna);	/* + */
+		bn_sub(&t[n], n, b, n, &b[n], tnb);	/* - */
 		neg = 1;
 		break;
 	case 3:
 		zero = 1;
 		break;
 	case 4:
-		bn_sub_part_words(t, a, &(a[n]), tna, n - tna);
-		bn_sub_part_words(&(t[n]), &(b[n]), b, tnb, tnb - n);
+		bn_sub(t, n, a, n, &a[n], tna);
+		bn_sub(&t[n], n, &b[n], tnb, b, n);
 		break;
 	}
 
@@ -587,10 +481,6 @@ bn_mul_part_recursive(BN_ULONG *r, BN_ULONG *a, BN_ULONG *b, int n, int tna,
 	int c1, c2, neg;
 	BN_ULONG ln, lo, *p;
 
-# ifdef BN_COUNT
-	fprintf(stderr, " bn_mul_part_recursive (%d%+d) * (%d%+d)\n",
-	    n, tna, n, tnb);
-# endif
 	if (n < 8) {
 		bn_mul_normal(r, a, n + tna, b, n + tnb);
 		return;
@@ -602,14 +492,14 @@ bn_mul_part_recursive(BN_ULONG *r, BN_ULONG *a, BN_ULONG *b, int n, int tna,
 	neg = 0;
 	switch (c1 * 3 + c2) {
 	case -4:
-		bn_sub_part_words(t, &(a[n]), a, tna, tna - n); /* - */
-		bn_sub_part_words(&(t[n]), b, &(b[n]), tnb, n - tnb); /* - */
+		bn_sub(t, n, &a[n], tna, a, n);		/* - */
+		bn_sub(&t[n], n, b, n, &b[n], tnb);	/* - */
 		break;
 	case -3:
 		/* break; */
 	case -2:
-		bn_sub_part_words(t, &(a[n]), a, tna, tna - n); /* - */
-		bn_sub_part_words(&(t[n]), &(b[n]), b, tnb, tnb - n); /* + */
+		bn_sub(t, n, &a[n], tna, a, n);		/* - */
+		bn_sub(&t[n], n, &b[n], tnb, b, n);	/* + */
 		neg = 1;
 		break;
 	case -1:
@@ -617,15 +507,15 @@ bn_mul_part_recursive(BN_ULONG *r, BN_ULONG *a, BN_ULONG *b, int n, int tna,
 	case 1:
 		/* break; */
 	case 2:
-		bn_sub_part_words(t, a, &(a[n]), tna, n - tna); /* + */
-		bn_sub_part_words(&(t[n]), b, &(b[n]), tnb, n - tnb); /* - */
+		bn_sub(t, n, a, n, &a[n], tna);		/* + */
+		bn_sub(&t[n], n, b, n, &b[n], tnb);	/* - */
 		neg = 1;
 		break;
 	case 3:
 		/* break; */
 	case 4:
-		bn_sub_part_words(t, a, &(a[n]), tna, n - tna);
-		bn_sub_part_words(&(t[n]), &(b[n]), b, tnb, tnb - n);
+		bn_sub(t, n, a, n, &a[n], tna);
+		bn_sub(&t[n], n, &b[n], tnb, b, n);
 		break;
 	}
 		/* The zero case isn't yet implemented here. The speedup
@@ -736,269 +626,34 @@ bn_mul_part_recursive(BN_ULONG *r, BN_ULONG *a, BN_ULONG *b, int n, int tna,
 		}
 	}
 }
-
-/* a and b must be the same size, which is n2.
- * r needs to be n2 words and t needs to be n2*2
- */
-void
-bn_mul_low_recursive(BN_ULONG *r, BN_ULONG *a, BN_ULONG *b, int n2, BN_ULONG *t)
-{
-	int n = n2 / 2;
-
-# ifdef BN_COUNT
-	fprintf(stderr, " bn_mul_low_recursive %d * %d\n",n2,n2);
-# endif
-
-	bn_mul_recursive(r, a, b, n, 0, 0, &(t[0]));
-	if (n >= BN_MUL_LOW_RECURSIVE_SIZE_NORMAL) {
-		bn_mul_low_recursive(&(t[0]), &(a[0]), &(b[n]), n, &(t[n2]));
-		bn_add_words(&(r[n]), &(r[n]), &(t[0]), n);
-		bn_mul_low_recursive(&(t[0]), &(a[n]), &(b[0]), n, &(t[n2]));
-		bn_add_words(&(r[n]), &(r[n]), &(t[0]), n);
-	} else {
-		bn_mul_low_normal(&(t[0]), &(a[0]), &(b[n]), n);
-		bn_mul_low_normal(&(t[n]), &(a[n]), &(b[0]), n);
-		bn_add_words(&(r[n]), &(r[n]), &(t[0]), n);
-		bn_add_words(&(r[n]), &(r[n]), &(t[n]), n);
-	}
-}
-
-/* a and b must be the same size, which is n2.
- * r needs to be n2 words and t needs to be n2*2
- * l is the low words of the output.
- * t needs to be n2*3
- */
-void
-bn_mul_high(BN_ULONG *r, BN_ULONG *a, BN_ULONG *b, BN_ULONG *l, int n2,
-    BN_ULONG *t)
-{
-	int i, n;
-	int c1, c2;
-	int neg, oneg, zero;
-	BN_ULONG ll, lc, *lp, *mp;
-
-# ifdef BN_COUNT
-	fprintf(stderr, " bn_mul_high %d * %d\n",n2,n2);
-# endif
-	n = n2 / 2;
-
-	/* Calculate (al-ah)*(bh-bl) */
-	neg = zero = 0;
-	c1 = bn_cmp_words(&(a[0]), &(a[n]), n);
-	c2 = bn_cmp_words(&(b[n]), &(b[0]), n);
-	switch (c1 * 3 + c2) {
-	case -4:
-		bn_sub_words(&(r[0]), &(a[n]), &(a[0]), n);
-		bn_sub_words(&(r[n]), &(b[0]), &(b[n]), n);
-		break;
-	case -3:
-		zero = 1;
-		break;
-	case -2:
-		bn_sub_words(&(r[0]), &(a[n]), &(a[0]), n);
-		bn_sub_words(&(r[n]), &(b[n]), &(b[0]), n);
-		neg = 1;
-		break;
-	case -1:
-	case 0:
-	case 1:
-		zero = 1;
-		break;
-	case 2:
-		bn_sub_words(&(r[0]), &(a[0]), &(a[n]), n);
-		bn_sub_words(&(r[n]), &(b[0]), &(b[n]), n);
-		neg = 1;
-		break;
-	case 3:
-		zero = 1;
-		break;
-	case 4:
-		bn_sub_words(&(r[0]), &(a[0]), &(a[n]), n);
-		bn_sub_words(&(r[n]), &(b[n]), &(b[0]), n);
-		break;
-	}
-
-	oneg = neg;
-	/* t[10] = (a[0]-a[1])*(b[1]-b[0]) */
-	/* r[10] = (a[1]*b[1]) */
-# ifdef BN_MUL_COMBA
-	if (n == 8) {
-		bn_mul_comba8(&(t[0]), &(r[0]), &(r[n]));
-		bn_mul_comba8(r, &(a[n]), &(b[n]));
-	} else
-# endif
-	{
-		bn_mul_recursive(&(t[0]), &(r[0]), &(r[n]), n, 0, 0, &(t[n2]));
-		bn_mul_recursive(r, &(a[n]), &(b[n]), n, 0, 0, &(t[n2]));
-	}
-
-	/* s0 == low(al*bl)
-	 * s1 == low(ah*bh)+low((al-ah)*(bh-bl))+low(al*bl)+high(al*bl)
-	 * We know s0 and s1 so the only unknown is high(al*bl)
-	 * high(al*bl) == s1 - low(ah*bh+s0+(al-ah)*(bh-bl))
-	 * high(al*bl) == s1 - (r[0]+l[0]+t[0])
-	 */
-	if (l != NULL) {
-		lp = &(t[n2 + n]);
-		c1 = (int)(bn_add_words(lp, &(r[0]), &(l[0]), n));
-	} else {
-		c1 = 0;
-		lp = &(r[0]);
-	}
-
-	if (neg)
-		neg = (int)(bn_sub_words(&(t[n2]), lp, &(t[0]), n));
-	else {
-		bn_add_words(&(t[n2]), lp, &(t[0]), n);
-		neg = 0;
-	}
-
-	if (l != NULL) {
-		bn_sub_words(&(t[n2 + n]), &(l[n]), &(t[n2]), n);
-	} else {
-		lp = &(t[n2 + n]);
-		mp = &(t[n2]);
-		for (i = 0; i < n; i++)
-			lp[i] = ((~mp[i]) + 1) & BN_MASK2;
-	}
-
-	/* s[0] = low(al*bl)
-	 * t[3] = high(al*bl)
-	 * t[10] = (a[0]-a[1])*(b[1]-b[0]) neg is the sign
-	 * r[10] = (a[1]*b[1])
-	 */
-	/* R[10] = al*bl
-	 * R[21] = al*bl + ah*bh + (a[0]-a[1])*(b[1]-b[0])
-	 * R[32] = ah*bh
-	 */
-	/* R[1]=t[3]+l[0]+r[0](+-)t[0] (have carry/borrow)
-	 * R[2]=r[0]+t[3]+r[1](+-)t[1] (have carry/borrow)
-	 * R[3]=r[1]+(carry/borrow)
-	 */
-	if (l != NULL) {
-		lp = &(t[n2]);
-		c1 = (int)(bn_add_words(lp, &(t[n2 + n]), &(l[0]), n));
-	} else {
-		lp = &(t[n2 + n]);
-		c1 = 0;
-	}
-	c1 += (int)(bn_add_words(&(t[n2]), lp, &(r[0]), n));
-	if (oneg)
-		c1 -= (int)(bn_sub_words(&(t[n2]), &(t[n2]), &(t[0]), n));
-	else
-		c1 += (int)(bn_add_words(&(t[n2]), &(t[n2]), &(t[0]), n));
-
-	c2 = (int)(bn_add_words(&(r[0]), &(r[0]), &(t[n2 + n]), n));
-	c2 += (int)(bn_add_words(&(r[0]), &(r[0]), &(r[n]), n));
-	if (oneg)
-		c2 -= (int)(bn_sub_words(&(r[0]), &(r[0]), &(t[n]), n));
-	else
-		c2 += (int)(bn_add_words(&(r[0]), &(r[0]), &(t[n]), n));
-
-	if (c1 != 0) /* Add starting at r[0], could be +ve or -ve */
-	{
-		i = 0;
-		if (c1 > 0) {
-			lc = c1;
-			do {
-				ll = (r[i] + lc) & BN_MASK2;
-				r[i++] = ll;
-				lc = (lc > ll);
-			} while (lc);
-		} else {
-			lc = -c1;
-			do {
-				ll = r[i];
-				r[i++] = (ll - lc) & BN_MASK2;
-				lc = (lc > ll);
-			} while (lc);
-		}
-	}
-	if (c2 != 0) /* Add starting at r[1] */
-	{
-		i = n;
-		if (c2 > 0) {
-			lc = c2;
-			do {
-				ll = (r[i] + lc) & BN_MASK2;
-				r[i++] = ll;
-				lc = (lc > ll);
-			} while (lc);
-		} else {
-			lc = -c2;
-			do {
-				ll = r[i];
-				r[i++] = (ll - lc) & BN_MASK2;
-				lc = (lc > ll);
-			} while (lc);
-		}
-	}
-}
 #endif /* BN_RECURSION */
 
+#ifndef HAVE_BN_MUL
+#ifndef BN_RECURSION
 int
-BN_mul(BIGNUM *r, const BIGNUM *a, const BIGNUM *b, BN_CTX *ctx)
+bn_mul(BIGNUM *r, const BIGNUM *a, const BIGNUM *b, int rn, BN_CTX *ctx)
 {
-	int ret = 0;
-	int top, al, bl;
-	BIGNUM *rr;
-#if defined(BN_MUL_COMBA) || defined(BN_RECURSION)
-	int i;
-#endif
-#ifdef BN_RECURSION
+	bn_mul_normal(r->d, a->d, a->top, b->d, b->top);
+
+	return 1;
+}
+
+#else /* BN_RECURSION */
+int
+bn_mul(BIGNUM *r, const BIGNUM *a, const BIGNUM *b, int rn, BN_CTX *ctx)
+{
 	BIGNUM *t = NULL;
-	int j = 0, k;
-#endif
+	int al, bl, i, k;
+	int j = 0;
+	int ret = 0;
 
-#ifdef BN_COUNT
-	fprintf(stderr, "BN_mul %d * %d\n",a->top,b->top);
-#endif
-
-	bn_check_top(a);
-	bn_check_top(b);
-	bn_check_top(r);
+	BN_CTX_start(ctx);
 
 	al = a->top;
 	bl = b->top;
 
-	if ((al == 0) || (bl == 0)) {
-		BN_zero(r);
-		return (1);
-	}
-	top = al + bl;
-
-	BN_CTX_start(ctx);
-	if ((r == a) || (r == b)) {
-		if ((rr = BN_CTX_get(ctx)) == NULL)
-			goto err;
-	} else
-		rr = r;
-	rr->neg = a->neg ^ b->neg;
-
-#if defined(BN_MUL_COMBA) || defined(BN_RECURSION)
 	i = al - bl;
-#endif
-#ifdef BN_MUL_COMBA
-	if (i == 0) {
-# if 0
-		if (al == 4) {
-			if (bn_wexpand(rr, 8) == NULL)
-				goto err;
-			rr->top = 8;
-			bn_mul_comba4(rr->d, a->d, b->d);
-			goto end;
-		}
-# endif
-		if (al == 8) {
-			if (bn_wexpand(rr, 16) == NULL)
-				goto err;
-			rr->top = 16;
-			bn_mul_comba8(rr->d, a->d, b->d);
-			goto end;
-		}
-	}
-#endif /* BN_MUL_COMBA */
-#ifdef BN_RECURSION
+
 	if ((al >= BN_MULL_SIZE_NORMAL) && (bl >= BN_MULL_SIZE_NORMAL)) {
 		if (i >= -1 && i <= 1) {
 			/* Find out the power of two lower or equal
@@ -1015,36 +670,36 @@ BN_mul(BIGNUM *r, const BIGNUM *a, const BIGNUM *b, BN_CTX *ctx)
 			if ((t = BN_CTX_get(ctx)) == NULL)
 				goto err;
 			if (al > j || bl > j) {
-				if (bn_wexpand(t, k * 4) == NULL)
+				if (!bn_wexpand(t, k * 4))
 					goto err;
-				if (bn_wexpand(rr, k * 4) == NULL)
+				if (!bn_wexpand(r, k * 4))
 					goto err;
-				bn_mul_part_recursive(rr->d, a->d, b->d,
+				bn_mul_part_recursive(r->d, a->d, b->d,
 				    j, al - j, bl - j, t->d);
 			}
 			else	/* al <= j || bl <= j */
 			{
-				if (bn_wexpand(t, k * 2) == NULL)
+				if (!bn_wexpand(t, k * 2))
 					goto err;
-				if (bn_wexpand(rr, k * 2) == NULL)
+				if (!bn_wexpand(r, k * 2))
 					goto err;
-				bn_mul_recursive(rr->d, a->d, b->d,
+				bn_mul_recursive(r->d, a->d, b->d,
 				    j, al - j, bl - j, t->d);
 			}
-			rr->top = top;
+			r->top = rn;
 			goto end;
 		}
 #if 0
 		if (i == 1 && !BN_get_flags(b, BN_FLG_STATIC_DATA)) {
 			BIGNUM *tmp_bn = (BIGNUM *)b;
-			if (bn_wexpand(tmp_bn, al) == NULL)
+			if (!bn_wexpand(tmp_bn, al))
 				goto err;
 			tmp_bn->d[bl] = 0;
 			bl++;
 			i--;
 		} else if (i == -1 && !BN_get_flags(a, BN_FLG_STATIC_DATA)) {
 			BIGNUM *tmp_bn = (BIGNUM *)a;
-			if (bn_wexpand(tmp_bn, bl) == NULL)
+			if (!bn_wexpand(tmp_bn, bl))
 				goto err;
 			tmp_bn->d[al] = 0;
 			al++;
@@ -1060,112 +715,83 @@ BN_mul(BIGNUM *r, const BIGNUM *a, const BIGNUM *b, BN_CTX *ctx)
 				goto err;
 			if (al == j) /* exact multiple */
 			{
-				if (bn_wexpand(t, k * 2) == NULL)
+				if (!bn_wexpand(t, k * 2))
 					goto err;
-				if (bn_wexpand(rr, k * 2) == NULL)
+				if (!bn_wexpand(r, k * 2))
 					goto err;
-				bn_mul_recursive(rr->d, a->d, b->d, al, t->d);
+				bn_mul_recursive(r->d, a->d, b->d, al, t->d);
 			} else {
-				if (bn_wexpand(t, k * 4) == NULL)
+				if (!bn_wexpand(t, k * 4))
 					goto err;
-				if (bn_wexpand(rr, k * 4) == NULL)
+				if (!bn_wexpand(r, k * 4))
 					goto err;
-				bn_mul_part_recursive(rr->d, a->d, b->d,
+				bn_mul_part_recursive(r->d, a->d, b->d,
 				    al - j, j, t->d);
 			}
-			rr->top = top;
+			r->top = top;
 			goto end;
 		}
 #endif
 	}
-#endif /* BN_RECURSION */
-	if (bn_wexpand(rr, top) == NULL)
-		goto err;
-	rr->top = top;
-	bn_mul_normal(rr->d, a->d, al, b->d, bl);
 
-#if defined(BN_MUL_COMBA) || defined(BN_RECURSION)
-end:
-#endif
+	bn_mul_normal(r->d, a->d, al, b->d, bl);
+
+ end:
+	ret = 1;
+ err:
+	BN_CTX_end(ctx);
+
+	return ret;
+}
+#endif /* BN_RECURSION */
+#endif /* HAVE_BN_MUL */
+
+int
+BN_mul(BIGNUM *r, const BIGNUM *a, const BIGNUM *b, BN_CTX *ctx)
+{
+	BIGNUM *rr;
+	int rn;
+	int ret = 0;
+
+	BN_CTX_start(ctx);
+
+	if (BN_is_zero(a) || BN_is_zero(b)) {
+		BN_zero(r);
+		goto done;
+	}
+
+	rr = r;
+	if (rr == a || rr == b)
+		rr = BN_CTX_get(ctx);
+	if (rr == NULL)
+		goto err;
+
+	rn = a->top + b->top;
+	if (rn < a->top)
+		goto err;
+	if (!bn_wexpand(rr, rn))
+		goto err;
+
+	if (a->top == 4 && b->top == 4) {
+		bn_mul_comba4(rr->d, a->d, b->d);
+	} else if (a->top == 8 && b->top == 8) {
+		bn_mul_comba8(rr->d, a->d, b->d);
+	} else {
+		if (!bn_mul(rr, a, b, rn, ctx))
+			goto err;
+	}
+
+	rr->top = rn;
 	bn_correct_top(rr);
+
+	BN_set_negative(rr, a->neg ^ b->neg);
+
 	if (r != rr)
 		BN_copy(r, rr);
+ done:
 	ret = 1;
-err:
-	bn_check_top(r);
+ err:
 	BN_CTX_end(ctx);
-	return (ret);
-}
 
-void
-bn_mul_normal(BN_ULONG *r, BN_ULONG *a, int na, BN_ULONG *b, int nb)
-{
-	BN_ULONG *rr;
-
-#ifdef BN_COUNT
-	fprintf(stderr, " bn_mul_normal %d * %d\n", na, nb);
-#endif
-
-	if (na < nb) {
-		int itmp;
-		BN_ULONG *ltmp;
-
-		itmp = na;
-		na = nb;
-		nb = itmp;
-		ltmp = a;
-		a = b;
-		b = ltmp;
-
-	}
-	rr = &(r[na]);
-	if (nb <= 0) {
-		(void)bn_mul_words(r, a, na, 0);
-		return;
-	} else
-		rr[0] = bn_mul_words(r, a, na, b[0]);
-
-	for (;;) {
-		if (--nb <= 0)
-			return;
-		rr[1] = bn_mul_add_words(&(r[1]), a, na, b[1]);
-		if (--nb <= 0)
-			return;
-		rr[2] = bn_mul_add_words(&(r[2]), a, na, b[2]);
-		if (--nb <= 0)
-			return;
-		rr[3] = bn_mul_add_words(&(r[3]), a, na, b[3]);
-		if (--nb <= 0)
-			return;
-		rr[4] = bn_mul_add_words(&(r[4]), a, na, b[4]);
-		rr += 4;
-		r += 4;
-		b += 4;
-	}
-}
-
-void
-bn_mul_low_normal(BN_ULONG *r, BN_ULONG *a, BN_ULONG *b, int n)
-{
-#ifdef BN_COUNT
-	fprintf(stderr, " bn_mul_low_normal %d * %d\n", n, n);
-#endif
-	bn_mul_words(r, a, n, b[0]);
-
-	for (;;) {
-		if (--n <= 0)
-			return;
-		bn_mul_add_words(&(r[1]), a, n, b[1]);
-		if (--n <= 0)
-			return;
-		bn_mul_add_words(&(r[2]), a, n, b[2]);
-		if (--n <= 0)
-			return;
-		bn_mul_add_words(&(r[3]), a, n, b[3]);
-		if (--n <= 0)
-			return;
-		bn_mul_add_words(&(r[4]), a, n, b[4]);
-		r += 4;
-		b += 4;
-	}
+	return ret;
 }

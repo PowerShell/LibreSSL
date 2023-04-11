@@ -1,4 +1,4 @@
-/* $OpenBSD: p12_kiss.c,v 1.25 2022/08/20 09:16:18 tb Exp $ */
+/* $OpenBSD: p12_kiss.c,v 1.27 2023/02/16 08:38:17 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 1999.
  */
@@ -168,6 +168,7 @@ err:
 
 	return 0;
 }
+LCRYPTO_ALIAS(PKCS12_parse);
 
 /* Parse the outer PKCS#12 structure */
 
