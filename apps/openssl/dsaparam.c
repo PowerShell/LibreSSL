@@ -1,4 +1,4 @@
-/* $OpenBSD: dsaparam.c,v 1.13 2022/01/14 09:24:20 tb Exp $ */
+/* $OpenBSD: dsaparam.c,v 1.15 2023/03/06 14:32:06 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -88,60 +88,60 @@ static struct {
 	char *outfile;
 	int outformat;
 	int text;
-} dsaparam_config;
+} cfg;
 
 static const struct option dsaparam_options[] = {
 	{
 		.name = "C",
 		.desc = "Convert DSA parameters into C code",
 		.type = OPTION_FLAG,
-		.opt.flag = &dsaparam_config.C,
+		.opt.flag = &cfg.C,
 	},
 	{
 		.name = "genkey",
 		.desc = "Generate a DSA key",
 		.type = OPTION_FLAG,
-		.opt.flag = &dsaparam_config.genkey,
+		.opt.flag = &cfg.genkey,
 	},
 	{
 		.name = "in",
 		.argname = "file",
 		.desc = "Input file (default stdin)",
 		.type = OPTION_ARG,
-		.opt.arg = &dsaparam_config.infile,
+		.opt.arg = &cfg.infile,
 	},
 	{
 		.name = "inform",
 		.argname = "format",
 		.desc = "Input format (DER or PEM (default))",
 		.type = OPTION_ARG_FORMAT,
-		.opt.value = &dsaparam_config.informat,
+		.opt.value = &cfg.informat,
 	},
 	{
 		.name = "noout",
 		.desc = "No output",
 		.type = OPTION_FLAG,
-		.opt.flag = &dsaparam_config.noout,
+		.opt.flag = &cfg.noout,
 	},
 	{
 		.name = "out",
 		.argname = "file",
 		.desc = "Output file (default stdout)",
 		.type = OPTION_ARG,
-		.opt.arg = &dsaparam_config.outfile,
+		.opt.arg = &cfg.outfile,
 	},
 	{
 		.name = "outform",
 		.argname = "format",
 		.desc = "Output format (DER or PEM (default))",
 		.type = OPTION_ARG_FORMAT,
-		.opt.value = &dsaparam_config.outformat,
+		.opt.value = &cfg.outformat,
 	},
 	{
 		.name = "text",
 		.desc = "Print as text",
 		.type = OPTION_FLAG,
-		.opt.flag = &dsaparam_config.text,
+		.opt.flag = &cfg.text,
 	},
 	{ NULL },
 };
@@ -169,17 +169,15 @@ dsaparam_main(int argc, char **argv)
 	int numbits = -1;
 	char *strbits = NULL;
 
-	if (single_execution) {
-		if (pledge("stdio cpath wpath rpath", NULL) == -1) {
-			perror("pledge");
-			exit(1);
-		}
+	if (pledge("stdio cpath wpath rpath", NULL) == -1) {
+		perror("pledge");
+		exit(1);
 	}
 
-	memset(&dsaparam_config, 0, sizeof(dsaparam_config));
+	memset(&cfg, 0, sizeof(cfg));
 
-	dsaparam_config.informat = FORMAT_PEM;
-	dsaparam_config.outformat = FORMAT_PEM;
+	cfg.informat = FORMAT_PEM;
+	cfg.outformat = FORMAT_PEM;
 
 	if (options_parse(argc, argv, dsaparam_options, &strbits, NULL) != 0) {
 		dsaparam_usage();
@@ -201,19 +199,19 @@ dsaparam_main(int argc, char **argv)
 		ERR_print_errors(bio_err);
 		goto end;
 	}
-	if (dsaparam_config.infile == NULL)
+	if (cfg.infile == NULL)
 		BIO_set_fp(in, stdin, BIO_NOCLOSE);
 	else {
-		if (BIO_read_filename(in, dsaparam_config.infile) <= 0) {
-			perror(dsaparam_config.infile);
+		if (BIO_read_filename(in, cfg.infile) <= 0) {
+			perror(cfg.infile);
 			goto end;
 		}
 	}
-	if (dsaparam_config.outfile == NULL) {
+	if (cfg.outfile == NULL) {
 		BIO_set_fp(out, stdout, BIO_NOCLOSE);
 	} else {
-		if (BIO_write_filename(out, dsaparam_config.outfile) <= 0) {
-			perror(dsaparam_config.outfile);
+		if (BIO_write_filename(out, cfg.outfile) <= 0) {
+			perror(cfg.outfile);
 			goto end;
 		}
 	}
@@ -239,9 +237,9 @@ dsaparam_main(int argc, char **argv)
 			BIO_printf(bio_err, "Error, DSA key generation failed\n");
 			goto end;
 		}
-	} else if (dsaparam_config.informat == FORMAT_ASN1)
+	} else if (cfg.informat == FORMAT_ASN1)
 		dsa = d2i_DSAparams_bio(in, NULL);
-	else if (dsaparam_config.informat == FORMAT_PEM)
+	else if (cfg.informat == FORMAT_PEM)
 		dsa = PEM_read_bio_DSAparams(in, NULL, NULL, NULL);
 	else {
 		BIO_printf(bio_err, "bad input format specified\n");
@@ -252,10 +250,10 @@ dsaparam_main(int argc, char **argv)
 		ERR_print_errors(bio_err);
 		goto end;
 	}
-	if (dsaparam_config.text) {
+	if (cfg.text) {
 		DSAparams_print(out, dsa);
 	}
-	if (dsaparam_config.C) {
+	if (cfg.C) {
 		unsigned char *data;
 		int l, len, bits_p;
 
@@ -309,10 +307,10 @@ dsaparam_main(int argc, char **argv)
 		printf("\tDSA_set0_pqg(dsa, p, q, g);\n");
 		printf("\treturn(dsa);\n\t}\n");
 	}
-	if (!dsaparam_config.noout) {
-		if (dsaparam_config.outformat == FORMAT_ASN1)
+	if (!cfg.noout) {
+		if (cfg.outformat == FORMAT_ASN1)
 			i = i2d_DSAparams_bio(out, dsa);
-		else if (dsaparam_config.outformat == FORMAT_PEM)
+		else if (cfg.outformat == FORMAT_PEM)
 			i = PEM_write_bio_DSAparams(out, dsa);
 		else {
 			BIO_printf(bio_err, "bad output format specified for outfile\n");
@@ -324,7 +322,7 @@ dsaparam_main(int argc, char **argv)
 			goto end;
 		}
 	}
-	if (dsaparam_config.genkey) {
+	if (cfg.genkey) {
 		DSA *dsakey;
 
 		if ((dsakey = DSAparams_dup(dsa)) == NULL)
@@ -334,9 +332,9 @@ dsaparam_main(int argc, char **argv)
 			DSA_free(dsakey);
 			goto end;
 		}
-		if (dsaparam_config.outformat == FORMAT_ASN1)
+		if (cfg.outformat == FORMAT_ASN1)
 			i = i2d_DSAPrivateKey_bio(out, dsakey);
-		else if (dsaparam_config.outformat == FORMAT_PEM)
+		else if (cfg.outformat == FORMAT_PEM)
 			i = PEM_write_bio_DSAPrivateKey(out, dsakey, NULL, NULL, 0, NULL, NULL);
 		else {
 			BIO_printf(bio_err, "bad output format specified for outfile\n");

@@ -1,4 +1,4 @@
-/* $OpenBSD: bio_local.h,v 1.3 2022/01/14 08:40:57 tb Exp $ */
+/* $OpenBSD: bio_local.h,v 1.5 2022/12/02 19:44:04 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *

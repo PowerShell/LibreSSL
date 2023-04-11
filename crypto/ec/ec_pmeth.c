@@ -1,4 +1,4 @@
-/* $OpenBSD: ec_pmeth.c,v 1.13 2021/12/04 16:08:32 tb Exp $ */
+/* $OpenBSD: ec_pmeth.c,v 1.16 2022/11/26 16:08:52 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2006.
  */
@@ -66,10 +66,10 @@
 #include <openssl/evp.h>
 #include <openssl/x509.h>
 
-#include "bn_lcl.h"
-#include "ec_lcl.h"
-#include "ech_locl.h"
-#include "evp_locl.h"
+#include "bn_local.h"
+#include "ec_local.h"
+#include "ech_local.h"
+#include "evp_local.h"
 
 /* EC pkey context structure */
 
@@ -93,8 +93,8 @@ typedef struct {
 	size_t kdf_outlen;
 } EC_PKEY_CTX;
 
-static int 
-pkey_ec_init(EVP_PKEY_CTX * ctx)
+static int
+pkey_ec_init(EVP_PKEY_CTX *ctx)
 {
 	EC_PKEY_CTX *dctx;
 
@@ -111,8 +111,8 @@ pkey_ec_init(EVP_PKEY_CTX * ctx)
 	return 1;
 }
 
-static int 
-pkey_ec_copy(EVP_PKEY_CTX * dst, EVP_PKEY_CTX * src)
+static int
+pkey_ec_copy(EVP_PKEY_CTX *dst, EVP_PKEY_CTX *src)
 {
 	EC_PKEY_CTX *dctx, *sctx;
 	if (!pkey_ec_init(dst))
@@ -146,8 +146,8 @@ pkey_ec_copy(EVP_PKEY_CTX * dst, EVP_PKEY_CTX * src)
 	return 1;
 }
 
-static void 
-pkey_ec_cleanup(EVP_PKEY_CTX * ctx)
+static void
+pkey_ec_cleanup(EVP_PKEY_CTX *ctx)
 {
 	EC_PKEY_CTX *dctx = ctx->data;
 
@@ -160,8 +160,8 @@ pkey_ec_cleanup(EVP_PKEY_CTX * ctx)
 	}
 }
 
-static int 
-pkey_ec_sign(EVP_PKEY_CTX * ctx, unsigned char *sig, size_t * siglen,
+static int
+pkey_ec_sign(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen,
     const unsigned char *tbs, size_t tbslen)
 {
 	int ret, type;
@@ -188,8 +188,8 @@ pkey_ec_sign(EVP_PKEY_CTX * ctx, unsigned char *sig, size_t * siglen,
 	return 1;
 }
 
-static int 
-pkey_ec_verify(EVP_PKEY_CTX * ctx,
+static int
+pkey_ec_verify(EVP_PKEY_CTX *ctx,
     const unsigned char *sig, size_t siglen,
     const unsigned char *tbs, size_t tbslen)
 {
@@ -207,8 +207,8 @@ pkey_ec_verify(EVP_PKEY_CTX * ctx,
 	return ret;
 }
 
-static int 
-pkey_ec_derive(EVP_PKEY_CTX * ctx, unsigned char *key, size_t * keylen)
+static int
+pkey_ec_derive(EVP_PKEY_CTX *ctx, unsigned char *key, size_t *keylen)
 {
 	int ret;
 	size_t outlen;
@@ -283,8 +283,8 @@ pkey_ec_kdf_derive(EVP_PKEY_CTX *ctx, unsigned char *key, size_t *keylen)
 	return rv;
 }
 
-static int 
-pkey_ec_ctrl(EVP_PKEY_CTX * ctx, int type, int p1, void *p2)
+static int
+pkey_ec_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
 {
 	EC_PKEY_CTX *dctx = ctx->data;
 	EC_GROUP *group;
@@ -410,8 +410,8 @@ pkey_ec_ctrl(EVP_PKEY_CTX * ctx, int type, int p1, void *p2)
 	}
 }
 
-static int 
-pkey_ec_ctrl_str(EVP_PKEY_CTX * ctx, const char *type, const char *value)
+static int
+pkey_ec_ctrl_str(EVP_PKEY_CTX *ctx, const char *type, const char *value)
 {
 	if (!strcmp(type, "ec_paramgen_curve")) {
 		int nid;
@@ -449,8 +449,8 @@ pkey_ec_ctrl_str(EVP_PKEY_CTX * ctx, const char *type, const char *value)
 	return -2;
 }
 
-static int 
-pkey_ec_paramgen(EVP_PKEY_CTX * ctx, EVP_PKEY * pkey)
+static int
+pkey_ec_paramgen(EVP_PKEY_CTX *ctx, EVP_PKEY *pkey)
 {
 	EC_KEY *ec = NULL;
 	EC_PKEY_CTX *dctx = ctx->data;
@@ -470,8 +470,8 @@ pkey_ec_paramgen(EVP_PKEY_CTX * ctx, EVP_PKEY * pkey)
 	return ret;
 }
 
-static int 
-pkey_ec_keygen(EVP_PKEY_CTX * ctx, EVP_PKEY * pkey)
+static int
+pkey_ec_keygen(EVP_PKEY_CTX *ctx, EVP_PKEY *pkey)
 {
 	EC_KEY *ec = NULL;
 	EC_PKEY_CTX *dctx = ctx->data;

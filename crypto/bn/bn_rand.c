@@ -1,4 +1,4 @@
-/* $OpenBSD: bn_rand.c,v 1.25 2021/08/31 11:19:19 tb Exp $ */
+/* $OpenBSD: bn_rand.c,v 1.27 2022/11/26 16:08:51 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -116,7 +116,7 @@
 
 #include <openssl/err.h>
 
-#include "bn_lcl.h"
+#include "bn_local.h"
 
 static int
 bnrand(int pseudorand, BIGNUM *rnd, int bits, int top, int bottom)
@@ -190,7 +190,6 @@ bnrand(int pseudorand, BIGNUM *rnd, int bits, int top, int bottom)
 
 err:
 	freezero(buf, bytes);
-	bn_check_top(rnd);
 	return (ret);
 }
 
@@ -272,7 +271,6 @@ bn_rand_range(int pseudo, BIGNUM *r, const BIGNUM *range)
 		} while (BN_cmp(r, range) >= 0);
 	}
 
-	bn_check_top(r);
 	return 1;
 }
 

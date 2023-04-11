@@ -1,4 +1,4 @@
-/* $OpenBSD: bn_nist.c,v 1.22 2022/07/31 14:38:38 jsing Exp $ */
+/* $OpenBSD: bn_nist.c,v 1.24 2022/11/30 01:47:19 jsing Exp $ */
 /*
  * Written by Nils Larsch for the OpenSSL project
  */
@@ -60,7 +60,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "bn_lcl.h"
+#include "bn_local.h"
 
 #define CTASSERT(x)	extern char  _ctassert[(x) ? 1 : -1 ]   \
 			    __attribute__((__unused__))
@@ -401,9 +401,6 @@ nist_cp_bn_0(BN_ULONG *dst, const BN_ULONG *src, int top, int max)
 {
 	int i;
 
-#ifdef BN_DEBUG
-	OPENSSL_assert(top <= max);
-#endif
 	for (i = 0; i < top; i++)
 		dst[i] = src[i];
 	for (; i < max; i++)

@@ -1,4 +1,4 @@
-/* $OpenBSD: digest.c,v 1.34 2022/01/10 10:51:31 tb Exp $ */
+/* $OpenBSD: digest.c,v 1.36 2022/12/26 07:18:52 jmc Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -122,7 +122,7 @@
 #include <openssl/engine.h>
 #endif
 
-#include "evp_locl.h"
+#include "evp_local.h"
 
 int
 EVP_DigestInit(EVP_MD_CTX *ctx, const EVP_MD *type)
@@ -140,7 +140,7 @@ EVP_DigestInit_ex(EVP_MD_CTX *ctx, const EVP_MD *type, ENGINE *impl)
 	/* Whether it's nice or not, "Inits" can be used on "Final"'d contexts
 	 * so this context may already have an ENGINE! Try to avoid releasing
 	 * the previous handle, re-querying for an ENGINE, and having a
-	 * reinitialisation, when it may all be unecessary. */
+	 * reinitialisation, when it may all be unnecessary. */
 	if (ctx->engine && ctx->digest && (!type ||
 	    (type && (type->type == ctx->digest->type))))
 		goto skip_to_init;

@@ -1,4 +1,4 @@
-/* $OpenBSD: e_aes.c,v 1.49 2022/09/13 04:59:18 jsing Exp $ */
+/* $OpenBSD: e_aes.c,v 1.51 2023/03/01 11:16:06 tb Exp $ */
 /* ====================================================================
  * Copyright (c) 2001-2011 The OpenSSL Project.  All rights reserved.
  *
@@ -60,8 +60,8 @@
 #include <openssl/err.h>
 #include <openssl/evp.h>
 
-#include "evp_locl.h"
-#include "modes_lcl.h"
+#include "evp_local.h"
+#include "modes_local.h"
 
 typedef struct {
 	AES_KEY ks;
@@ -1255,7 +1255,7 @@ EVP_aes_256_ctr(void)
 #endif
 }
 
-static void
+static int
 aes_gcm_cleanup(EVP_CIPHER_CTX *c)
 {
 	EVP_AES_GCM_CTX *gctx = c->cipher_data;
@@ -1264,6 +1264,8 @@ aes_gcm_cleanup(EVP_CIPHER_CTX *c)
 		free(gctx->iv);
 
 	explicit_bzero(gctx, sizeof(*gctx));
+
+	return 1;
 }
 
 /* increment counter (64-bit int) by 1 */

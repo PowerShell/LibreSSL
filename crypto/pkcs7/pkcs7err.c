@@ -1,4 +1,4 @@
-/* $OpenBSD: pkcs7err.c,v 1.13 2022/07/12 14:42:50 kn Exp $ */
+/* $OpenBSD: pkcs7err.c,v 1.15 2023/02/16 08:38:17 tb Exp $ */
 /* ====================================================================
  * Copyright (c) 1999-2007 The OpenSSL Project.  All rights reserved.
  *
@@ -140,3 +140,4 @@ ERR_load_PKCS7_strings(void)
 	}
 #endif
 }
+LCRYPTO_ALIAS(ERR_load_PKCS7_strings);

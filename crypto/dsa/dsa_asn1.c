@@ -1,4 +1,4 @@
-/* $OpenBSD: dsa_asn1.c,v 1.25 2022/09/03 16:01:23 jsing Exp $ */
+/* $OpenBSD: dsa_asn1.c,v 1.29 2023/03/07 09:27:10 jsing Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2000.
  */
@@ -10,7 +10,7 @@
  * are met:
  *
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer. 
+ *    notice, this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in
@@ -64,7 +64,7 @@
 #include <openssl/dsa.h>
 #include <openssl/err.h>
 
-#include "dsa_locl.h"
+#include "dsa_local.h"
 
 /* Override the default new methods */
 static int
@@ -147,9 +147,9 @@ DSA_SIG_set0(DSA_SIG *sig, BIGNUM *r, BIGNUM *s)
 	if (r == NULL || s == NULL)
 		return 0;
 
-	BN_clear_free(sig->r);
+	BN_free(sig->r);
 	sig->r = r;
-	BN_clear_free(sig->s);
+	BN_free(sig->s);
 	sig->s = s;
 
 	return 1;
@@ -399,18 +399,27 @@ DSAparams_dup(DSA *dsa)
 
 int
 DSA_sign(int type, const unsigned char *dgst, int dlen, unsigned char *sig,
-    unsigned int *siglen, DSA *dsa)
+    unsigned int *out_siglen, DSA *dsa)
 {
 	DSA_SIG *s;
+	int siglen;
+	int ret = 0;
 
-	s = DSA_do_sign(dgst, dlen, dsa);
-	if (s == NULL) {
-		*siglen = 0;
-		return 0;
-	}
-	*siglen = i2d_DSA_SIG(s,&sig);
+	*out_siglen = 0;
+
+	if ((s = DSA_do_sign(dgst, dlen, dsa)) == NULL)
+		goto err;
+
+	if ((siglen = i2d_DSA_SIG(s, &sig)) < 0)
+		goto err;
+
+	*out_siglen = siglen;
+
+	ret = 1;
+ err:
 	DSA_SIG_free(s);
-	return 1;
+
+	return ret;
 }
 
 /*
@@ -424,24 +433,26 @@ int
 DSA_verify(int type, const unsigned char *dgst, int dgst_len,
     const unsigned char *sigbuf, int siglen, DSA *dsa)
 {
-	DSA_SIG *s;
+	DSA_SIG *s = NULL;
 	unsigned char *der = NULL;
-	const unsigned char *p = sigbuf;
-	int derlen = -1;
+	const unsigned char *p;
 	int ret = -1;
 
-	s = DSA_SIG_new();
-	if (s == NULL)
-		return ret;
-	if (d2i_DSA_SIG(&s, &p, siglen) == NULL)
+	p = sigbuf;
+	if ((s = d2i_DSA_SIG(NULL, &p, siglen)) == NULL)
 		goto err;
+
 	/* Ensure signature uses DER and doesn't have trailing garbage */
-	derlen = i2d_DSA_SIG(s, &der);
-	if (derlen != siglen || memcmp(sigbuf, der, derlen))
+	if (i2d_DSA_SIG(s, &der) != siglen)
 		goto err;
+
+	if (memcmp(der, sigbuf, siglen) != 0)
+		goto err;
+
 	ret = DSA_do_verify(dgst, dgst_len, s, dsa);
-err:
-	freezero(der, derlen);
+ err:
+	free(der);
 	DSA_SIG_free(s);
+
 	return ret;
 }

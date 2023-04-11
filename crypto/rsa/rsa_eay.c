@@ -1,4 +1,4 @@
-/* $OpenBSD: rsa_eay.c,v 1.54 2022/01/20 11:10:11 inoguchi Exp $ */
+/* $OpenBSD: rsa_eay.c,v 1.56 2022/12/26 07:18:52 jmc Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -118,8 +118,8 @@
 #include <openssl/err.h>
 #include <openssl/rsa.h>
 
-#include "bn_lcl.h"
-#include "rsa_locl.h"
+#include "bn_local.h"
+#include "rsa_local.h"
 
 static int RSA_eay_public_encrypt(int flen, const unsigned char *from,
     unsigned char *to, RSA *rsa, int padding);
@@ -716,7 +716,7 @@ RSA_eay_mod_exp(BIGNUM *r0, const BIGNUM *I, RSA *rsa, BN_CTX *ctx)
 		BIGNUM p, q;
 
 		/*
-		 * Make sure BN_mod_inverse in Montgomery intialization uses the
+		 * Make sure BN_mod_inverse in Montgomery initialization uses the
 		 * BN_FLG_CONSTTIME flag
 		 */
 		BN_init(&p);

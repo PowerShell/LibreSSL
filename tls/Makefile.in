@@ -369,11 +369,13 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AM_CFLAGS = 
-AM_CPPFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/include/compat \
-	-DLIBRESSL_INTERNAL -D__BEGIN_HIDDEN_DECLS= \
-	-D__END_HIDDEN_DECLS=
+AM_CPPFLAGS = -I$(top_srcdir)/include -I$(abs_top_builddir)/include \
+	-I$(top_srcdir)/include/compat -DLIBRESSL_INTERNAL \
+	-D__BEGIN_HIDDEN_DECLS= -D__END_HIDDEN_DECLS=
 lib_LTLIBRARIES = libtls.la
-EXTRA_DIST = VERSION CMakeLists.txt tls.sym
+EXTRA_DIST = VERSION CMakeLists.txt tls.sym empty.c
+CLEANFILES = libtls_la_objects.mk
+EXTRA_libtls_la_DEPENDENCIES = libtls_la_objects.mk
 libtls_la_LDFLAGS = -version-info @LIBTLS_VERSION@ -no-undefined -export-symbols $(top_srcdir)/tls/tls.sym
 libtls_la_LIBADD = $(libcrypto_la_objects) $(libcompat_la_objects) \
 	$(libcompatnoopt_la_objects) $(libssl_la_objects) \
@@ -747,6 +749,7 @@ install-strip:
 mostlyclean-generic:
 
 clean-generic:
+	-test -z "$(CLEANFILES)" || rm -f $(CLEANFILES)
 
 distclean-generic:
 	-test -z "$(CONFIG_CLEAN_FILES)" || rm -f $(CONFIG_CLEAN_FILES)
@@ -877,6 +880,11 @@ uninstall-am: uninstall-libLTLIBRARIES
 
 -include $(abs_top_builddir)/crypto/libcrypto_la_objects.mk
 -include $(abs_top_builddir)/ssl/libssl_la_objects.mk
+
+libtls_la_objects.mk: Makefile
+	@echo "libtls_la_objects= $(libtls_la_OBJECTS)" \
+	  | sed 's/  */ $$\(abs_top_builddir\)\/tls\//g' \
+	  > libtls_la_objects.mk
 
 # Tell versions [3.59,3.63) of GNU make to not export all variables.
 # Otherwise a system limit (for SysV at least) may be exceeded.

@@ -1,11 +1,11 @@
 include $(top_srcdir)/Makefile.am.common
 
 AM_CPPFLAGS += -DLIBRESSL_CRYPTO_INTERNAL
-
 AM_CPPFLAGS += -I$(top_srcdir)/crypto/asn1
 AM_CPPFLAGS += -I$(top_srcdir)/crypto/bio
 AM_CPPFLAGS += -I$(top_srcdir)/crypto/bn
 AM_CPPFLAGS += -I$(top_srcdir)/crypto/bytestring
+AM_CPPFLAGS += -I$(top_srcdir)/crypto/curve25519
 AM_CPPFLAGS += -I$(top_srcdir)/crypto/dh
 AM_CPPFLAGS += -I$(top_srcdir)/crypto/dsa
 AM_CPPFLAGS += -I$(top_srcdir)/crypto/ec
@@ -31,6 +31,7 @@ endif
 EXTRA_DIST = VERSION
 EXTRA_DIST += CMakeLists.txt
 EXTRA_DIST += crypto.sym
+EXTRA_DIST += empty.c
 
 # needed for a CMake target
 EXTRA_DIST += compat/strcasecmp.c
@@ -132,13 +133,9 @@ libcrypto_la_LIBADD = libcompat.la
 if !HAVE_EXPLICIT_BZERO
 libcrypto_la_LIBADD += libcompatnoopt.la
 endif
-libcrypto_la_CPPFLAGS = $(AM_CPPFLAGS)
+libcrypto_la_CPPFLAGS = -I$(top_srcdir)/crypto/hidden ${AM_CPPFLAGS}
 libcrypto_la_CPPFLAGS += -DLIBRESSL_INTERNAL
 libcrypto_la_CPPFLAGS += -DOPENSSL_NO_HW_PADLOCK
-if OPENSSL_NO_ASM
-libcrypto_la_CPPFLAGS += -DOPENSSL_NO_ASM
-else
-endif
 
 if OPENSSLDIR_DEFINED
 libcrypto_la_CPPFLAGS += -DOPENSSLDIR=\"@OPENSSLDIR@\"
@@ -246,16 +243,21 @@ libcrypto_la_SOURCES =
 EXTRA_libcrypto_la_SOURCES =
 
 include Makefile.am.elf-arm
+include Makefile.am.elf-mips
+include Makefile.am.elf-mips64
 include Makefile.am.elf-x86_64
 include Makefile.am.macosx-x86_64
 include Makefile.am.masm-x86_64
 include Makefile.am.mingw64-x86_64
 
 if !HOST_ASM_ELF_ARM
+if !HOST_ASM_ELF_MIPS
+if !HOST_ASM_ELF_MIPS64
 if !HOST_ASM_ELF_X86_64
 if !HOST_ASM_MACOSX_X86_64
 if !HOST_ASM_MASM_X86_64
 if !HOST_ASM_MINGW64_X86_64
+libcrypto_la_CPPFLAGS += -DOPENSSL_NO_ASM
 libcrypto_la_SOURCES += aes/aes_cbc.c
 libcrypto_la_SOURCES += aes/aes_core.c
 libcrypto_la_SOURCES += camellia/camellia.c
@@ -263,6 +265,8 @@ libcrypto_la_SOURCES += camellia/cmll_cbc.c
 libcrypto_la_SOURCES += rc4/rc4_enc.c
 libcrypto_la_SOURCES += rc4/rc4_skey.c
 libcrypto_la_SOURCES += whrlpool/wp_block.c
+endif
+endif
 endif
 endif
 endif
@@ -285,12 +289,10 @@ libcrypto_la_SOURCES += mem_dbg.c
 libcrypto_la_SOURCES += o_fips.c
 libcrypto_la_SOURCES += o_init.c
 libcrypto_la_SOURCES += o_str.c
-libcrypto_la_SOURCES += o_time.c
 noinst_HEADERS += arm_arch.h
-noinst_HEADERS += constant_time_locl.h
+noinst_HEADERS += constant_time.h
 noinst_HEADERS += cryptlib.h
 noinst_HEADERS += md32_common.h
-noinst_HEADERS += o_time.h
 noinst_HEADERS += x86_arch.h
 
 # aes
@@ -301,7 +303,7 @@ libcrypto_la_SOURCES += aes/aes_ige.c
 libcrypto_la_SOURCES += aes/aes_misc.c
 libcrypto_la_SOURCES += aes/aes_ofb.c
 libcrypto_la_SOURCES += aes/aes_wrap.c
-noinst_HEADERS += aes/aes_locl.h
+noinst_HEADERS += aes/aes_local.h
 
 # asn1
 libcrypto_la_SOURCES += asn1/a_bitstr.c
@@ -317,6 +319,7 @@ libcrypto_la_SOURCES += asn1/a_strex.c
 libcrypto_la_SOURCES += asn1/a_string.c
 libcrypto_la_SOURCES += asn1/a_strnid.c
 libcrypto_la_SOURCES += asn1/a_time.c
+libcrypto_la_SOURCES += asn1/a_time_posix.c
 libcrypto_la_SOURCES += asn1/a_time_tm.c
 libcrypto_la_SOURCES += asn1/a_type.c
 libcrypto_la_SOURCES += asn1/a_utf8.c
@@ -366,7 +369,7 @@ libcrypto_la_SOURCES += asn1/x_spki.c
 libcrypto_la_SOURCES += asn1/x_val.c
 libcrypto_la_SOURCES += asn1/x_x509.c
 libcrypto_la_SOURCES += asn1/x_x509a.c
-noinst_HEADERS += asn1/asn1_locl.h
+noinst_HEADERS += asn1/asn1_local.h
 noinst_HEADERS += asn1/charmap.h
 
 # bf
@@ -375,8 +378,7 @@ libcrypto_la_SOURCES += bf/bf_ecb.c
 libcrypto_la_SOURCES += bf/bf_enc.c
 libcrypto_la_SOURCES += bf/bf_ofb64.c
 libcrypto_la_SOURCES += bf/bf_skey.c
-noinst_HEADERS += bf/bf_locl.h
-noinst_HEADERS += bf/bf_pi.h
+noinst_HEADERS += bf/bf_local.h
 
 # bio
 libcrypto_la_SOURCES += bio/b_dump.c
@@ -411,16 +413,13 @@ noinst_HEADERS += bio/bio_local.h
 
 # bn
 libcrypto_la_SOURCES += bn/bn_add.c
-libcrypto_la_SOURCES += bn/bn_asm.c
 libcrypto_la_SOURCES += bn/bn_blind.c
 libcrypto_la_SOURCES += bn/bn_bpsw.c
 libcrypto_la_SOURCES += bn/bn_const.c
 libcrypto_la_SOURCES += bn/bn_ctx.c
-libcrypto_la_SOURCES += bn/bn_depr.c
 libcrypto_la_SOURCES += bn/bn_div.c
 libcrypto_la_SOURCES += bn/bn_err.c
 libcrypto_la_SOURCES += bn/bn_exp.c
-libcrypto_la_SOURCES += bn/bn_exp2.c
 libcrypto_la_SOURCES += bn/bn_gcd.c
 libcrypto_la_SOURCES += bn/bn_gf2m.c
 libcrypto_la_SOURCES += bn/bn_isqrt.c
@@ -436,12 +435,67 @@ libcrypto_la_SOURCES += bn/bn_print.c
 libcrypto_la_SOURCES += bn/bn_rand.c
 libcrypto_la_SOURCES += bn/bn_recp.c
 libcrypto_la_SOURCES += bn/bn_shift.c
+libcrypto_la_SOURCES += bn/bn_small_primes.c
 libcrypto_la_SOURCES += bn/bn_sqr.c
 libcrypto_la_SOURCES += bn/bn_sqrt.c
 libcrypto_la_SOURCES += bn/bn_word.c
 libcrypto_la_SOURCES += bn/bn_x931p.c
-noinst_HEADERS += bn/bn_lcl.h
+noinst_HEADERS += bn/bn_internal.h
+noinst_HEADERS += bn/bn_local.h
 noinst_HEADERS += bn/bn_prime.h
+noinst_HEADERS += bn/s2n_bignum.h
+noinst_HEADERS += bn/s2n_bignum_internal.h
+
+# bn/arch
+if HOST_AARCH64
+libcrypto_la_CPPFLAGS += -I$(top_srcdir)/crypto/bn/arch/aarch64/
+endif
+noinst_HEADERS += bn/arch/aarch64/bn_arch.h
+
+if HOST_ARM
+libcrypto_la_CPPFLAGS += -I$(top_srcdir)/crypto/bn/arch/arm/
+endif
+noinst_HEADERS += bn/arch/arm/bn_arch.h
+
+if HOST_I386
+libcrypto_la_CPPFLAGS += -I$(top_srcdir)/crypto/bn/arch/i386/
+endif
+noinst_HEADERS += bn/arch/i386/bn_arch.h
+
+if HOST_MIPS
+libcrypto_la_CPPFLAGS += -I$(top_srcdir)/crypto/bn/arch/mips/
+endif
+noinst_HEADERS += bn/arch/mips/bn_arch.h
+
+if HOST_MIPS64
+libcrypto_la_CPPFLAGS += -I$(top_srcdir)/crypto/bn/arch/mips64/
+endif
+noinst_HEADERS += bn/arch/mips64/bn_arch.h
+
+if HOST_POWERPC
+libcrypto_la_CPPFLAGS += -I$(top_srcdir)/crypto/bn/arch/powerpc/
+endif
+noinst_HEADERS += bn/arch/powerpc/bn_arch.h
+
+if HOST_POWERPC64
+libcrypto_la_CPPFLAGS += -I$(top_srcdir)/crypto/bn/arch/powerpc64/
+endif
+noinst_HEADERS += bn/arch/powerpc64/bn_arch.h
+
+if HOST_RISCV64
+libcrypto_la_CPPFLAGS += -I$(top_srcdir)/crypto/bn/arch/riscv64/
+endif
+noinst_HEADERS += bn/arch/riscv64/bn_arch.h
+
+if HOST_SPARC64
+libcrypto_la_CPPFLAGS += -I$(top_srcdir)/crypto/bn/arch/sparc64/
+endif
+noinst_HEADERS += bn/arch/sparc64/bn_arch.h
+
+if HOST_X86_64
+libcrypto_la_CPPFLAGS += -I$(top_srcdir)/crypto/bn/arch/amd64/
+endif
+noinst_HEADERS += bn/arch/amd64/bn_arch.h
 
 # buffer
 libcrypto_la_SOURCES += buffer/buf_err.c
@@ -461,7 +515,7 @@ libcrypto_la_SOURCES += camellia/cmll_ecb.c
 libcrypto_la_SOURCES += camellia/cmll_misc.c
 libcrypto_la_SOURCES += camellia/cmll_ofb.c
 noinst_HEADERS += camellia/camellia.h
-noinst_HEADERS += camellia/cmll_locl.h
+noinst_HEADERS += camellia/cmll_local.h
 
 # cast
 libcrypto_la_SOURCES += cast/c_cfb64.c
@@ -469,7 +523,7 @@ libcrypto_la_SOURCES += cast/c_ecb.c
 libcrypto_la_SOURCES += cast/c_enc.c
 libcrypto_la_SOURCES += cast/c_ofb64.c
 libcrypto_la_SOURCES += cast/c_skey.c
-noinst_HEADERS += cast/cast_lcl.h
+noinst_HEADERS += cast/cast_local.h
 noinst_HEADERS += cast/cast_s.h
 
 # chacha
@@ -496,7 +550,7 @@ libcrypto_la_SOURCES += cms/cms_lib.c
 libcrypto_la_SOURCES += cms/cms_pwri.c
 libcrypto_la_SOURCES += cms/cms_sd.c
 libcrypto_la_SOURCES += cms/cms_smime.c
-noinst_HEADERS += cms/cms_lcl.h
+noinst_HEADERS += cms/cms_local.h
 
 # comp
 libcrypto_la_SOURCES += comp/c_rle.c
@@ -558,7 +612,7 @@ libcrypto_la_SOURCES += des/rand_key.c
 libcrypto_la_SOURCES += des/set_key.c
 libcrypto_la_SOURCES += des/str2key.c
 libcrypto_la_SOURCES += des/xcbc_enc.c
-noinst_HEADERS += des/des_locl.h
+noinst_HEADERS += des/des_local.h
 noinst_HEADERS += des/spr.h
 
 # dh
@@ -586,9 +640,7 @@ libcrypto_la_SOURCES += dsa/dsa_meth.c
 libcrypto_la_SOURCES += dsa/dsa_ossl.c
 libcrypto_la_SOURCES += dsa/dsa_pmeth.c
 libcrypto_la_SOURCES += dsa/dsa_prn.c
-libcrypto_la_SOURCES += dsa/dsa_sign.c
-libcrypto_la_SOURCES += dsa/dsa_vrf.c
-noinst_HEADERS += dsa/dsa_locl.h
+noinst_HEADERS += dsa/dsa_local.h
 
 # dso
 libcrypto_la_SOURCES += dso/dso_dlfcn.c
@@ -619,14 +671,15 @@ libcrypto_la_SOURCES += ec/ecp_mont.c
 libcrypto_la_SOURCES += ec/ecp_nist.c
 libcrypto_la_SOURCES += ec/ecp_oct.c
 libcrypto_la_SOURCES += ec/ecp_smpl.c
-noinst_HEADERS += ec/ec_lcl.h
+libcrypto_la_SOURCES += ec/ecx_methods.c
+noinst_HEADERS += ec/ec_local.h
 
 # ecdh
 libcrypto_la_SOURCES += ecdh/ecdh_kdf.c
 libcrypto_la_SOURCES += ecdh/ech_err.c
 libcrypto_la_SOURCES += ecdh/ech_key.c
 libcrypto_la_SOURCES += ecdh/ech_lib.c
-noinst_HEADERS += ecdh/ech_locl.h
+noinst_HEADERS += ecdh/ech_local.h
 
 # ecdsa
 libcrypto_la_SOURCES += ecdsa/ecs_asn1.c
@@ -635,7 +688,7 @@ libcrypto_la_SOURCES += ecdsa/ecs_lib.c
 libcrypto_la_SOURCES += ecdsa/ecs_ossl.c
 libcrypto_la_SOURCES += ecdsa/ecs_sign.c
 libcrypto_la_SOURCES += ecdsa/ecs_vrf.c
-noinst_HEADERS += ecdsa/ecs_locl.h
+noinst_HEADERS += ecdsa/ecs_local.h
 
 # engine
 libcrypto_la_SOURCES += engine/eng_all.c
@@ -674,6 +727,7 @@ libcrypto_la_SOURCES += evp/bio_b64.c
 libcrypto_la_SOURCES += evp/bio_enc.c
 libcrypto_la_SOURCES += evp/bio_md.c
 libcrypto_la_SOURCES += evp/c_all.c
+libcrypto_la_SOURCES += evp/cipher_method_lib.c
 libcrypto_la_SOURCES += evp/digest.c
 libcrypto_la_SOURCES += evp/e_aes.c
 libcrypto_la_SOURCES += evp/e_aes_cbc_hmac_sha1.c
@@ -726,7 +780,7 @@ libcrypto_la_SOURCES += evp/p_verify.c
 libcrypto_la_SOURCES += evp/pmeth_fn.c
 libcrypto_la_SOURCES += evp/pmeth_gn.c
 libcrypto_la_SOURCES += evp/pmeth_lib.c
-noinst_HEADERS += evp/evp_locl.h
+noinst_HEADERS += evp/evp_local.h
 
 # gost
 libcrypto_la_SOURCES += gost/gost2814789.c
@@ -744,7 +798,18 @@ libcrypto_la_SOURCES += gost/gostr341001_pmeth.c
 libcrypto_la_SOURCES += gost/gostr341194.c
 libcrypto_la_SOURCES += gost/streebog.c
 noinst_HEADERS += gost/gost_asn1.h
-noinst_HEADERS += gost/gost_locl.h
+noinst_HEADERS += gost/gost_local.h
+
+# hidden
+noinst_HEADERS += hidden/crypto_namespace.h
+noinst_HEADERS += hidden/openssl/hmac.h
+noinst_HEADERS += hidden/openssl/pkcs12.h
+noinst_HEADERS += hidden/openssl/pkcs7.h
+noinst_HEADERS += hidden/openssl/stack.h
+noinst_HEADERS += hidden/openssl/ui.h
+noinst_HEADERS += hidden/openssl/x509.h
+noinst_HEADERS += hidden/openssl/x509_vfy.h
+noinst_HEADERS += hidden/openssl/x509v3.h
 
 # hkdf
 libcrypto_la_SOURCES += hkdf/hkdf.c
@@ -761,7 +826,7 @@ libcrypto_la_SOURCES += idea/i_cfb64.c
 libcrypto_la_SOURCES += idea/i_ecb.c
 libcrypto_la_SOURCES += idea/i_ofb64.c
 libcrypto_la_SOURCES += idea/i_skey.c
-noinst_HEADERS += idea/idea_lcl.h
+noinst_HEADERS += idea/idea_local.h
 
 # kdf
 libcrypto_la_SOURCES += kdf/hkdf_evp.c
@@ -774,12 +839,12 @@ libcrypto_la_SOURCES += lhash/lhash.c
 # md4
 libcrypto_la_SOURCES += md4/md4_dgst.c
 libcrypto_la_SOURCES += md4/md4_one.c
-noinst_HEADERS += md4/md4_locl.h
+noinst_HEADERS += md4/md4_local.h
 
 # md5
 libcrypto_la_SOURCES += md5/md5_dgst.c
 libcrypto_la_SOURCES += md5/md5_one.c
-noinst_HEADERS += md5/md5_locl.h
+noinst_HEADERS += md5/md5_local.h
 
 # modes
 libcrypto_la_SOURCES += modes/cbc128.c
@@ -790,7 +855,7 @@ libcrypto_la_SOURCES += modes/cts128.c
 libcrypto_la_SOURCES += modes/gcm128.c
 libcrypto_la_SOURCES += modes/ofb128.c
 libcrypto_la_SOURCES += modes/xts128.c
-noinst_HEADERS += modes/modes_lcl.h
+noinst_HEADERS += modes/modes_local.h
 
 # objects
 libcrypto_la_SOURCES += objects/o_names.c
@@ -870,15 +935,15 @@ libcrypto_la_SOURCES += rc2/rc2_ecb.c
 libcrypto_la_SOURCES += rc2/rc2_skey.c
 libcrypto_la_SOURCES += rc2/rc2cfb64.c
 libcrypto_la_SOURCES += rc2/rc2ofb64.c
-noinst_HEADERS += rc2/rc2_locl.h
+noinst_HEADERS += rc2/rc2_local.h
 
 # rc4
-noinst_HEADERS += rc4/rc4_locl.h
+noinst_HEADERS += rc4/rc4_local.h
 
 # ripemd
 libcrypto_la_SOURCES += ripemd/rmd_dgst.c
 libcrypto_la_SOURCES += ripemd/rmd_one.c
-noinst_HEADERS += ripemd/rmd_locl.h
+noinst_HEADERS += ripemd/rmd_local.h
 noinst_HEADERS += ripemd/rmdconst.h
 
 # rsa
@@ -901,18 +966,18 @@ libcrypto_la_SOURCES += rsa/rsa_pss.c
 libcrypto_la_SOURCES += rsa/rsa_saos.c
 libcrypto_la_SOURCES += rsa/rsa_sign.c
 libcrypto_la_SOURCES += rsa/rsa_x931.c
-noinst_HEADERS += rsa/rsa_locl.h
+noinst_HEADERS += rsa/rsa_local.h
 
 # sha
 libcrypto_la_SOURCES += sha/sha1_one.c
 libcrypto_la_SOURCES += sha/sha1dgst.c
 libcrypto_la_SOURCES += sha/sha256.c
 libcrypto_la_SOURCES += sha/sha512.c
-noinst_HEADERS += sha/sha_locl.h
+noinst_HEADERS += sha/sha_local.h
 
 # sm3
 libcrypto_la_SOURCES += sm3/sm3.c
-noinst_HEADERS += sm3/sm3_locl.h
+noinst_HEADERS += sm3/sm3_local.h
 
 # sm4
 libcrypto_la_SOURCES += sm4/sm4.c
@@ -940,6 +1005,7 @@ libcrypto_la_SOURCES += txt_db/txt_db.c
 # ui
 libcrypto_la_SOURCES += ui/ui_err.c
 libcrypto_la_SOURCES += ui/ui_lib.c
+libcrypto_la_SOURCES += ui/ui_null.c
 if !HOST_WIN
 libcrypto_la_SOURCES += ui/ui_openssl.c
 endif
@@ -947,11 +1013,11 @@ if HOST_WIN
 libcrypto_la_SOURCES += ui/ui_openssl_win.c
 endif
 libcrypto_la_SOURCES += ui/ui_util.c
-noinst_HEADERS += ui/ui_locl.h
+noinst_HEADERS += ui/ui_local.h
 
 # whrlpool
 libcrypto_la_SOURCES += whrlpool/wp_dgst.c
-noinst_HEADERS += whrlpool/wp_locl.h
+noinst_HEADERS += whrlpool/wp_local.h
 
 # x509
 libcrypto_la_SOURCES += x509/by_dir.c
@@ -1022,4 +1088,5 @@ noinst_HEADERS += x509/pcy_int.h
 noinst_HEADERS += x509/vpm_int.h
 noinst_HEADERS += x509/x509_internal.h
 noinst_HEADERS += x509/x509_issuer_cache.h
-noinst_HEADERS += x509/x509_lcl.h
+noinst_HEADERS += x509/x509_local.h
+noinst_HEADERS += x509/x509_verify.h

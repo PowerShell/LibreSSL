@@ -588,6 +588,7 @@ whirlpool_block:
 	retq
 .size	whirlpool_block,.-whirlpool_block
 
+.section	.rodata
 .align	64
 .type	.Ltable,@object
 .Ltable:

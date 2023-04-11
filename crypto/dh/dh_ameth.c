@@ -1,4 +1,4 @@
-/* $OpenBSD: dh_ameth.c,v 1.24 2022/06/27 12:36:05 tb Exp $ */
+/* $OpenBSD: dh_ameth.c,v 1.26 2022/12/26 07:18:51 jmc Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2006.
  */
@@ -64,9 +64,9 @@
 #include <openssl/err.h>
 #include <openssl/x509.h>
 
-#include "asn1_locl.h"
+#include "asn1_local.h"
 #include "dh_local.h"
-#include "evp_locl.h"
+#include "evp_local.h"
 
 static void
 int_dh_free(EVP_PKEY *pkey)
@@ -177,7 +177,7 @@ err:
 
 /*
  * PKCS#8 DH is defined in PKCS#11 of all places. It is similar to DH in
- * that the AlgorithmIdentifier contains the paramaters, the private key
+ * that the AlgorithmIdentifier contains the parameters, the private key
  * is explcitly included and the pubkey must be recalculated.
  */
 

@@ -1,4 +1,4 @@
-/* $OpenBSD: ec_print.c,v 1.7 2014/12/03 19:53:20 deraadt Exp $ */
+/* $OpenBSD: ec_print.c,v 1.11 2023/03/08 05:45:31 jsing Exp $ */
 /* ====================================================================
  * Copyright (c) 1998-2002 The OpenSSL Project.  All rights reserved.
  *
@@ -54,11 +54,11 @@
  */
 
 #include <openssl/crypto.h>
-#include "ec_lcl.h"
+#include "ec_local.h"
 
 BIGNUM *
-EC_POINT_point2bn(const EC_GROUP * group, const EC_POINT * point,
-    point_conversion_form_t form, BIGNUM * ret, BN_CTX * ctx)
+EC_POINT_point2bn(const EC_GROUP *group, const EC_POINT *point,
+    point_conversion_form_t form, BIGNUM *ret, BN_CTX *ctx)
 {
 	size_t buf_len = 0;
 	unsigned char *buf;
@@ -83,8 +83,8 @@ EC_POINT_point2bn(const EC_GROUP * group, const EC_POINT * point,
 }
 
 EC_POINT *
-EC_POINT_bn2point(const EC_GROUP * group,
-    const BIGNUM * bn, EC_POINT * point, BN_CTX * ctx)
+EC_POINT_bn2point(const EC_GROUP *group,
+    const BIGNUM *bn, EC_POINT *point, BN_CTX *ctx)
 {
 	size_t buf_len = 0;
 	unsigned char *buf;
@@ -110,7 +110,7 @@ EC_POINT_bn2point(const EC_GROUP * group,
 
 	if (!EC_POINT_oct2point(group, ret, buf, buf_len, ctx)) {
 		if (point == NULL)
-			EC_POINT_clear_free(ret);
+			EC_POINT_free(ret);
 		free(buf);
 		return NULL;
 	}
@@ -122,8 +122,8 @@ static const char *HEX_DIGITS = "0123456789ABCDEF";
 
 /* the return value must be freed (using free()) */
 char *
-EC_POINT_point2hex(const EC_GROUP * group, const EC_POINT * point,
-    point_conversion_form_t form, BN_CTX * ctx)
+EC_POINT_point2hex(const EC_GROUP *group, const EC_POINT *point,
+    point_conversion_form_t form, BN_CTX *ctx)
 {
 	char *ret, *p;
 	size_t buf_len = 0, i;
@@ -161,8 +161,8 @@ EC_POINT_point2hex(const EC_GROUP * group, const EC_POINT * point,
 }
 
 EC_POINT *
-EC_POINT_hex2point(const EC_GROUP * group, const char *buf,
-    EC_POINT * point, BN_CTX * ctx)
+EC_POINT_hex2point(const EC_GROUP *group, const char *buf,
+    EC_POINT *point, BN_CTX *ctx)
 {
 	EC_POINT *ret = NULL;
 	BIGNUM *tmp_bn = NULL;
@@ -172,7 +172,7 @@ EC_POINT_hex2point(const EC_GROUP * group, const char *buf,
 
 	ret = EC_POINT_bn2point(group, tmp_bn, point, ctx);
 
-	BN_clear_free(tmp_bn);
+	BN_free(tmp_bn);
 
 	return ret;
 }

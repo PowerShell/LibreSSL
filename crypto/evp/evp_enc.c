@@ -1,4 +1,4 @@
-/* $OpenBSD: evp_enc.c,v 1.47 2022/09/13 04:59:18 jsing Exp $ */
+/* $OpenBSD: evp_enc.c,v 1.50 2023/03/01 11:16:06 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -72,7 +72,7 @@
 #include <openssl/engine.h>
 #endif
 
-#include "evp_locl.h"
+#include "evp_local.h"
 
 int
 EVP_CipherInit(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *cipher,
@@ -98,7 +98,7 @@ EVP_CipherInit_ex(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *cipher, ENGINE *impl,
 	/* Whether it's nice or not, "Inits" can be used on "Final"'d contexts
 	 * so this context may already have an ENGINE! Try to avoid releasing
 	 * the previous handle, re-querying for an ENGINE, and having a
-	 * reinitialisation, when it may all be unecessary. */
+	 * reinitialisation, when it may all be unnecessary. */
 	if (ctx->engine && ctx->cipher &&
 	    (!cipher || (cipher && (cipher->nid == ctx->cipher->nid))))
 		goto skip_to_init;
@@ -601,6 +601,7 @@ int
 EVP_CIPHER_CTX_cleanup(EVP_CIPHER_CTX *c)
 {
 	if (c->cipher != NULL) {
+		/* XXX - Avoid leaks, so ignore return value of cleanup()... */
 		if (c->cipher->cleanup != NULL)
 			c->cipher->cleanup(c);
 		if (c->cipher_data != NULL)

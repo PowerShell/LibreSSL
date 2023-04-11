@@ -349,9 +349,9 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AM_CFLAGS = 
-AM_CPPFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/include/compat \
-	-DLIBRESSL_INTERNAL -D__BEGIN_HIDDEN_DECLS= \
-	-D__END_HIDDEN_DECLS=
+AM_CPPFLAGS = -I$(top_srcdir)/include -I$(abs_top_builddir)/include \
+	-I$(top_srcdir)/include/compat -DLIBRESSL_INTERNAL \
+	-D__BEGIN_HIDDEN_DECLS= -D__END_HIDDEN_DECLS=
 @ENABLE_LIBTLS_ONLY_FALSE@dist_man_MANS = ocspcheck.8
 EXTRA_DIST = ocspcheck.8 CMakeLists.txt
 ocspcheck_LDADD = $(abs_top_builddir)/crypto/libcrypto.la \

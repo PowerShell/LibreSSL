@@ -15,6 +15,7 @@ noinst_DATA = remove_bs_objects
 EXTRA_DIST = VERSION
 EXTRA_DIST += CMakeLists.txt
 EXTRA_DIST += ssl.sym
+EXTRA_DIST += empty.c
 
 CLEANFILES = libssl_la_objects.mk
 
@@ -30,6 +31,7 @@ remove_bs_objects: libssl.la
 	-$(AR) dv $(abs_top_builddir)/ssl/.libs/libssl.a \
 	    bs_ber.o bs_cbb.o bs_cbs.o
 
+libssl_la_CPPFLAGS = -I$(top_srcdir)/ssl/hidden ${AM_CPPFLAGS}
 libssl_la_LDFLAGS = -version-info @LIBSSL_VERSION@ -no-undefined -export-symbols $(top_srcdir)/ssl/ssl.sym
 libssl_la_LIBADD = $(abs_top_builddir)/crypto/libcrypto.la $(PLATFORM_LDADD)
 libssl_la_LIBADD += libbs.la
@@ -38,6 +40,9 @@ libbs_la_SOURCES = bs_ber.c
 libbs_la_SOURCES += bs_cbb.c
 libbs_la_SOURCES += bs_cbs.c
 noinst_HEADERS = bytestring.h
+
+noinst_HEADERS += hidden/ssl_namespace.h
+noinst_HEADERS += hidden/openssl/ssl.h
 
 libssl_la_SOURCES = bio_ssl.c
 libssl_la_SOURCES += d1_both.c
@@ -93,12 +98,13 @@ libssl_la_SOURCES += tls13_record_layer.c
 libssl_la_SOURCES += tls13_server.c
 
 noinst_HEADERS += srtp.h
-noinst_HEADERS += dtls_locl.h
-noinst_HEADERS += ssl_locl.h
+noinst_HEADERS += dtls_local.h
+noinst_HEADERS += ssl_local.h
 noinst_HEADERS += ssl_sigalgs.h
 noinst_HEADERS += ssl_tlsext.h
 noinst_HEADERS += tls_content.h
 noinst_HEADERS += tls_internal.h
+noinst_HEADERS += tls12_internal.h
 noinst_HEADERS += tls13_internal.h
 noinst_HEADERS += tls13_handshake.h
 noinst_HEADERS += tls13_record.h

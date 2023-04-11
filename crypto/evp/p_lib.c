@@ -1,4 +1,4 @@
-/* $OpenBSD: p_lib.c,v 1.29 2022/06/27 12:36:05 tb Exp $ */
+/* $OpenBSD: p_lib.c,v 1.32 2022/11/26 16:08:53 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -81,8 +81,8 @@
 #include <openssl/engine.h>
 #endif
 
-#include "asn1_locl.h"
-#include "evp_locl.h"
+#include "asn1_local.h"
+#include "evp_local.h"
 
 static void EVP_PKEY_free_it(EVP_PKEY *x);
 
@@ -279,6 +279,96 @@ EVP_PKEY_set_type(EVP_PKEY *pkey, int type)
 }
 
 EVP_PKEY *
+EVP_PKEY_new_raw_private_key(int type, ENGINE *engine,
+    const unsigned char *private_key, size_t len)
+{
+	EVP_PKEY *ret;
+
+	if ((ret = EVP_PKEY_new()) == NULL)
+		goto err;
+
+	if (!pkey_set_type(ret, engine, type, NULL, -1))
+		goto err;
+
+	if (ret->ameth->set_priv_key == NULL) {
+		EVPerror(EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE);
+		goto err;
+	}
+	if (!ret->ameth->set_priv_key(ret, private_key, len)) {
+		EVPerror(EVP_R_KEY_SETUP_FAILED);
+		goto err;
+	}
+
+	return ret;
+
+ err:
+	EVP_PKEY_free(ret);
+
+	return NULL;
+}
+
+EVP_PKEY *
+EVP_PKEY_new_raw_public_key(int type, ENGINE *engine,
+    const unsigned char *public_key, size_t len)
+{
+	EVP_PKEY *ret;
+
+	if ((ret = EVP_PKEY_new()) == NULL)
+		goto err;
+
+	if (!pkey_set_type(ret, engine, type, NULL, -1))
+		goto err;
+
+	if (ret->ameth->set_pub_key == NULL) {
+		EVPerror(EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE);
+		goto err;
+	}
+	if (!ret->ameth->set_pub_key(ret, public_key, len)) {
+		EVPerror(EVP_R_KEY_SETUP_FAILED);
+		goto err;
+	}
+
+	return ret;
+
+ err:
+	EVP_PKEY_free(ret);
+
+	return NULL;
+}
+
+int
+EVP_PKEY_get_raw_private_key(const EVP_PKEY *pkey,
+    unsigned char *out_private_key, size_t *out_len)
+{
+	if (pkey->ameth->get_priv_key == NULL) {
+		EVPerror(EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE);
+		return 0;
+	}
+	if (!pkey->ameth->get_priv_key(pkey, out_private_key, out_len)) {
+		EVPerror(EVP_R_GET_RAW_KEY_FAILED);
+		return 0;
+	}
+
+	return 1;
+}
+
+int
+EVP_PKEY_get_raw_public_key(const EVP_PKEY *pkey,
+    unsigned char *out_public_key, size_t *out_len)
+{
+	if (pkey->ameth->get_pub_key == NULL) {
+		EVPerror(EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE);
+		return 0;
+	}
+	if (!pkey->ameth->get_pub_key(pkey, out_public_key, out_len)) {
+		EVPerror(EVP_R_GET_RAW_KEY_FAILED);
+		return 0;
+	}
+
+	return 1;
+}
+
+EVP_PKEY *
 EVP_PKEY_new_CMAC_key(ENGINE *e, const unsigned char *priv, size_t len,
     const EVP_CIPHER *cipher)
 {
@@ -298,7 +388,7 @@ EVP_PKEY_new_CMAC_key(ENGINE *e, const unsigned char *priv, size_t len,
 		goto err;
 	}
 
-	ret->pkey.ptr = (char *)cmctx;
+	ret->pkey.ptr = cmctx;
 
 	return ret;
 
@@ -581,4 +671,3 @@ EVP_PKEY_get_default_digest_nid(EVP_PKEY *pkey, int *pnid)
 	return pkey->ameth->pkey_ctrl(pkey, ASN1_PKEY_CTRL_DEFAULT_MD_NID,
 	    0, pnid);
 }
-

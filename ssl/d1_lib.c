@@ -1,4 +1,4 @@
-/* $OpenBSD: d1_lib.c,v 1.61 2021/10/23 13:36:03 jsing Exp $ */
+/* $OpenBSD: d1_lib.c,v 1.64 2022/11/26 16:08:55 tb Exp $ */
 /*
  * DTLS implementation written by Nagendra Modadugu
  * (nagendra@cs.stanford.edu) for the OpenSSL project 2005.
@@ -67,9 +67,9 @@
 
 #include <openssl/objects.h>
 
-#include "dtls_locl.h"
+#include "dtls_local.h"
 #include "pqueue.h"
-#include "ssl_locl.h"
+#include "ssl_local.h"
 
 void dtls1_hm_fragment_free(hm_fragment *frag);
 
@@ -102,6 +102,23 @@ dtls1_new(SSL *s)
  err:
 	dtls1_free(s);
 	return (0);
+}
+
+static void
+dtls1_drain_rcontents(pqueue queue)
+{
+	DTLS1_RCONTENT_DATA_INTERNAL *rdata;
+	pitem *item;
+
+	if (queue == NULL)
+		return;
+
+	while ((item = pqueue_pop(queue)) != NULL) {
+		rdata = (DTLS1_RCONTENT_DATA_INTERNAL *)item->data;
+		tls_content_free(rdata->rcontent);
+		free(item->data);
+		pitem_free(item);
+	}
 }
 
 static void
@@ -141,7 +158,7 @@ dtls1_clear_queues(SSL *s)
 	dtls1_drain_records(s->d1->unprocessed_rcds.q);
 	dtls1_drain_fragments(s->d1->buffered_messages);
 	dtls1_drain_fragments(s->d1->sent_messages);
-	dtls1_drain_records(s->d1->buffered_app_data.q);
+	dtls1_drain_rcontents(s->d1->buffered_app_data.q);
 }
 
 void
@@ -187,7 +204,7 @@ dtls1_clear(SSL *s)
 		memset(s->d1, 0, sizeof(*s->d1));
 
 		s->d1->unprocessed_rcds.epoch =
-		    tls12_record_layer_read_epoch(s->internal->rl) + 1;
+		    tls12_record_layer_read_epoch(s->rl) + 1;
 
 		if (s->server) {
 			s->d1->cookie_len = sizeof(s->d1->cookie);

@@ -19,20 +19,128 @@ with relevant portions of the C library, to a Git repository. This makes it
 easier to follow all of the relevant changes to the upstream project in a
 single place:
 
-	https://github.com/libressl-portable/openbsd
+	https://github.com/libressl/openbsd
 
 The portable bits of the project are largely maintained out-of-tree, and their
 history is also available from Git.
 
-	https://github.com/libressl-portable/portable
+	https://github.com/libressl/portable
 
 LibreSSL Portable Release Notes:
 
-3.6.2 - Stable release
+3.7.2 - Stable release
 
-	* Security fix
+	* Portable changes
+	  - Moved official Github project to https://github.com/libressl/.
+	  - Build support for Apple Silicon.
+	  - Installed opensslconf.h is now architecture-specific.
+	  - Removed internal defines from opensslconf.h.
+	  - Support reproducible builds on tagged commits in main branch.
+
+3.7.1 - Development release
+
+	* Internal improvements
+	  - Initial overhaul of the BIGNUM code:
+	    - Added a new framework that allows architecture-dependent
+	      replacement implementations for bignum primitives.
+	    - Imported various s2n-bignum's constant time assembly primitives
+	      and switched amd64 to them.
+	    - Lots of cleanup, simplification and bug fixes.
+	  - Changed Perl assembly generators to move constants into .rodata,
+	    allowing code to run with execute-only permissions.
+	  - Capped the number of iterations in DSA and ECDSA signing (avoiding
+	    infinite loops), added additional sanity checks to DSA.
+	  - ASN.1 parsing improvements.
+	  - Made UI_destroy_method() NULL safe.
+	  - Various improvements to nc(1).
+	  - Always clear EC groups and points on free.
+	  - Cleanup and improvements in EC code.
+	  - Various openssl(1) improvements.
+	* Bug fixes
+	  - Fixed a memory leak, a double free and various other issues in
+	    BIO_new_NDEF().
+	  - Fixed various crashes in the openssl(1) testing utility.
+	  - Do not check policies by default in the new X.509 verifier.
+	  - Added missing error checking in PKCS7.
+	  - Call CRYPTO_cleanup_all_ex_data() from OPENSSL_cleanup().
+	* New features
+	  - Added UI_null()
+	  - Added X509_STORE_*check_issued()
+	  - Added X509_CRL_get0_tbs_sigalg() and X509_get0_uids() accessors.
+	  - Added EVP_CIPHER_meth_*() setter API.
+	* Documentation improvements
+	  - Marked BIO_s_log(3) BIO_nread0(3), BIO_nread(3), BIO_nwrite0(3), BIO_nwrite(3),
+	    BIO_dump_cb(3) and BIO_dump_indent_cb(3) as intentionally undocumented.
+	  - Document BIO_number_read(3), BIO_number_written(3),
+		BIO_set_retry_read(3), BIO_set_retry_write(3),
+		BIO_set_retry_special(3), BIO_clear_retry_flags(3),
+		BIO_get_retry_flags(3), BIO_dup_chain(3), BIO_set_flags(3),
+		BIO_clear_flags(3), BIO_test_flags(3), BIO_get_flags(3).
+		BIO_callback_fn_ex(3), BIO_set_callback_ex(3), BIO_get_callback_ex(3),
+		BIO_callback_fn(3), and the BIO_FLAGS_* constants
+	  - Correct the prototypes of BIO_get_conn_ip(3) and BIO_get_conn_int_port(3).
+	  - Document ED25519_keypair(3), ED25519_sign(3), and ED25519_verify(3).
+	  - Document EVP_PKEY_new_raw_private_key(3),
+		EVP_PKEY_new_raw_public_key(3), EVP_PKEY_get_raw_private_key(3), and
+		EVP_PKEY_get_raw_public_key(3).
+	  - Document ASN1_buf_print(3).
+	  - Document DH_get0_*, DSA_get0_*, ECDSA_SIG_get0_{r,s}() and RSA_get0_*.
+	  - Merged documentation of UI_null() from OpenSSL 1.1
+	  - Various spelling and other documentation improvements.
+	* Testing and Proactive Security
+	  - As always, new test coverage is added as bugs are fixed and subsystems
+	    are cleaned up.
+	  - New Wycheproof tests added.
+	  - OpenSSL 3.0 Interop tests added.
+	  - Many old tests rewritten, cleaned up and extended.
+	* Security fixes
 	  - A malicious certificate revocation list or timestamp response token
 	    would allow an attacker to read arbitrary memory.
+
+3.7.0 - Development release
+
+	* Internal improvements
+	  - Remove dependency on system timegm() and gmtime() by replacing
+	    traditional Julian date conversion with POSIX epoch-seconds date
+	    conversion from BoringSSL.
+	  - Clean old and unused BN code dealing with primes.
+	  - Start rewriting name constraints code using CBS.
+	  - Remove support for the HMAC PRIVATE KEY.
+	  - Rework DSA signing and verifying internals.
+	  - First few passes on cleaning up the BN code.
+	  - Internal headers coming from OpenSSL are all called *_local.h now.
+	  - Rewrite TLSv1.2 key exporter.
+	  - Cleaned up and refactored various aspects of the legacy TLS stack.
+	* Compatibility changes
+	  - BIO_read() and BIO_write() now behave more closely to OpenSSL 3 in
+	    various corner cases. More work is needed here.
+	* Bug fixes
+	  - Add EVP_chacha20_poly1305() to the list of all ciphers.
+	  - Fix potential leaks of EVP_PKEY in various printing functions
+	  - Fix potential leak in OBJ_NAME_add().
+	  - Avoid signed overflow in i2c_ASN1_BIT_STRING().
+	  - Clean up EVP_PKEY_ASN1_METHOD related tables and code.
+	  - Fix long standing bugs BN_GF2m_poly2arr() and BN_GF2m_mod().
+	  - Fix segfaults in BN_{dec,hex}2bn().
+	  - Fix NULL dereference in x509_constraints_uri_host() reachable only
+	    in the process of generating certificates.
+	  - Fixed a variety of memory corruption issues in BIO chains coming
+	    from poor old and new API: BIO_push(), BIO_pop(), BIO_set_next().
+	  - Avoid potential divide by zero in BIO_dump_indent_cb()
+	* Documentation improvements
+	  - Numerous improvements and additions for ASN.1, BIO, BN, and X.509.
+	  - The BN documentation is now considered to be complete.
+	* Testing and Proactive Security
+	  - As always, new test coverage is added as bugs are fixed and
+	    subsystems are cleaned up.
+	  - Many old tests rewritten, cleaned up and extended.
+	* New features
+	  - Added Ed25519 support both as a primitive and via OpenSSL's EVP
+	    interfaces.
+	  - X25519 is now also supported via EVP.
+	  - The OpenSSL 1.1 raw public and private key API is available with
+	    support for EVP_PKEY_ED25519, EVP_PKEY_HMAC and EVP_PKEY_X25519.
+	    Poly1305 is not currently supported via this interface.
 
 3.6.1 - Stable release
 
@@ -2563,7 +2671,7 @@ LibreSSL Portable Release Notes:
 	* Address POODLE attack by disabling SSLv3 by default
 
 	* Fix Eliptical Curve cipher selection bug
-	  (https://github.com/libressl-portable/portable/issues/35)
+	  (https://github.com/libressl/portable/issues/35)
 
 2.1.0 - First release from the OpenBSD 5.7 tree
 	* Added support for automatic ephemeral EC keys

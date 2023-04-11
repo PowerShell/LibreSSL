@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_prn.c,v 1.2 2021/11/01 20:53:08 tb Exp $ */
+/* $OpenBSD: x509_prn.c,v 1.5 2023/02/16 08:38:17 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 1999.
  */
@@ -62,7 +62,7 @@
 #include <openssl/conf.h>
 #include <openssl/x509v3.h>
 
-#include "x509_lcl.h"
+#include "x509_local.h"
 
 /* Extension printing routines */
 
@@ -99,6 +99,7 @@ X509V3_EXT_val_prn(BIO *out, STACK_OF(CONF_VALUE) *val, int indent, int ml)
 			BIO_puts(out, "\n");
 	}
 }
+LCRYPTO_ALIAS(X509V3_EXT_val_prn);
 
 /* Main routine: print out a general extension */
 
@@ -152,6 +153,7 @@ err:
 		method->ext_free(ext_str);
 	return ok;
 }
+LCRYPTO_ALIAS(X509V3_EXT_print);
 
 int
 X509V3_extensions_print(BIO *bp, const char *title,
@@ -187,6 +189,7 @@ X509V3_extensions_print(BIO *bp, const char *title,
 	}
 	return 1;
 }
+LCRYPTO_ALIAS(X509V3_extensions_print);
 
 static int
 unknown_ext_print(BIO *out, X509_EXTENSION *ext, unsigned long flag,
@@ -225,3 +228,4 @@ X509V3_EXT_print_fp(FILE *fp, X509_EXTENSION *ext, int flag, int indent)
 	BIO_free(bio_tmp);
 	return ret;
 }
+LCRYPTO_ALIAS(X509V3_EXT_print_fp);

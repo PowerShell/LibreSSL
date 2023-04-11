@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_alt.c,v 1.12 2022/03/26 16:34:21 tb Exp $ */
+/* $OpenBSD: x509_alt.c,v 1.15 2023/02/16 08:38:17 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project.
  */
@@ -152,6 +152,7 @@ i2v_GENERAL_NAMES(X509V3_EXT_METHOD *method, GENERAL_NAMES *gens,
 
 	return NULL;
 }
+LCRYPTO_ALIAS(i2v_GENERAL_NAMES);
 
 STACK_OF(CONF_VALUE) *
 i2v_GENERAL_NAME(X509V3_EXT_METHOD *method, GENERAL_NAME *gen,
@@ -244,6 +245,7 @@ i2v_GENERAL_NAME(X509V3_EXT_METHOD *method, GENERAL_NAME *gen,
 
 	return NULL;
 }
+LCRYPTO_ALIAS(i2v_GENERAL_NAME);
 
 int
 GENERAL_NAME_print(BIO *out, GENERAL_NAME *gen)
@@ -310,6 +312,7 @@ GENERAL_NAME_print(BIO *out, GENERAL_NAME *gen)
 	}
 	return 1;
 }
+LCRYPTO_ALIAS(GENERAL_NAME_print);
 
 static GENERAL_NAMES *
 v2i_issuer_alt(X509V3_EXT_METHOD *method, X509V3_CTX *ctx,
@@ -512,6 +515,7 @@ err:
 	sk_GENERAL_NAME_pop_free(gens, GENERAL_NAME_free);
 	return NULL;
 }
+LCRYPTO_ALIAS(v2i_GENERAL_NAMES);
 
 GENERAL_NAME *
 v2i_GENERAL_NAME(const X509V3_EXT_METHOD *method, X509V3_CTX *ctx,
@@ -519,6 +523,7 @@ v2i_GENERAL_NAME(const X509V3_EXT_METHOD *method, X509V3_CTX *ctx,
 {
 	return v2i_GENERAL_NAME_ex(NULL, method, ctx, cnf, 0);
 }
+LCRYPTO_ALIAS(v2i_GENERAL_NAME);
 
 GENERAL_NAME *
 a2i_GENERAL_NAME(GENERAL_NAME *out, const X509V3_EXT_METHOD *method,
@@ -609,6 +614,7 @@ err:
 		GENERAL_NAME_free(gen);
 	return NULL;
 }
+LCRYPTO_ALIAS(a2i_GENERAL_NAME);
 
 GENERAL_NAME *
 v2i_GENERAL_NAME_ex(GENERAL_NAME *out, const X509V3_EXT_METHOD *method,
@@ -619,6 +625,7 @@ v2i_GENERAL_NAME_ex(GENERAL_NAME *out, const X509V3_EXT_METHOD *method,
 	GENERAL_NAME *ret;
 	size_t len = 0;
 	int type;
+	CBS cbs;
 
 	name = cnf->name;
 	value = cnf->value;
@@ -669,9 +676,10 @@ v2i_GENERAL_NAME_ex(GENERAL_NAME *out, const X509V3_EXT_METHOD *method,
 	}
 
 	type = x509_constraints_general_to_bytes(ret, &bytes, &len);
+	CBS_init(&cbs, bytes, len);
 	switch (type) {
 	case GEN_DNS:
-		if (!x509_constraints_valid_sandns(bytes, len)) {
+		if (!x509_constraints_valid_sandns(&cbs)) {
 			X509V3error(X509V3_R_BAD_OBJECT);
 			ERR_asprintf_error_data("name=%s value='%.*s'", name,
 			    (int)len, bytes);
@@ -687,7 +695,7 @@ v2i_GENERAL_NAME_ex(GENERAL_NAME *out, const X509V3_EXT_METHOD *method,
 		}
 		break;
 	case GEN_EMAIL:
-		if (!x509_constraints_parse_mailbox(bytes, len, NULL)) {
+		if (!x509_constraints_parse_mailbox(&cbs, NULL)) {
 			X509V3error(X509V3_R_BAD_OBJECT);
 			ERR_asprintf_error_data("name=%s value='%.*s'", name,
 			    (int)len, bytes);
@@ -710,6 +718,7 @@ v2i_GENERAL_NAME_ex(GENERAL_NAME *out, const X509V3_EXT_METHOD *method,
 		GENERAL_NAME_free(ret);
 	return NULL;
 }
+LCRYPTO_ALIAS(v2i_GENERAL_NAME_ex);
 
 static int
 do_othername(GENERAL_NAME *gen, const char *value, X509V3_CTX *ctx)
