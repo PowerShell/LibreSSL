@@ -598,7 +598,6 @@ whirlpool_block:
 	retq
 .LSEH_end_whirlpool_block:
 
-.section	.rodata
 .p2align	6
 
 .Ltable:

@@ -1,4 +1,4 @@
-/* $OpenBSD: openssl.c,v 1.32 2022/11/11 18:24:32 joshua Exp $ */
+/* $OpenBSD: openssl.c,v 1.35 2023/06/11 13:02:10 jsg Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -161,7 +161,6 @@ FUNCTION functions[] = {
 	{ FUNC_TYPE_GENERAL, "enc", enc_main },
 	{ FUNC_TYPE_GENERAL, "errstr", errstr_main },
 	{ FUNC_TYPE_GENERAL, "genpkey", genpkey_main },
-	{ FUNC_TYPE_GENERAL, "nseq", nseq_main },
 #ifndef OPENSSL_NO_OCSP
 	{ FUNC_TYPE_GENERAL, "ocsp", ocsp_main },
 #endif
@@ -330,10 +329,6 @@ FUNCTION functions[] = {
 	{ FUNC_TYPE_CIPHER, "sm4-ofb", enc_main },
 	{ FUNC_TYPE_CIPHER, "sm4-cfb", enc_main },
 #endif
-#ifdef ZLIB
-	{ FUNC_TYPE_CIPHER, "zlib", enc_main },
-#endif
-
 	{ 0, NULL, NULL }
 };
 
@@ -385,15 +380,11 @@ openssl_shutdown(void)
 int
 main(int argc, char **argv)
 {
-	ARGS arg;
 	char *to_free = NULL;
 	int i, ret = 0;
 	char *p;
 	LHASH_OF(FUNCTION) * prog = NULL;
 	long errline;
-
-	arg.data = NULL;
-	arg.count = 0;
 
 	if (pledge("stdio cpath wpath rpath inet dns proc flock tty", NULL) == -1) {
 		fprintf(stderr, "openssl: pledge: %s\n", strerror(errno));
@@ -474,7 +465,6 @@ main(int argc, char **argv)
 	}
 	if (prog != NULL)
 		lh_FUNCTION_free(prog);
-	free(arg.data);
 
 	openssl_shutdown();
 

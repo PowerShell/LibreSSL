@@ -1,4 +1,4 @@
-/* $OpenBSD: ec_oct.c,v 1.10 2023/03/08 04:50:27 jsing Exp $ */
+/* $OpenBSD: ec_oct.c,v 1.16 2023/07/07 19:37:53 beck Exp $ */
 /*
  * Originally written by Bodo Moeller for the OpenSSL project.
  */
@@ -72,19 +72,34 @@
 
 int
 EC_POINT_set_compressed_coordinates(const EC_GROUP *group, EC_POINT *point,
-    const BIGNUM *x, int y_bit, BN_CTX *ctx)
+    const BIGNUM *x, int y_bit, BN_CTX *ctx_in)
 {
+	BN_CTX *ctx;
+	int ret = 0;
+
+	if ((ctx = ctx_in) == NULL)
+		ctx = BN_CTX_new();
+	if (ctx == NULL)
+		goto err;
+
 	if (group->meth->point_set_compressed_coordinates == NULL) {
 		ECerror(ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED);
-		return 0;
+		goto err;
 	}
 	if (group->meth != point->meth) {
 		ECerror(EC_R_INCOMPATIBLE_OBJECTS);
-		return 0;
+		goto err;
 	}
-	return group->meth->point_set_compressed_coordinates(group, point,
+	ret = group->meth->point_set_compressed_coordinates(group, point,
 	    x, y_bit, ctx);
+
+ err:
+	if (ctx != ctx_in)
+		BN_CTX_free(ctx);
+
+	return ret;
 }
+LCRYPTO_ALIAS(EC_POINT_set_compressed_coordinates);
 
 int
 EC_POINT_set_compressed_coordinates_GFp(const EC_GROUP *group, EC_POINT *point,
@@ -93,42 +108,63 @@ EC_POINT_set_compressed_coordinates_GFp(const EC_GROUP *group, EC_POINT *point,
 	return EC_POINT_set_compressed_coordinates(group, point, x, y_bit, ctx);
 }
 
-#ifndef OPENSSL_NO_EC2M
-int
-EC_POINT_set_compressed_coordinates_GF2m(const EC_GROUP *group, EC_POINT *point,
-    const BIGNUM *x, int y_bit, BN_CTX *ctx)
-{
-	return EC_POINT_set_compressed_coordinates(group, point, x, y_bit, ctx);
-}
-#endif
-
 size_t
 EC_POINT_point2oct(const EC_GROUP *group, const EC_POINT *point,
-    point_conversion_form_t form,
-    unsigned char *buf, size_t len, BN_CTX *ctx)
+    point_conversion_form_t form, unsigned char *buf, size_t len,
+    BN_CTX *ctx_in)
 {
-	if (group->meth->point2oct == NULL) { 
+	BN_CTX *ctx;
+	size_t ret = 0;
+
+	if ((ctx = ctx_in) == NULL)
+		ctx = BN_CTX_new();
+	if (ctx == NULL)
+		goto err;
+
+	if (group->meth->point2oct == NULL) {
 		ECerror(ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED);
-		return 0;
+		goto err;
 	}
 	if (group->meth != point->meth) {
 		ECerror(EC_R_INCOMPATIBLE_OBJECTS);
-		return 0;
+		goto err;
 	}
-	return group->meth->point2oct(group, point, form, buf, len, ctx);
+	ret = group->meth->point2oct(group, point, form, buf, len, ctx);
+
+ err:
+	if (ctx != ctx_in)
+		BN_CTX_free(ctx);
+
+	return ret;
 }
+LCRYPTO_ALIAS(EC_POINT_point2oct);
 
 int
 EC_POINT_oct2point(const EC_GROUP *group, EC_POINT *point,
-    const unsigned char *buf, size_t len, BN_CTX *ctx)
+    const unsigned char *buf, size_t len, BN_CTX *ctx_in)
 {
+	BN_CTX *ctx;
+	int ret = 0;
+
+	if ((ctx = ctx_in) == NULL)
+		ctx = BN_CTX_new();
+	if (ctx == NULL)
+		goto err;
+
 	if (group->meth->oct2point == NULL) {
 		ECerror(ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED);
-		return 0;
+		goto err;
 	}
 	if (group->meth != point->meth) {
 		ECerror(EC_R_INCOMPATIBLE_OBJECTS);
-		return 0;
+		goto err;
 	}
-	return group->meth->oct2point(group, point, buf, len, ctx);
+	ret = group->meth->oct2point(group, point, buf, len, ctx);
+
+ err:
+	if (ctx != ctx_in)
+		BN_CTX_free(ctx);
+
+	return ret;
 }
+LCRYPTO_ALIAS(EC_POINT_oct2point);

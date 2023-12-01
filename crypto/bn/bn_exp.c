@@ -1,4 +1,4 @@
-/* $OpenBSD: bn_exp.c,v 1.38 2023/03/15 04:30:20 jsing Exp $ */
+/* $OpenBSD: bn_exp.c,v 1.47 2023/07/08 12:21:58 beck Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -120,56 +120,60 @@
 /* maximum precomputation table size for *variable* sliding windows */
 #define TABLE_SIZE	32
 
-/* this one works - simple but works */
+/* Calculates r = a^p by successive squaring of a. Not constant time. */
 int
 BN_exp(BIGNUM *r, const BIGNUM *a, const BIGNUM *p, BN_CTX *ctx)
 {
-	int i, bits, ret = 0;
-	BIGNUM *v, *rr;
+	BIGNUM *rr, *v;
+	int i;
+	int ret = 0;
 
 	if (BN_get_flags(p, BN_FLG_CONSTTIME) != 0) {
-		/* BN_FLG_CONSTTIME only supported by BN_mod_exp_mont() */
 		BNerror(ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED);
 		return -1;
 	}
 
 	BN_CTX_start(ctx);
-	if ((r == a) || (r == p))
+
+	if ((v = BN_CTX_get(ctx)) == NULL)
+		goto err;
+
+	rr = r;
+	if (r == a || r == p)
 		rr = BN_CTX_get(ctx);
-	else
-		rr = r;
-	v = BN_CTX_get(ctx);
-	if (rr == NULL || v == NULL)
+	if (rr == NULL)
 		goto err;
 
-	if (BN_copy(v, a) == NULL)
+	if (!BN_one(rr))
 		goto err;
-	bits = BN_num_bits(p);
-
 	if (BN_is_odd(p)) {
-		if (BN_copy(rr, a) == NULL)
-			goto err;
-	} else {
-		if (!BN_one(rr))
+		if (!bn_copy(rr, a))
 			goto err;
 	}
 
-	for (i = 1; i < bits; i++) {
+	if (!bn_copy(v, a))
+		goto err;
+
+	for (i = 1; i < BN_num_bits(p); i++) {
 		if (!BN_sqr(v, v, ctx))
 			goto err;
-		if (BN_is_bit_set(p, i)) {
-			if (!BN_mul(rr, rr, v, ctx))
-				goto err;
-		}
+		if (!BN_is_bit_set(p, i))
+			continue;
+		if (!BN_mul(rr, rr, v, ctx))
+			goto err;
 	}
+
+	if (!bn_copy(r, rr))
+		goto err;
+
 	ret = 1;
 
-err:
-	if (r != rr && rr != NULL)
-		BN_copy(r, rr);
+ err:
 	BN_CTX_end(ctx);
-	return (ret);
+
+	return ret;
 }
+LCRYPTO_ALIAS(BN_exp);
 
 /* The old fallback, simple version :-) */
 int
@@ -191,7 +195,7 @@ BN_mod_exp_simple(BIGNUM *r, const BIGNUM *a, const BIGNUM *p, const BIGNUM *m,
 	bits = BN_num_bits(p);
 	if (bits == 0) {
 		/* x**0 mod 1 is still zero. */
-		if (BN_is_one(m)) {
+		if (BN_abs_is_word(m, 1)) {
 			ret = 1;
 			BN_zero(r);
 		} else
@@ -288,6 +292,7 @@ err:
 	BN_CTX_end(ctx);
 	return (ret);
 }
+LCRYPTO_ALIAS(BN_mod_exp_simple);
 
 /* BN_mod_exp_mont_consttime() stores the precomputed powers in a specific layout
  * so that accessing any of these table values shows the same access pattern as far
@@ -399,7 +404,7 @@ BN_mod_exp_mont_consttime(BIGNUM *rr, const BIGNUM *a, const BIGNUM *p,
 	bits = BN_num_bits(p);
 	if (bits == 0) {
 		/* x**0 mod 1 is still zero. */
-		if (BN_is_one(m)) {
+		if (BN_abs_is_word(m, 1)) {
 			ret = 1;
 			BN_zero(rr);
 		} else
@@ -409,9 +414,10 @@ BN_mod_exp_mont_consttime(BIGNUM *rr, const BIGNUM *a, const BIGNUM *p,
 
 	BN_CTX_start(ctx);
 
-	/* Allocate a montgomery context if it was not supplied by the caller.
+	/*
+	 * Allocate a Montgomery context if it was not supplied by the caller.
 	 * If this is not done, things will break in the montgomery part.
- 	 */
+	 */
 	if (in_mont != NULL)
 		mont = in_mont;
 	else {
@@ -628,6 +634,7 @@ err:
 	BN_CTX_end(ctx);
 	return (ret);
 }
+LCRYPTO_ALIAS(BN_mod_exp_mont_consttime);
 
 static int
 BN_mod_exp_mont_internal(BIGNUM *rr, const BIGNUM *a, const BIGNUM *p, const BIGNUM *m,
@@ -654,7 +661,7 @@ BN_mod_exp_mont_internal(BIGNUM *rr, const BIGNUM *a, const BIGNUM *p, const BIG
 	bits = BN_num_bits(p);
 	if (bits == 0) {
 		/* x**0 mod 1 is still zero. */
-		if (BN_is_one(m)) {
+		if (BN_abs_is_word(m, 1)) {
 			ret = 1;
 			BN_zero(rr);
 		} else
@@ -682,12 +689,9 @@ BN_mod_exp_mont_internal(BIGNUM *rr, const BIGNUM *a, const BIGNUM *p, const BIG
 			goto err;
 	}
 
-	if (a->neg || BN_ucmp(a, m) >= 0) {
-		if (!BN_nnmod(val[0], a,m, ctx))
-			goto err;
-		aa = val[0];
-	} else
-		aa = a;
+	if (!BN_nnmod(val[0], a,m, ctx))
+		goto err;
+	aa = val[0];
 	if (BN_is_zero(aa)) {
 		BN_zero(rr);
 		ret = 1;
@@ -816,7 +820,7 @@ BN_mod_exp_mont_word(BIGNUM *rr, BN_ULONG a, const BIGNUM *p, const BIGNUM *m,
 			(BN_mod_ct(t, r, m, ctx) && (swap_tmp = r, r = t, t = swap_tmp, 1))))
 		/* BN_MOD_MUL_WORD is only used with 'w' large,
 		 * so the BN_ucmp test is probably more overhead
-		 * than always using BN_mod (which uses BN_copy if
+		 * than always using BN_mod (which uses bn_copy if
 		 * a similar test returns true). */
 		/* We can use BN_mod and do not need BN_nnmod because our
 		 * accumulator is never negative (the result of BN_mod does
@@ -842,7 +846,7 @@ BN_mod_exp_mont_word(BIGNUM *rr, BN_ULONG a, const BIGNUM *p, const BIGNUM *m,
 	bits = BN_num_bits(p);
 	if (bits == 0) {
 		/* x**0 mod 1 is still zero. */
-		if (BN_is_one(m)) {
+		if (BN_abs_is_word(m, 1)) {
 			ret = 1;
 			BN_zero(rr);
 		} else
@@ -946,6 +950,7 @@ err:
 	BN_CTX_end(ctx);
 	return (ret);
 }
+LCRYPTO_ALIAS(BN_mod_exp_mont_word);
 
 int
 BN_mod_exp_recp(BIGNUM *r, const BIGNUM *a, const BIGNUM *p, const BIGNUM *m,
@@ -967,7 +972,7 @@ BN_mod_exp_recp(BIGNUM *r, const BIGNUM *a, const BIGNUM *p, const BIGNUM *m,
 	bits = BN_num_bits(p);
 	if (bits == 0) {
 		/* x**0 mod 1 is still zero. */
-		if (BN_is_one(m)) {
+		if (BN_abs_is_word(m, 1)) {
 			ret = 1;
 			BN_zero(r);
 		} else
@@ -985,7 +990,7 @@ BN_mod_exp_recp(BIGNUM *r, const BIGNUM *a, const BIGNUM *p, const BIGNUM *m,
 
 	if (m->neg) {
 		/* ignore sign of 'm' */
-		if (!BN_copy(aa, m))
+		if (!bn_copy(aa, m))
 			goto err;
 		aa->neg = 0;
 		if (BN_RECP_CTX_set(&recp, aa, ctx) <= 0)
@@ -1103,7 +1108,7 @@ BN_mod_exp_internal(BIGNUM *r, const BIGNUM *a, const BIGNUM *p, const BIGNUM *m
 	 * standard algorithm:
 	 *
 	 *   BN_mod_exp_mont   33 .. 40 %  [AMD K6-2, Linux, debug configuration]
-         *                     55 .. 77 %  [UltraSparc processor, but
+	 *                     55 .. 77 %  [UltraSparc processor, but
 	 *                                  debug-solaris-sparcv8-gcc conf.]
 	 *
 	 *   BN_mod_exp_recp   50 .. 70 %  [AMD K6-2, Linux, debug configuration]
@@ -1205,12 +1210,9 @@ BN_mod_exp2_mont(BIGNUM *rr, const BIGNUM *a1, const BIGNUM *p1,
 	/*
 	 * Build table for a1:   val1[i] := a1^(2*i + 1) mod m  for i = 0 .. 2^(window1-1)
 	 */
-	if (a1->neg || BN_ucmp(a1, m) >= 0) {
-		if (!BN_mod_ct(val1[0], a1, m, ctx))
-			goto err;
-		a_mod_m = val1[0];
-	} else
-		a_mod_m = a1;
+	if (!BN_nnmod(val1[0], a1, m, ctx))
+		goto err;
+	a_mod_m = val1[0];
 	if (BN_is_zero(a_mod_m)) {
 		BN_zero(rr);
 		ret = 1;
@@ -1236,12 +1238,9 @@ BN_mod_exp2_mont(BIGNUM *rr, const BIGNUM *a1, const BIGNUM *p1,
 	/*
 	 * Build table for a2:   val2[i] := a2^(2*i + 1) mod m  for i = 0 .. 2^(window2-1)
 	 */
-	if (a2->neg || BN_ucmp(a2, m) >= 0) {
-		if (!BN_mod_ct(val2[0], a2, m, ctx))
-			goto err;
-		a_mod_m = val2[0];
-	} else
-		a_mod_m = a2;
+	if (!BN_nnmod(val2[0], a2, m, ctx))
+		goto err;
+	a_mod_m = val2[0];
 	if (BN_is_zero(a_mod_m)) {
 		BN_zero(rr);
 		ret = 1;
@@ -1336,3 +1335,4 @@ err:
 	BN_CTX_end(ctx);
 	return (ret);
 }
+LCRYPTO_ALIAS(BN_mod_exp2_mont);

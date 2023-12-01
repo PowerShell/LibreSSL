@@ -588,7 +588,6 @@ L$epilogue:
 	retq
 
 
-.section	__DATA,__const
 .p2align	6
 
 L$table:

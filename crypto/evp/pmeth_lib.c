@@ -1,4 +1,4 @@
-/* $OpenBSD: pmeth_lib.c,v 1.27 2022/12/26 07:18:52 jmc Exp $ */
+/* $OpenBSD: pmeth_lib.c,v 1.33 2023/07/07 19:37:54 beck Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2006.
  */
@@ -151,69 +151,65 @@ EVP_PKEY_meth_find(int type)
 }
 
 static EVP_PKEY_CTX *
-int_ctx_new(EVP_PKEY *pkey, ENGINE *e, int id)
+evp_pkey_ctx_new(EVP_PKEY *pkey, ENGINE *engine, int id)
 {
-	EVP_PKEY_CTX *ret;
+	EVP_PKEY_CTX *pkey_ctx = NULL;
 	const EVP_PKEY_METHOD *pmeth;
 
 	if (id == -1) {
-		if (!pkey || !pkey->ameth)
+		if (pkey == NULL || pkey->ameth == NULL)
 			return NULL;
 		id = pkey->ameth->pkey_id;
 	}
 #ifndef OPENSSL_NO_ENGINE
-	if (pkey && pkey->engine)
-		e = pkey->engine;
-	/* Try to find an ENGINE which implements this method */
-	if (e) {
-		if (!ENGINE_init(e)) {
+	if (pkey != NULL && pkey->engine != NULL)
+		engine = pkey->engine;
+	/* Try to find an ENGINE which implements this method. */
+	if (engine != NULL) {
+		if (!ENGINE_init(engine)) {
 			EVPerror(ERR_R_ENGINE_LIB);
 			return NULL;
 		}
 	} else
-		e = ENGINE_get_pkey_meth_engine(id);
+		engine = ENGINE_get_pkey_meth_engine(id);
 
-	/* If an ENGINE handled this method look it up. Otherwise
-	 * use internal tables.
-	 */
-
-	if (e)
-		pmeth = ENGINE_get_pkey_meth(e, id);
+	/* Look up method handler in ENGINE or use internal tables. */
+	if (engine != NULL)
+		pmeth = ENGINE_get_pkey_meth(engine, id);
 	else
 #endif
 		pmeth = EVP_PKEY_meth_find(id);
 
 	if (pmeth == NULL) {
 		EVPerror(EVP_R_UNSUPPORTED_ALGORITHM);
-		return NULL;
+		goto err;
 	}
 
-	ret = malloc(sizeof(EVP_PKEY_CTX));
-	if (ret == NULL) {
-#ifndef OPENSSL_NO_ENGINE
-		ENGINE_finish(e);
-#endif
+	if ((pkey_ctx = calloc(1, sizeof(*pkey_ctx))) == NULL) {
 		EVPerror(ERR_R_MALLOC_FAILURE);
-		return NULL;
+		goto err;
 	}
-	ret->engine = e;
-	ret->pmeth = pmeth;
-	ret->operation = EVP_PKEY_OP_UNDEFINED;
-	ret->pkey = pkey;
-	ret->peerkey = NULL;
-	ret->pkey_gencb = 0;
-	if (pkey)
-		CRYPTO_add(&pkey->references, 1, CRYPTO_LOCK_EVP_PKEY);
-	ret->data = NULL;
+	pkey_ctx->engine = engine;
+	engine = NULL;
+	pkey_ctx->pmeth = pmeth;
+	pkey_ctx->operation = EVP_PKEY_OP_UNDEFINED;
+	if ((pkey_ctx->pkey = pkey) != NULL)
+		EVP_PKEY_up_ref(pkey_ctx->pkey);
 
-	if (pmeth->init) {
-		if (pmeth->init(ret) <= 0) {
-			EVP_PKEY_CTX_free(ret);
-			return NULL;
-		}
+	if (pmeth->init != NULL) {
+		if (pmeth->init(pkey_ctx) <= 0)
+			goto err;
 	}
 
-	return ret;
+	return pkey_ctx;
+
+ err:
+	EVP_PKEY_CTX_free(pkey_ctx);
+#ifndef OPENSSL_NO_ENGINE
+	ENGINE_finish(engine);
+#endif
+
+	return NULL;
 }
 
 EVP_PKEY_METHOD*
@@ -261,57 +257,54 @@ EVP_PKEY_meth_free(EVP_PKEY_METHOD *pmeth)
 }
 
 EVP_PKEY_CTX *
-EVP_PKEY_CTX_new(EVP_PKEY *pkey, ENGINE *e)
+EVP_PKEY_CTX_new(EVP_PKEY *pkey, ENGINE *engine)
 {
-	return int_ctx_new(pkey, e, -1);
+	return evp_pkey_ctx_new(pkey, engine, -1);
 }
 
 EVP_PKEY_CTX *
-EVP_PKEY_CTX_new_id(int id, ENGINE *e)
+EVP_PKEY_CTX_new_id(int id, ENGINE *engine)
 {
-	return int_ctx_new(NULL, e, id);
+	return evp_pkey_ctx_new(NULL, engine, id);
 }
 
 EVP_PKEY_CTX *
 EVP_PKEY_CTX_dup(EVP_PKEY_CTX *pctx)
 {
-	EVP_PKEY_CTX *rctx;
+	EVP_PKEY_CTX *rctx = NULL;
 
-	if (!pctx->pmeth || !pctx->pmeth->copy)
-		return NULL;
+	if (pctx->pmeth == NULL || pctx->pmeth->copy == NULL)
+		goto err;
 #ifndef OPENSSL_NO_ENGINE
 	/* Make sure it's safe to copy a pkey context using an ENGINE */
-	if (pctx->engine && !ENGINE_init(pctx->engine)) {
+	if (pctx->engine != NULL && !ENGINE_init(pctx->engine)) {
 		EVPerror(ERR_R_ENGINE_LIB);
-		return 0;
+		goto err;
 	}
 #endif
-	rctx = malloc(sizeof(EVP_PKEY_CTX));
-	if (!rctx)
-		return NULL;
+	if ((rctx = calloc(1, sizeof(*rctx))) == NULL) {
+		EVPerror(ERR_R_MALLOC_FAILURE);
+		goto err;
+	}
 
 	rctx->pmeth = pctx->pmeth;
 #ifndef OPENSSL_NO_ENGINE
 	rctx->engine = pctx->engine;
 #endif
 
-	if (pctx->pkey)
-		CRYPTO_add(&pctx->pkey->references, 1, CRYPTO_LOCK_EVP_PKEY);
+	if ((rctx->pkey = pctx->pkey) != NULL)
+		EVP_PKEY_up_ref(rctx->pkey);
+	if ((rctx->peerkey = pctx->peerkey) != NULL)
+		EVP_PKEY_up_ref(rctx->peerkey);
 
-	rctx->pkey = pctx->pkey;
-
-	if (pctx->peerkey)
-		CRYPTO_add(&pctx->peerkey->references, 1, CRYPTO_LOCK_EVP_PKEY);
-
-	rctx->peerkey = pctx->peerkey;
-
-	rctx->data = NULL;
-	rctx->app_data = NULL;
 	rctx->operation = pctx->operation;
 
-	if (pctx->pmeth->copy(rctx, pctx) > 0)
-		return rctx;
+	if (pctx->pmeth->copy(rctx, pctx) <= 0)
+		goto err;
 
+	return rctx;
+
+ err:
 	EVP_PKEY_CTX_free(rctx);
 	return NULL;
 }
