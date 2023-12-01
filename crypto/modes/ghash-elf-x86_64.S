@@ -659,6 +659,7 @@ gcm_ghash_4bit:
 .type	gcm_init_clmul,@function
 .align	16
 gcm_init_clmul:
+	endbr64
 	movdqu	(%rsi),%xmm2
 	pshufd	$78,%xmm2,%xmm2
 
@@ -724,6 +725,7 @@ gcm_init_clmul:
 .type	gcm_gmult_clmul,@function
 .align	16
 gcm_gmult_clmul:
+	endbr64
 	movdqu	(%rdi),%xmm0
 	movdqa	.Lbswap_mask(%rip),%xmm5
 	movdqu	(%rsi),%xmm2
@@ -774,6 +776,7 @@ gcm_gmult_clmul:
 .type	gcm_ghash_clmul,@function
 .align	16
 gcm_ghash_clmul:
+	endbr64
 	movdqa	.Lbswap_mask(%rip),%xmm5
 
 	movdqu	(%rdi),%xmm0

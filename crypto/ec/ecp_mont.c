@@ -1,4 +1,4 @@
-/* $OpenBSD: ecp_mont.c,v 1.27 2023/03/08 05:45:31 jsing Exp $ */
+/* $OpenBSD: ecp_mont.c,v 1.30 2023/07/07 13:54:45 beck Exp $ */
 /*
  * Originally written by Bodo Moeller for the OpenSSL project.
  */
@@ -127,18 +127,12 @@ static int
 ec_GFp_mont_group_set_curve(EC_GROUP *group, const BIGNUM *p, const BIGNUM *a,
     const BIGNUM *b, BN_CTX *ctx)
 {
-	BN_CTX *new_ctx = NULL;
 	BN_MONT_CTX *mont = NULL;
 	BIGNUM *one = NULL;
 	int ret = 0;
 
 	ec_GFp_mont_group_clear(group);
 
-	if (ctx == NULL) {
-		ctx = new_ctx = BN_CTX_new();
-		if (ctx == NULL)
-			return 0;
-	}
 	mont = BN_MONT_CTX_new();
 	if (mont == NULL)
 		goto err;
@@ -158,14 +152,13 @@ ec_GFp_mont_group_set_curve(EC_GROUP *group, const BIGNUM *p, const BIGNUM *a,
 	one = NULL;
 
 	ret = ec_GFp_simple_group_set_curve(group, p, a, b, ctx);
-
 	if (!ret)
 		ec_GFp_mont_group_clear(group);
 
  err:
-	BN_CTX_free(new_ctx);
 	BN_MONT_CTX_free(mont);
 	BN_free(one);
+
 	return ret;
 }
 
@@ -220,8 +213,9 @@ ec_GFp_mont_field_set_to_one(const EC_GROUP *group, BIGNUM *r, BN_CTX *ctx)
 		ECerror(EC_R_NOT_INITIALIZED);
 		return 0;
 	}
-	if (!BN_copy(r, group->mont_one))
+	if (!bn_copy(r, group->mont_one))
 		return 0;
+
 	return 1;
 }
 
@@ -275,3 +269,4 @@ EC_GFp_mont_method(void)
 {
 	return &ec_GFp_mont_method;
 }
+LCRYPTO_ALIAS(EC_GFp_mont_method);

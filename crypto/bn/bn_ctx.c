@@ -1,4 +1,4 @@
-/*	$OpenBSD: bn_ctx.c,v 1.20 2023/01/14 15:23:27 jsing Exp $ */
+/*	$OpenBSD: bn_ctx.c,v 1.22 2023/07/08 12:21:58 beck Exp $ */
 /*
  * Copyright (c) 2023 Joel Sing <jsing@openbsd.org>
  *
@@ -70,12 +70,7 @@ BN_CTX_new(void)
 {
 	return calloc(1, sizeof(struct bignum_ctx));
 }
-
-void
-BN_CTX_init(BN_CTX *bctx)
-{
-	memset(bctx, 0, sizeof(*bctx));
-}
+LCRYPTO_ALIAS(BN_CTX_new);
 
 void
 BN_CTX_free(BN_CTX *bctx)
@@ -95,6 +90,7 @@ BN_CTX_free(BN_CTX *bctx)
 
 	freezero(bctx, sizeof(*bctx));
 }
+LCRYPTO_ALIAS(BN_CTX_free);
 
 void
 BN_CTX_start(BN_CTX *bctx)
@@ -107,6 +103,7 @@ BN_CTX_start(BN_CTX *bctx)
 		return;
 	}
 }
+LCRYPTO_ALIAS(BN_CTX_start);
 
 BIGNUM *
 BN_CTX_get(BN_CTX *bctx)
@@ -145,6 +142,7 @@ BN_CTX_get(BN_CTX *bctx)
 
 	return bn;
 }
+LCRYPTO_ALIAS(BN_CTX_get);
 
 void
 BN_CTX_end(BN_CTX *bctx)
@@ -160,3 +158,4 @@ BN_CTX_end(BN_CTX *bctx)
 
 	bctx->group--;
 }
+LCRYPTO_ALIAS(BN_CTX_end);

@@ -1,4 +1,4 @@
-/* $OpenBSD: bn_kron.c,v 1.12 2022/11/26 16:08:51 tb Exp $ */
+/* $OpenBSD: bn_kron.c,v 1.15 2023/07/08 12:21:58 beck Exp $ */
 /* ====================================================================
  * Copyright (c) 1998-2000 The OpenSSL Project.  All rights reserved.
  *
@@ -71,7 +71,6 @@ BN_kronecker(const BIGNUM *A, const BIGNUM *B, BN_CTX *ctx)
 	int k, v;
 	int ret = -2;
 
-
 	BN_CTX_start(ctx);
 
 	if ((a = BN_CTX_get(ctx)) == NULL)
@@ -79,9 +78,9 @@ BN_kronecker(const BIGNUM *A, const BIGNUM *B, BN_CTX *ctx)
 	if ((b = BN_CTX_get(ctx)) == NULL)
 		goto end;
 
-	if (BN_copy(a, A) == NULL)
+	if (!bn_copy(a, A))
 		goto end;
-	if (BN_copy(b, B) == NULL)
+	if (!bn_copy(b, B))
 		goto end;
 
 	/*
@@ -193,3 +192,4 @@ BN_kronecker(const BIGNUM *A, const BIGNUM *B, BN_CTX *ctx)
 
 	return ret;
 }
+LCRYPTO_ALIAS(BN_kronecker);

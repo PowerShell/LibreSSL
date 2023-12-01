@@ -518,7 +518,6 @@ main(int argc, char *argv[])
 	unsigned int	depth = 0;
 	int		ch, graphviz = 0, print = 0;
 
-#ifndef _MSC_VER
 	while ((ch = getopt(argc, argv, "Cg")) != -1) {
 		switch (ch) {
 		case 'C':
@@ -536,7 +535,6 @@ main(int argc, char *argv[])
 
 	if (argc != 0)
 		usage();
-#endif
 
 	if (graphviz && print)
 		usage();

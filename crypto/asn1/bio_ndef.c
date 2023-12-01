@@ -1,4 +1,4 @@
-/* $OpenBSD: bio_ndef.c,v 1.20 2023/03/15 06:30:21 tb Exp $ */
+/* $OpenBSD: bio_ndef.c,v 1.24 2023/07/28 09:58:30 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project.
  */
@@ -52,12 +52,17 @@
  *
  */
 
+#include <stdio.h>
+
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
 #include <openssl/bio.h>
 #include <openssl/err.h>
 
-#include <stdio.h>
+#include "asn1_local.h"
+
+int BIO_asn1_set_prefix(BIO *b, asn1_ps_func *prefix, asn1_ps_func *prefix_free);
+int BIO_asn1_set_suffix(BIO *b, asn1_ps_func *suffix, asn1_ps_func *suffix_free);
 
 /* Experimental NDEF ASN1 BIO support routines */
 
@@ -161,6 +166,7 @@ BIO_new_NDEF(BIO *out, ASN1_VALUE *val, const ASN1_ITEM *it)
  err:
 	BIO_pop(pop_bio);
 	BIO_free(asn_bio);
+
 	return NULL;
 }
 
@@ -168,7 +174,7 @@ static int
 ndef_prefix(BIO *b, unsigned char **pbuf, int *plen, void *parg)
 {
 	NDEF_SUPPORT *ndef_aux;
-	unsigned char *p;
+	unsigned char *p = NULL;
 	int derlen;
 
 	if (!parg)
@@ -176,13 +182,13 @@ ndef_prefix(BIO *b, unsigned char **pbuf, int *plen, void *parg)
 
 	ndef_aux = *(NDEF_SUPPORT **)parg;
 
-	derlen = ASN1_item_ndef_i2d(ndef_aux->val, NULL, ndef_aux->it);
-	p = malloc(derlen);
+	if ((derlen = ASN1_item_ndef_i2d(ndef_aux->val, &p, ndef_aux->it)) <= 0)
+		return 0;
+
 	ndef_aux->derbuf = p;
 	*pbuf = p;
-	derlen = ASN1_item_ndef_i2d(ndef_aux->val, &p, ndef_aux->it);
 
-	if (!*ndef_aux->boundary)
+	if (*ndef_aux->boundary == NULL)
 		return 0;
 
 	*plen = *ndef_aux->boundary - *pbuf;
@@ -228,7 +234,7 @@ static int
 ndef_suffix(BIO *b, unsigned char **pbuf, int *plen, void *parg)
 {
 	NDEF_SUPPORT *ndef_aux;
-	unsigned char *p;
+	unsigned char *p = NULL;
 	int derlen;
 	const ASN1_AUX *aux;
 	ASN1_STREAM_ARG sarg;
@@ -248,14 +254,15 @@ ndef_suffix(BIO *b, unsigned char **pbuf, int *plen, void *parg)
 	    &ndef_aux->val, ndef_aux->it, &sarg) <= 0)
 		return 0;
 
-	derlen = ASN1_item_ndef_i2d(ndef_aux->val, NULL, ndef_aux->it);
-	p = malloc(derlen);
+	if ((derlen = ASN1_item_ndef_i2d(ndef_aux->val, &p, ndef_aux->it)) <= 0)
+		return 0;
+
 	ndef_aux->derbuf = p;
 	*pbuf = p;
-	derlen = ASN1_item_ndef_i2d(ndef_aux->val, &p, ndef_aux->it);
 
-	if (!*ndef_aux->boundary)
+	if (*ndef_aux->boundary == NULL)
 		return 0;
+
 	*pbuf = *ndef_aux->boundary;
 	*plen = derlen - (*ndef_aux->boundary - ndef_aux->derbuf);
 
