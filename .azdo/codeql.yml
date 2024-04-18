@@ -1,0 +1,48 @@
+name: $(BuildDefinitionName)-$(date:yyMM).$(date:dd)$(rev:rrr)
+
+trigger: none
+
+schedules:
+- cron: "0 10 * * 1-5"
+  displayName: Daily CodeQL Build
+  branches:
+    include:
+    - master
+
+stages:
+- stage: Build
+  displayName: Build LibreSSL
+  jobs:
+  - job: BuildPkg
+    displayName: Build Package
+    pool:
+      name: PS-PowerShell-x64
+      demands:
+      - ImageOverride -equals PSMMS2022-OpenSSH-Secure
+    variables:
+      Codeql.Enabled: true
+      Codeql.Cadence: 1 # hour (for testing, normally will run daily)
+      skipComponentGovernanceDetection: true # not needed for CodeQL run
+    steps:
+    # - task: CodeQL3000Init@0
+    #   displayName: Initialize CodeQL
+
+    - pwsh: |
+        Write-Verbose "Starting the build configuration:Release Platform:x64"
+        $destination = "$(Build.SourcesDirectory)\bin\x64\Release"
+        CreateDirectory -directory $destination
+        $buildPath = "$(Build.SourcesDirectory)\build_x64"
+        CreateDirectory -directory $buildPath
+        Set-location $buildPath
+        cmake -DBUILD_SHARED_LIBS=ON -G"Visual Studio 17 2022" -A"x64" ..
+        $buildLogPath = "$(Build.SourcesDirectory)\build\build_x64_Release.log"
+        & 'C:\Program Files\Microsoft Visual Studio\2022\Enterprise\MSBuild\Current\Bin\MSBuild.exe' LibreSSL.sln /p:Configuration=Release /m /noconlog /fl /flp:LogFile=build.log
+      displayName: Build LibreSSL
+
+    # - task: CodeQL3000Finalize@0
+    #   displayName: Finalize CodeQL
+
+    - pwsh: |
+        $BuildOutx64Path = "$(Build.SourcesDirectory)\build_x64"
+        Get-ChildItem -Path $BuildOutx64Path
+      displayName: Capture build results
