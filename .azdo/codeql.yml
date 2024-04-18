@@ -30,9 +30,9 @@ stages:
     - pwsh: |
         Write-Verbose "Starting the build configuration:Release Platform:x64"
         $destination = "$(Build.SourcesDirectory)\bin\x64\Release"
-        CreateDirectory -directory $destination
+        New-Item -Path $destination -ItemType Directory -Force
         $buildPath = "$(Build.SourcesDirectory)\build_x64"
-        CreateDirectory -directory $buildPath
+        New-Item -Path $buildPath -ItemType Directory -Force 
         Set-location $buildPath
         cmake -DBUILD_SHARED_LIBS=ON -G"Visual Studio 17 2022" -A"x64" ..
         $buildLogPath = "$(Build.SourcesDirectory)\build\build_x64_Release.log"
