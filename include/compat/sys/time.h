@@ -14,7 +14,7 @@
 
 struct timeval {
     long long    tv_sec;
-	long         tv_usec;
+    long         tv_usec;
 };
 
 int gettimeofday(struct timeval *tp, void *tzp);
