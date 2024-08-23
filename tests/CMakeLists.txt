@@ -131,6 +131,11 @@ add_executable(bio_chain bio_chain.c)
 target_link_libraries(bio_chain ${OPENSSL_TEST_LIBS})
 add_test(bio_chain bio_chain)
 
+# bio_dump
+add_executable(bio_dump bio_dump.c)
+target_link_libraries(bio_dump ${OPENSSL_TEST_LIBS})
+add_test(bio_dump bio_dump)
+
 # bio_host
 # this test relies on resolver results that are OS and environment-specific
 if(ENABLE_EXTRATESTS)
@@ -349,11 +354,6 @@ add_executable(ed25519test ed25519test.c)
 target_link_libraries(ed25519test ${OPENSSL_TEST_LIBS})
 add_test(ed25519test ed25519test)
 
-# enginetest
-add_executable(enginetest enginetest.c)
-target_link_libraries(enginetest ${OPENSSL_TEST_LIBS})
-add_test(enginetest enginetest)
-
 # evp_ecx_test
 add_executable(evp_ecx_test evp_ecx_test.c)
 target_link_libraries(evp_ecx_test ${OPENSSL_TEST_LIBS})
@@ -378,6 +378,11 @@ add_test(evptest evptest ${CMAKE_CURRENT_SOURCE_DIR}/evptests.txt)
 add_executable(evp_test evp_test.c)
 target_link_libraries(evp_test ${OPENSSL_TEST_LIBS})
 add_test(evp_test evp_test)
+
+# exdata_test
+add_executable(exdata_test exdata_test.c)
+target_link_libraries(exdata_test ${OPENSSL_TEST_LIBS})
+add_test(exdata_test exdata_test)
 
 # expirecallback.c
 
@@ -409,11 +414,6 @@ add_test(freenull freenull)
 add_executable(gcm128test gcm128test.c)
 target_link_libraries(gcm128test ${OPENSSL_TEST_LIBS})
 add_test(gcm128test gcm128test)
-
-# gost2814789t
-add_executable(gost2814789t gost2814789t.c)
-target_link_libraries(gost2814789t ${OPENSSL_TEST_LIBS})
-add_test(gost2814789t gost2814789t)
 
 # handshake_table
 add_executable(handshake_table handshake_table.c)
@@ -452,9 +452,9 @@ add_executable(keypairtest keypairtest.c)
 target_link_libraries(keypairtest ${LIBTLS_TEST_LIBS})
 target_include_directories(keypairtest BEFORE PUBLIC ../tls)
 add_test(keypairtest keypairtest
-	${CMAKE_CURRENT_SOURCE_DIR}/ca.pem
-	${CMAKE_CURRENT_SOURCE_DIR}/server.pem
-	${CMAKE_CURRENT_SOURCE_DIR}/server.pem)
+	${CMAKE_CURRENT_SOURCE_DIR}/ca-root-rsa.pem
+	${CMAKE_CURRENT_SOURCE_DIR}/server1-rsa.pem
+	${CMAKE_CURRENT_SOURCE_DIR}/server1-rsa.pem)
 
 # md_test
 add_executable(md_test md_test.c)
@@ -601,6 +601,17 @@ add_executable(sha_test sha_test.c)
 target_link_libraries(sha_test ${OPENSSL_TEST_LIBS})
 add_test(sha_test sha_test)
 
+# shutdowntest
+set(SHUTDOWNTEST_SRC shutdowntest.c)
+add_executable(shutdowntest ${SHUTDOWNTEST_SRC})
+target_link_libraries(shutdowntest ${OPENSSL_TEST_LIBS})
+if(NOT MSVC)
+	add_test(NAME shutdowntest COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/shutdowntest.sh)
+else()
+	add_test(NAME shutdowntest COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/shutdowntest.bat $<TARGET_FILE:shutdowntest>)
+endif()
+set_tests_properties(shutdowntest PROPERTIES ENVIRONMENT "srcdir=${TEST_SOURCE_DIR}")
+
 # signertest
 if(NOT CMAKE_SYSTEM_NAME MATCHES "WindowsStore")
 	set(SIGNERTEST_SRC signertest.c)
@@ -669,11 +680,6 @@ else()
 	add_test(NAME ssltest COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/ssltest.bat $<TARGET_FILE:ssltest> $<TARGET_FILE:openssl>)
 endif()
 set_tests_properties(ssltest PROPERTIES ENVIRONMENT "srcdir=${TEST_SOURCE_DIR}")
-
-# string_table
-add_executable(string_table string_table.c)
-target_link_libraries(string_table ${OPENSSL_TEST_LIBS})
-add_test(string_table string_table)
 
 # testdsa
 if(NOT MSVC)
@@ -768,6 +774,11 @@ add_test(x25519test x25519test)
 add_executable(x509attribute x509attribute.c)
 target_link_libraries(x509attribute ${OPENSSL_TEST_LIBS})
 add_test(x509attribute x509attribute)
+
+# x509_algor
+add_executable(x509_algor x509_algor.c)
+target_link_libraries(x509_algor ${OPENSSL_TEST_LIBS})
+add_test(x509_algor x509_algor)
 
 # x509_asn1
 add_executable(x509_asn1 x509_asn1.c)

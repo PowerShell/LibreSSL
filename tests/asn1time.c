@@ -1,6 +1,7 @@
-/* $OpenBSD: asn1time.c,v 1.20 2023/10/02 11:14:15 tb Exp $ */
+/* $OpenBSD: asn1time.c,v 1.25 2024/02/18 22:17:01 tb Exp $ */
 /*
  * Copyright (c) 2015 Joel Sing <jsing@openbsd.org>
+ * Copyright (c) 2024 Google Inc.
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -16,10 +17,16 @@
  */
 
 #include <openssl/asn1.h>
+#include <openssl/posix_time.h>
 
 #include <err.h>
+#include <limits.h>
 #include <stdio.h>
 #include <string.h>
+
+#include "asn1_local.h"
+
+int ASN1_UTCTIME_cmp_time_t(const ASN1_UTCTIME *s, time_t t);
 
 struct asn1_time_test {
 	const char *str;
@@ -527,10 +534,15 @@ asn1_time_compare_families(const struct asn1_time_test *fam1, size_t fam1_size,
 				comparison_failure |= 1;
 			}
 
-			/*
-			 * XXX - add ASN1_UTCTIME_cmp_time_t later. Don't want
-			 * to mess with LIBRESSL_INTERNAL right before lock.
-			 */
+			time_cmp = ASN1_UTCTIME_cmp_time_t(t1, att2->time);
+			if (t1->type != V_ASN1_UTCTIME)
+				asn1_cmp = -2;
+			if (time_cmp != asn1_cmp) {
+				fprintf(stderr, "%s vs. %lld: want %d, got %d\n",
+				    att1->str, (long long)att2->time,
+				    asn1_cmp, time_cmp);
+				comparison_failure |= 1;
+			}
 		}
 	}
 
@@ -557,6 +569,203 @@ asn1_time_compare_test(void)
 	failed |= asn1_time_compare_families(utc, utc_size, gen, gen_size);
 	failed |= asn1_time_compare_families(utc, utc_size, utc, utc_size);
 
+	return failed;
+}
+
+static int
+asn1_time_overflow(void)
+{
+	struct tm overflow_year = {0}, overflow_month = {0};
+	struct tm copy, max_time = {0}, min_time = {0}, zero = {0};
+	int64_t valid_time_range = INT64_C(315569519999);
+	int64_t posix_u64;
+	time_t posix_time;
+	int days, secs;
+	int failed = 1;
+
+	overflow_year.tm_year = INT_MAX - 1899;
+	overflow_year.tm_mday = 1;
+
+	overflow_month.tm_mon = INT_MAX;
+	overflow_month.tm_mday = 1;
+
+	if (OPENSSL_tm_to_posix(&overflow_year, &posix_u64)) {
+		fprintf(stderr, "FAIL: OPENSSL_tm_to_posix didn't fail on "
+		    "overflow of years\n");
+		goto err;
+	}
+	if (OPENSSL_tm_to_posix(&overflow_month, &posix_u64)) {
+		fprintf(stderr, "FAIL: OPENSSL_tm_to_posix didn't fail on "
+		    "overflow of months\n");
+		goto err;
+	}
+	if (OPENSSL_timegm(&overflow_year, &posix_time)) {
+		fprintf(stderr, "FAIL: OPENSSL_timegm didn't fail on "
+		    "overflow of years\n");
+		goto err;
+	}
+	if (OPENSSL_timegm(&overflow_month, &posix_time)) {
+		fprintf(stderr, "FAIL: OPENSSL_timegm didn't fail on "
+		    "overflow of months\n");
+		goto err;
+	}
+	if (OPENSSL_gmtime_adj(&overflow_year, 0, 0)) {
+		fprintf(stderr, "FAIL: OPENSSL_gmtime_adj didn't fail on "
+		    "overflow of years\n");
+		goto err;
+	}
+	if (OPENSSL_gmtime_adj(&overflow_month, 0, 0)) {
+		fprintf(stderr, "FAIL: OPENSSL_gmtime_adj didn't fail on "
+		    "overflow of months\n");
+		goto err;
+	}
+	if (OPENSSL_gmtime_diff(&days, &secs, &overflow_year, &overflow_year)) {
+		fprintf(stderr, "FAIL: OPENSSL_gmtime_diff didn't fail on "
+		    "overflow of years\n");
+		goto err;
+	}
+	if (OPENSSL_gmtime_diff(&days, &secs, &overflow_month, &overflow_month)) {
+		fprintf(stderr, "FAIL: OPENSSL_gmtime_diff didn't fail on "
+		    "overflow of months\n");
+		goto err;
+	}
+
+	/* Input time is in range but adding one second puts it out of range. */
+	max_time.tm_year = 9999 - 1900;
+	max_time.tm_mon = 12 - 1;
+	max_time.tm_mday = 31;
+	max_time.tm_hour = 23;
+	max_time.tm_min = 59;
+	max_time.tm_sec = 59;
+
+	copy = max_time;
+	if (!OPENSSL_gmtime_adj(&copy, 0, 0)) {
+		fprintf(stderr, "FAIL: OPENSSL_gmtime_adj by 0 sec didn't "
+		    "succeed for maximum time\n");
+		goto err;
+	}
+	if (memcmp(&copy, &max_time, sizeof(max_time)) != 0) {
+		fprintf(stderr, "FAIL: OPENSSL_gmtime_adj by 0 sec didn't "
+		    "leave copy of max_time unmodified\n");
+		goto err;
+	}
+	if (OPENSSL_gmtime_adj(&copy, 0, 1)) {
+		fprintf(stderr, "FAIL: OPENSSL_gmtime_adj by 1 sec didn't "
+		    "fail for maximum time\n");
+		goto err;
+	}
+	if (memcmp(&zero, &copy, sizeof(copy)) != 0) {
+		fprintf(stderr, "FAIL: failing OPENSSL_gmtime_adj didn't "
+		    "zero out max_time\n");
+		goto err;
+	}
+
+	min_time.tm_year = 0 - 1900;
+	min_time.tm_mon = 1 - 1;
+	min_time.tm_mday = 1;
+	min_time.tm_hour = 0;
+	min_time.tm_min = 0;
+	min_time.tm_sec = 0;
+
+	copy = min_time;
+	if (!OPENSSL_gmtime_adj(&copy, 0, 0)) {
+		fprintf(stderr, "FAIL: OPENSSL_gmtime_adj by 0 sec didn't "
+		    "succeed for minimum time\n");
+		goto err;
+	}
+	if (memcmp(&copy, &min_time, sizeof(min_time)) != 0) {
+		fprintf(stderr, "FAIL: OPENSSL_gmtime_adj by 0 sec didn't "
+		    "leave copy of min_time unmodified\n");
+		goto err;
+	}
+	if (OPENSSL_gmtime_adj(&copy, 0, -1)) {
+		fprintf(stderr, "FAIL: OPENSSL_gmtime_adj by 1 sec didn't "
+		    "fail for minimum time\n");
+		goto err;
+	}
+	if (memcmp(&zero, &copy, sizeof(copy)) != 0) {
+		fprintf(stderr, "FAIL: failing OPENSSL_gmtime_adj didn't "
+		    "zero out max_time\n");
+		goto err;
+	}
+
+	copy = min_time;
+	/* Test that we can offset by the valid minimum and maximum times. */
+	if (!OPENSSL_gmtime_adj(&copy, 0, valid_time_range)) {
+		fprintf(stderr, "FAIL: OPENSSL_gmtime_adj by maximum range "
+		    "failed\n");
+		goto err;
+	}
+	if (memcmp(&copy, &max_time, sizeof(max_time)) != 0) {
+		fprintf(stderr, "FAIL: maximally adjusted copy didn't match "
+		    "max_time\n");
+		goto err;
+	}
+	if (!OPENSSL_gmtime_adj(&copy, 0, -valid_time_range)) {
+		fprintf(stderr, "FAIL: OPENSSL_gmtime_adj by maximum range "
+		    "failed\n");
+		goto err;
+	}
+	if (memcmp(&copy, &min_time, sizeof(min_time)) != 0) {
+		fprintf(stderr, "FAIL: maximally adjusted copy didn't match "
+		    "min_time\n");
+		goto err;
+	}
+
+	/*
+	 * The second offset may even exceed the valid_time_range if it is
+	 * cancelled out by offset_day.
+	 */
+	if (!OPENSSL_gmtime_adj(&copy, -1, valid_time_range + 24 * 3600)) {
+		fprintf(stderr, "FAIL: OPENSSL_gmtime_adj by maximum range "
+		    "failed\n");
+		goto err;
+	}
+	if (memcmp(&copy, &max_time, sizeof(max_time)) != 0) {
+		fprintf(stderr, "FAIL: excess maximally adjusted copy didn't "
+		    "match max_time\n");
+		goto err;
+	}
+	if (!OPENSSL_gmtime_adj(&copy, 1, -valid_time_range - 24 * 3600)) {
+		fprintf(stderr, "FAIL: OPENSSL_gmtime_adj by maximum range "
+		    "failed\n");
+		goto err;
+	}
+	if (memcmp(&copy, &min_time, sizeof(min_time)) != 0) {
+		fprintf(stderr, "FAIL: excess maximally adjusted copy didn't "
+		    "match min_time\n");
+		goto err;
+	}
+
+	copy = max_time;
+	if (OPENSSL_gmtime_adj(&copy, INT_MAX, INT64_MAX)) {
+		fprintf(stderr, "FAIL: maximal adjustments in OPENSSL_gmtime_adj"
+		    "didn't fail\n");
+		goto err;
+	}
+	copy = min_time;
+	if (OPENSSL_gmtime_adj(&copy, INT_MIN, INT64_MIN)) {
+		fprintf(stderr, "FAIL: minimal adjustments in OPENSSL_gmtime_adj"
+		    "didn't fail\n");
+		goto err;
+	}
+
+	/* Test we can diff between maximum time and minimum time. */
+	if (!OPENSSL_gmtime_diff(&days, &secs, &max_time, &min_time)) {
+		fprintf(stderr, "FAIL: OPENSSL_gmtime_diff between maximum and "
+		    "minimum time failed\n");
+		goto err;
+	}
+	if (!OPENSSL_gmtime_diff(&days, &secs, &min_time, &max_time)) {
+		fprintf(stderr, "FAIL: OPENSSL_gmtime_diff between minimum and "
+		    "maximum time failed\n");
+		goto err;
+	}
+
+
+	failed = 0;
+
+ err:
 	return failed;
 }
 
@@ -606,6 +815,9 @@ main(int argc, char **argv)
 
 	/* Check for a leak in ASN1_TIME_normalize(). */
 	failed |= ASN1_TIME_normalize(NULL) != 0;
+
+	fprintf(stderr, "Time overflow tests...\n");
+	failed |= asn1_time_overflow();
 
 	return (failed);
 }

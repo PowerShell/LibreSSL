@@ -95,10 +95,10 @@ TESTS = aeadtest.sh aes_test$(EXEEXT) aes_wrap$(EXEEXT) \
 	asn1evp$(EXEEXT) asn1object$(EXEEXT) asn1oct$(EXEEXT) \
 	asn1string_copy$(EXEEXT) asn1test$(EXEEXT) asn1time$(EXEEXT) \
 	asn1x509$(EXEEXT) base64test$(EXEEXT) bf_test$(EXEEXT) \
-	bio_asn1$(EXEEXT) bio_chain$(EXEEXT) $(am__EXEEXT_2) \
-	bio_mem$(EXEEXT) bn_add_sub$(EXEEXT) bn_cmp$(EXEEXT) \
-	bn_convert$(EXEEXT) bn_gcd$(EXEEXT) bn_isqrt$(EXEEXT) \
-	bn_mod_exp$(EXEEXT) bn_mod_inverse$(EXEEXT) \
+	bio_asn1$(EXEEXT) bio_chain$(EXEEXT) bio_dump$(EXEEXT) \
+	$(am__EXEEXT_2) bio_mem$(EXEEXT) bn_add_sub$(EXEEXT) \
+	bn_cmp$(EXEEXT) bn_convert$(EXEEXT) bn_gcd$(EXEEXT) \
+	bn_isqrt$(EXEEXT) bn_mod_exp$(EXEEXT) bn_mod_inverse$(EXEEXT) \
 	bn_mod_sqrt$(EXEEXT) bn_mont$(EXEEXT) bn_primes$(EXEEXT) \
 	bn_print$(EXEEXT) bn_shift$(EXEEXT) bn_test$(EXEEXT) \
 	bn_to_string$(EXEEXT) bn_unit$(EXEEXT) bn_word$(EXEEXT) \
@@ -109,10 +109,10 @@ TESTS = aeadtest.sh aes_test$(EXEEXT) aes_wrap$(EXEEXT) \
 	dhtest$(EXEEXT) dsatest$(EXEEXT) ecc_cdh$(EXEEXT) \
 	ec_asn1_test$(EXEEXT) ec_point_conversion$(EXEEXT) \
 	ecdhtest$(EXEEXT) ecdsatest$(EXEEXT) ectest$(EXEEXT) \
-	ed25519test$(EXEEXT) enginetest$(EXEEXT) evp_ecx_test$(EXEEXT) \
+	ed25519test$(EXEEXT) evp_ecx_test$(EXEEXT) \
 	evp_pkey_check$(EXEEXT) evp_pkey_cleanup$(EXEEXT) evptest.sh \
-	evp_test$(EXEEXT) $(am__EXEEXT_3) exportertest$(EXEEXT) \
-	freenull$(EXEEXT) gcm128test$(EXEEXT) gost2814789t$(EXEEXT) \
+	evp_test$(EXEEXT) exdata_test$(EXEEXT) $(am__EXEEXT_3) \
+	exportertest$(EXEEXT) freenull$(EXEEXT) gcm128test$(EXEEXT) \
 	handshake_table$(EXEEXT) hkdftest$(EXEEXT) hmactest$(EXEEXT) \
 	ideatest$(EXEEXT) igetest$(EXEEXT) key_schedule$(EXEEXT) \
 	keypairtest.sh md_test$(EXEEXT) objectstest$(EXEEXT) \
@@ -122,27 +122,28 @@ TESTS = aeadtest.sh aes_test$(EXEEXT) aes_wrap$(EXEEXT) \
 	rc2_test$(EXEEXT) rc4_test$(EXEEXT) recordtest$(EXEEXT) \
 	record_layer_test$(EXEEXT) rfc3779$(EXEEXT) $(am__append_12) \
 	$(am__EXEEXT_6) rmd_test$(EXEEXT) rsa_test$(EXEEXT) \
-	servertest.sh sha_test$(EXEEXT) signertest$(EXEEXT) \
-	sm3test$(EXEEXT) sm4test$(EXEEXT) \
+	servertest.sh sha_test$(EXEEXT) shutdowntest.sh \
+	signertest$(EXEEXT) sm3test$(EXEEXT) sm4test$(EXEEXT) \
 	ssl_get_shared_ciphers$(EXEEXT) ssl_methods$(EXEEXT) \
 	ssl_set_alpn_protos$(EXEEXT) ssl_verify_param$(EXEEXT) \
-	ssl_versions$(EXEEXT) ssltest.sh string_table$(EXEEXT) \
-	testdsa.sh testenc.sh testrsa.sh timingsafe$(EXEEXT) \
-	tlsexttest$(EXEEXT) tlslegacytest$(EXEEXT) tlstest.sh \
-	tls_ext_alpn$(EXEEXT) tls_prf$(EXEEXT) utf8test$(EXEEXT) \
+	ssl_versions$(EXEEXT) ssltest.sh testdsa.sh testenc.sh \
+	testrsa.sh timingsafe$(EXEEXT) tlsexttest$(EXEEXT) \
+	tlslegacytest$(EXEEXT) tlstest.sh tls_ext_alpn$(EXEEXT) \
+	tls_prf$(EXEEXT) utf8test$(EXEEXT) \
 	valid_handshakes_terminate$(EXEEXT) verifytest$(EXEEXT) \
-	x25519test$(EXEEXT) x509attribute$(EXEEXT) x509_asn1$(EXEEXT) \
-	x509_info$(EXEEXT) x509name$(EXEEXT) x509req_ext$(EXEEXT)
+	x25519test$(EXEEXT) x509attribute$(EXEEXT) x509_algor$(EXEEXT) \
+	x509_asn1$(EXEEXT) x509_info$(EXEEXT) x509name$(EXEEXT) \
+	x509req_ext$(EXEEXT)
 check_PROGRAMS = aeadtest$(EXEEXT) aes_test$(EXEEXT) aes_wrap$(EXEEXT) \
 	apitest$(EXEEXT) $(am__EXEEXT_1) asn1_string_to_utf8$(EXEEXT) \
 	asn1api$(EXEEXT) asn1basic$(EXEEXT) asn1complex$(EXEEXT) \
 	asn1evp$(EXEEXT) asn1object$(EXEEXT) asn1oct$(EXEEXT) \
 	asn1string_copy$(EXEEXT) asn1test$(EXEEXT) asn1time$(EXEEXT) \
 	asn1x509$(EXEEXT) base64test$(EXEEXT) bf_test$(EXEEXT) \
-	bio_asn1$(EXEEXT) bio_chain$(EXEEXT) $(am__EXEEXT_2) \
-	bio_mem$(EXEEXT) bn_add_sub$(EXEEXT) bn_cmp$(EXEEXT) \
-	bn_convert$(EXEEXT) bn_gcd$(EXEEXT) bn_isqrt$(EXEEXT) \
-	bn_mod_exp$(EXEEXT) bn_mod_inverse$(EXEEXT) \
+	bio_asn1$(EXEEXT) bio_chain$(EXEEXT) bio_dump$(EXEEXT) \
+	$(am__EXEEXT_2) bio_mem$(EXEEXT) bn_add_sub$(EXEEXT) \
+	bn_cmp$(EXEEXT) bn_convert$(EXEEXT) bn_gcd$(EXEEXT) \
+	bn_isqrt$(EXEEXT) bn_mod_exp$(EXEEXT) bn_mod_inverse$(EXEEXT) \
 	bn_mod_sqrt$(EXEEXT) bn_mont$(EXEEXT) bn_primes$(EXEEXT) \
 	bn_print$(EXEEXT) bn_shift$(EXEEXT) bn_test$(EXEEXT) \
 	bn_to_string$(EXEEXT) bn_unit$(EXEEXT) bn_word$(EXEEXT) \
@@ -153,29 +154,29 @@ check_PROGRAMS = aeadtest$(EXEEXT) aes_test$(EXEEXT) aes_wrap$(EXEEXT) \
 	dhtest$(EXEEXT) dsatest$(EXEEXT) ecc_cdh$(EXEEXT) \
 	ec_asn1_test$(EXEEXT) ec_point_conversion$(EXEEXT) \
 	ecdhtest$(EXEEXT) ecdsatest$(EXEEXT) ectest$(EXEEXT) \
-	ed25519test$(EXEEXT) enginetest$(EXEEXT) evp_ecx_test$(EXEEXT) \
+	ed25519test$(EXEEXT) evp_ecx_test$(EXEEXT) \
 	evp_pkey_check$(EXEEXT) evp_pkey_cleanup$(EXEEXT) \
-	evptest$(EXEEXT) evp_test$(EXEEXT) $(am__EXEEXT_3) \
-	exportertest$(EXEEXT) freenull$(EXEEXT) gcm128test$(EXEEXT) \
-	gost2814789t$(EXEEXT) handshake_table$(EXEEXT) \
-	hkdftest$(EXEEXT) hmactest$(EXEEXT) ideatest$(EXEEXT) \
-	igetest$(EXEEXT) key_schedule$(EXEEXT) keypairtest$(EXEEXT) \
-	md_test$(EXEEXT) objectstest$(EXEEXT) $(am__EXEEXT_4) \
-	optionstest$(EXEEXT) pbkdf2$(EXEEXT) $(am__EXEEXT_5) \
-	pkcs7test$(EXEEXT) poly1305test$(EXEEXT) policy$(EXEEXT) \
-	pq_test$(EXEEXT) quictest$(EXEEXT) randtest$(EXEEXT) \
-	rc2_test$(EXEEXT) rc4_test$(EXEEXT) recordtest$(EXEEXT) \
+	evptest$(EXEEXT) evp_test$(EXEEXT) exdata_test$(EXEEXT) \
+	$(am__EXEEXT_3) exportertest$(EXEEXT) freenull$(EXEEXT) \
+	gcm128test$(EXEEXT) handshake_table$(EXEEXT) hkdftest$(EXEEXT) \
+	hmactest$(EXEEXT) ideatest$(EXEEXT) igetest$(EXEEXT) \
+	key_schedule$(EXEEXT) keypairtest$(EXEEXT) md_test$(EXEEXT) \
+	objectstest$(EXEEXT) $(am__EXEEXT_4) optionstest$(EXEEXT) \
+	pbkdf2$(EXEEXT) $(am__EXEEXT_5) pkcs7test$(EXEEXT) \
+	poly1305test$(EXEEXT) policy$(EXEEXT) pq_test$(EXEEXT) \
+	quictest$(EXEEXT) randtest$(EXEEXT) rc2_test$(EXEEXT) \
+	rc4_test$(EXEEXT) recordtest$(EXEEXT) \
 	record_layer_test$(EXEEXT) rfc3779$(EXEEXT) \
 	rfc5280time$(EXEEXT) rmd_test$(EXEEXT) rsa_test$(EXEEXT) \
-	servertest$(EXEEXT) sha_test$(EXEEXT) signertest$(EXEEXT) \
-	sm3test$(EXEEXT) sm4test$(EXEEXT) \
+	servertest$(EXEEXT) sha_test$(EXEEXT) shutdowntest$(EXEEXT) \
+	signertest$(EXEEXT) sm3test$(EXEEXT) sm4test$(EXEEXT) \
 	ssl_get_shared_ciphers$(EXEEXT) ssl_methods$(EXEEXT) \
 	ssl_set_alpn_protos$(EXEEXT) ssl_verify_param$(EXEEXT) \
-	ssl_versions$(EXEEXT) ssltest$(EXEEXT) string_table$(EXEEXT) \
-	timingsafe$(EXEEXT) tlsexttest$(EXEEXT) tlslegacytest$(EXEEXT) \
-	tlstest$(EXEEXT) tls_ext_alpn$(EXEEXT) tls_prf$(EXEEXT) \
-	utf8test$(EXEEXT) valid_handshakes_terminate$(EXEEXT) \
-	verifytest$(EXEEXT) x25519test$(EXEEXT) x509attribute$(EXEEXT) \
+	ssl_versions$(EXEEXT) ssltest$(EXEEXT) timingsafe$(EXEEXT) \
+	tlsexttest$(EXEEXT) tlslegacytest$(EXEEXT) tlstest$(EXEEXT) \
+	tls_ext_alpn$(EXEEXT) tls_prf$(EXEEXT) utf8test$(EXEEXT) \
+	valid_handshakes_terminate$(EXEEXT) verifytest$(EXEEXT) \
+	x25519test$(EXEEXT) x509attribute$(EXEEXT) x509_algor$(EXEEXT) \
 	x509_asn1$(EXEEXT) x509_info$(EXEEXT) x509name$(EXEEXT) \
 	x509req_ext$(EXEEXT)
 
@@ -344,6 +345,11 @@ am_bio_chain_OBJECTS = bio_chain.$(OBJEXT)
 bio_chain_OBJECTS = $(am_bio_chain_OBJECTS)
 bio_chain_LDADD = $(LDADD)
 bio_chain_DEPENDENCIES = libtest.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
+am_bio_dump_OBJECTS = bio_dump.$(OBJEXT)
+bio_dump_OBJECTS = $(am_bio_dump_OBJECTS)
+bio_dump_LDADD = $(LDADD)
+bio_dump_DEPENDENCIES = libtest.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
 am__bio_host_SOURCES_DIST = bio_host.c
 @ENABLE_EXTRATESTS_TRUE@am_bio_host_OBJECTS = bio_host.$(OBJEXT)
@@ -541,11 +547,6 @@ ed25519test_OBJECTS = $(am_ed25519test_OBJECTS)
 ed25519test_LDADD = $(LDADD)
 ed25519test_DEPENDENCIES = libtest.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
-am_enginetest_OBJECTS = enginetest.$(OBJEXT)
-enginetest_OBJECTS = $(am_enginetest_OBJECTS)
-enginetest_LDADD = $(LDADD)
-enginetest_DEPENDENCIES = libtest.la $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1)
 am_evp_ecx_test_OBJECTS = evp_ecx_test.$(OBJEXT)
 evp_ecx_test_OBJECTS = $(am_evp_ecx_test_OBJECTS)
 evp_ecx_test_LDADD = $(LDADD)
@@ -571,6 +572,11 @@ evptest_OBJECTS = $(am_evptest_OBJECTS)
 evptest_LDADD = $(LDADD)
 evptest_DEPENDENCIES = libtest.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
+am_exdata_test_OBJECTS = exdata_test.$(OBJEXT)
+exdata_test_OBJECTS = $(am_exdata_test_OBJECTS)
+exdata_test_LDADD = $(LDADD)
+exdata_test_DEPENDENCIES = libtest.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 am__explicit_bzero_SOURCES_DIST = explicit_bzero.c compat/memmem.c
 am__dirstamp = $(am__leading_dot)dirstamp
 @HAVE_MEMMEM_FALSE@@HOST_CYGWIN_FALSE@@HOST_WIN_FALSE@am__objects_1 = compat/memmem.$(OBJEXT)
@@ -595,11 +601,6 @@ am_gcm128test_OBJECTS = gcm128test.$(OBJEXT)
 gcm128test_OBJECTS = $(am_gcm128test_OBJECTS)
 gcm128test_LDADD = $(LDADD)
 gcm128test_DEPENDENCIES = libtest.la $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1)
-am_gost2814789t_OBJECTS = gost2814789t.$(OBJEXT)
-gost2814789t_OBJECTS = $(am_gost2814789t_OBJECTS)
-gost2814789t_LDADD = $(LDADD)
-gost2814789t_DEPENDENCIES = libtest.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
 am_handshake_table_OBJECTS = handshake_table.$(OBJEXT)
 handshake_table_OBJECTS = $(am_handshake_table_OBJECTS)
@@ -749,6 +750,11 @@ sha_test_OBJECTS = $(am_sha_test_OBJECTS)
 sha_test_LDADD = $(LDADD)
 sha_test_DEPENDENCIES = libtest.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
+am_shutdowntest_OBJECTS = shutdowntest.$(OBJEXT)
+shutdowntest_OBJECTS = $(am_shutdowntest_OBJECTS)
+shutdowntest_LDADD = $(LDADD)
+shutdowntest_DEPENDENCIES = libtest.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 am__signertest_SOURCES_DIST = signertest.c compat/pipe2.c
 @HAVE_PIPE2_FALSE@am__objects_2 = compat/signertest-pipe2.$(OBJEXT)
 am_signertest_OBJECTS = signertest-signertest.$(OBJEXT) \
@@ -797,11 +803,6 @@ am_ssltest_OBJECTS = ssltest.$(OBJEXT)
 ssltest_OBJECTS = $(am_ssltest_OBJECTS)
 ssltest_LDADD = $(LDADD)
 ssltest_DEPENDENCIES = libtest.la $(am__DEPENDENCIES_1) \
-	$(am__DEPENDENCIES_1)
-am_string_table_OBJECTS = string_table.$(OBJEXT)
-string_table_OBJECTS = $(am_string_table_OBJECTS)
-string_table_LDADD = $(LDADD)
-string_table_DEPENDENCIES = libtest.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
 am_timingsafe_OBJECTS = timingsafe.$(OBJEXT)
 timingsafe_OBJECTS = $(am_timingsafe_OBJECTS)
@@ -857,6 +858,11 @@ x25519test_OBJECTS = $(am_x25519test_OBJECTS)
 x25519test_LDADD = $(LDADD)
 x25519test_DEPENDENCIES = libtest.la $(am__DEPENDENCIES_1) \
 	$(am__DEPENDENCIES_1)
+am_x509_algor_OBJECTS = x509_algor.$(OBJEXT)
+x509_algor_OBJECTS = $(am_x509_algor_OBJECTS)
+x509_algor_LDADD = $(LDADD)
+x509_algor_DEPENDENCIES = libtest.la $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1)
 am_x509_asn1_OBJECTS = x509_asn1.$(OBJEXT)
 x509_asn1_OBJECTS = $(am_x509_asn1_OBJECTS)
 x509_asn1_LDADD = $(LDADD)
@@ -907,11 +913,11 @@ am__depfiles_remade = ./$(DEPDIR)/aeadtest.Po ./$(DEPDIR)/aes_test.Po \
 	./$(DEPDIR)/asn1test.Po ./$(DEPDIR)/asn1time.Po \
 	./$(DEPDIR)/asn1x509.Po ./$(DEPDIR)/base64test.Po \
 	./$(DEPDIR)/bf_test.Po ./$(DEPDIR)/bio_asn1.Po \
-	./$(DEPDIR)/bio_chain.Po ./$(DEPDIR)/bio_host.Po \
-	./$(DEPDIR)/bio_mem.Po ./$(DEPDIR)/bn_add_sub.Po \
-	./$(DEPDIR)/bn_cmp.Po ./$(DEPDIR)/bn_convert.Po \
-	./$(DEPDIR)/bn_gcd.Po ./$(DEPDIR)/bn_isqrt.Po \
-	./$(DEPDIR)/bn_mod_exp-bn_mod_exp.Po \
+	./$(DEPDIR)/bio_chain.Po ./$(DEPDIR)/bio_dump.Po \
+	./$(DEPDIR)/bio_host.Po ./$(DEPDIR)/bio_mem.Po \
+	./$(DEPDIR)/bn_add_sub.Po ./$(DEPDIR)/bn_cmp.Po \
+	./$(DEPDIR)/bn_convert.Po ./$(DEPDIR)/bn_gcd.Po \
+	./$(DEPDIR)/bn_isqrt.Po ./$(DEPDIR)/bn_mod_exp-bn_mod_exp.Po \
 	./$(DEPDIR)/bn_mod_inverse.Po ./$(DEPDIR)/bn_mod_sqrt.Po \
 	./$(DEPDIR)/bn_mont.Po ./$(DEPDIR)/bn_primes.Po \
 	./$(DEPDIR)/bn_print.Po ./$(DEPDIR)/bn_shift.Po \
@@ -928,15 +934,14 @@ am__depfiles_remade = ./$(DEPDIR)/aeadtest.Po ./$(DEPDIR)/aes_test.Po \
 	./$(DEPDIR)/ecc_cdh.Po ./$(DEPDIR)/ecdhtest.Po \
 	./$(DEPDIR)/ecdsatest.Po ./$(DEPDIR)/ectest.Po \
 	./$(DEPDIR)/ed25519test.Po ./$(DEPDIR)/empty.Plo \
-	./$(DEPDIR)/enginetest.Po ./$(DEPDIR)/evp_ecx_test.Po \
-	./$(DEPDIR)/evp_pkey_check.Po ./$(DEPDIR)/evp_pkey_cleanup.Po \
-	./$(DEPDIR)/evp_test.Po ./$(DEPDIR)/evptest.Po \
+	./$(DEPDIR)/evp_ecx_test.Po ./$(DEPDIR)/evp_pkey_check.Po \
+	./$(DEPDIR)/evp_pkey_cleanup.Po ./$(DEPDIR)/evp_test.Po \
+	./$(DEPDIR)/evptest.Po ./$(DEPDIR)/exdata_test.Po \
 	./$(DEPDIR)/explicit_bzero.Po ./$(DEPDIR)/exportertest.Po \
 	./$(DEPDIR)/freenull-freenull.Po ./$(DEPDIR)/gcm128test.Po \
-	./$(DEPDIR)/gost2814789t.Po ./$(DEPDIR)/handshake_table.Po \
-	./$(DEPDIR)/hkdf_test.Po ./$(DEPDIR)/hmactest.Po \
-	./$(DEPDIR)/ideatest.Po ./$(DEPDIR)/igetest.Po \
-	./$(DEPDIR)/key_schedule.Po \
+	./$(DEPDIR)/handshake_table.Po ./$(DEPDIR)/hkdf_test.Po \
+	./$(DEPDIR)/hmactest.Po ./$(DEPDIR)/ideatest.Po \
+	./$(DEPDIR)/igetest.Po ./$(DEPDIR)/key_schedule.Po \
 	./$(DEPDIR)/keypairtest-keypairtest.Po ./$(DEPDIR)/md_test.Po \
 	./$(DEPDIR)/objectstest.Po ./$(DEPDIR)/ocsp_test.Po \
 	./$(DEPDIR)/optionstest.Po ./$(DEPDIR)/pbkdf2.Po \
@@ -948,22 +953,23 @@ am__depfiles_remade = ./$(DEPDIR)/aeadtest.Po ./$(DEPDIR)/aes_test.Po \
 	./$(DEPDIR)/recordtest.Po ./$(DEPDIR)/rfc3779-rfc3779.Po \
 	./$(DEPDIR)/rfc5280time.Po ./$(DEPDIR)/rmd_test.Po \
 	./$(DEPDIR)/rsa_test.Po ./$(DEPDIR)/servertest.Po \
-	./$(DEPDIR)/sha_test.Po ./$(DEPDIR)/signertest-signertest.Po \
-	./$(DEPDIR)/sm3test.Po ./$(DEPDIR)/sm4test.Po \
+	./$(DEPDIR)/sha_test.Po ./$(DEPDIR)/shutdowntest.Po \
+	./$(DEPDIR)/signertest-signertest.Po ./$(DEPDIR)/sm3test.Po \
+	./$(DEPDIR)/sm4test.Po \
 	./$(DEPDIR)/ssl_get_shared_ciphers-ssl_get_shared_ciphers.Po \
 	./$(DEPDIR)/ssl_methods.Po ./$(DEPDIR)/ssl_set_alpn_protos.Po \
 	./$(DEPDIR)/ssl_verify_param.Po ./$(DEPDIR)/ssl_versions.Po \
-	./$(DEPDIR)/ssltest.Po ./$(DEPDIR)/string_table.Po \
-	./$(DEPDIR)/timingsafe.Po ./$(DEPDIR)/tls_ext_alpn.Po \
-	./$(DEPDIR)/tls_prf.Po ./$(DEPDIR)/tlsexttest.Po \
-	./$(DEPDIR)/tlslegacytest.Po ./$(DEPDIR)/tlstest.Po \
-	./$(DEPDIR)/utf8test.Po \
+	./$(DEPDIR)/ssltest.Po ./$(DEPDIR)/timingsafe.Po \
+	./$(DEPDIR)/tls_ext_alpn.Po ./$(DEPDIR)/tls_prf.Po \
+	./$(DEPDIR)/tlsexttest.Po ./$(DEPDIR)/tlslegacytest.Po \
+	./$(DEPDIR)/tlstest.Po ./$(DEPDIR)/utf8test.Po \
 	./$(DEPDIR)/valid_handshakes_terminate.Po \
 	./$(DEPDIR)/verifytest.Po ./$(DEPDIR)/x25519test.Po \
-	./$(DEPDIR)/x509_asn1.Po ./$(DEPDIR)/x509_info.Po \
-	./$(DEPDIR)/x509attribute.Po ./$(DEPDIR)/x509name.Po \
-	./$(DEPDIR)/x509req_ext.Po compat/$(DEPDIR)/memmem.Po \
-	compat/$(DEPDIR)/pipe2.Po compat/$(DEPDIR)/signertest-pipe2.Po
+	./$(DEPDIR)/x509_algor.Po ./$(DEPDIR)/x509_asn1.Po \
+	./$(DEPDIR)/x509_info.Po ./$(DEPDIR)/x509attribute.Po \
+	./$(DEPDIR)/x509name.Po ./$(DEPDIR)/x509req_ext.Po \
+	compat/$(DEPDIR)/memmem.Po compat/$(DEPDIR)/pipe2.Po \
+	compat/$(DEPDIR)/signertest-pipe2.Po
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
@@ -991,60 +997,7 @@ SOURCES = $(libtest_la_SOURCES) $(aeadtest_SOURCES) \
 	$(asn1string_copy_SOURCES) $(asn1test_SOURCES) \
 	$(asn1time_SOURCES) $(asn1x509_SOURCES) $(base64test_SOURCES) \
 	$(bf_test_SOURCES) $(bio_asn1_SOURCES) $(bio_chain_SOURCES) \
-	$(bio_host_SOURCES) $(bio_mem_SOURCES) $(bn_add_sub_SOURCES) \
-	$(bn_cmp_SOURCES) $(bn_convert_SOURCES) $(bn_gcd_SOURCES) \
-	$(bn_isqrt_SOURCES) $(bn_mod_exp_SOURCES) \
-	$(bn_mod_inverse_SOURCES) $(bn_mod_sqrt_SOURCES) \
-	$(bn_mont_SOURCES) $(bn_primes_SOURCES) $(bn_print_SOURCES) \
-	$(bn_shift_SOURCES) $(bn_test_SOURCES) $(bn_to_string_SOURCES) \
-	$(bn_unit_SOURCES) $(bn_word_SOURCES) $(buffertest_SOURCES) \
-	$(bytestringtest_SOURCES) $(casttest_SOURCES) \
-	$(chachatest_SOURCES) $(cipher_list_SOURCES) \
-	$(cipherstest_SOURCES) $(clienttest_SOURCES) \
-	$(cmstest_SOURCES) $(configtest_SOURCES) \
-	$(constraints_SOURCES) $(cttest_SOURCES) $(destest_SOURCES) \
-	$(dhtest_SOURCES) $(dsatest_SOURCES) $(ec_asn1_test_SOURCES) \
-	$(ec_point_conversion_SOURCES) $(ecc_cdh_SOURCES) \
-	$(ecdhtest_SOURCES) $(ecdsatest_SOURCES) $(ectest_SOURCES) \
-	$(ed25519test_SOURCES) $(enginetest_SOURCES) \
-	$(evp_ecx_test_SOURCES) $(evp_pkey_check_SOURCES) \
-	$(evp_pkey_cleanup_SOURCES) $(evp_test_SOURCES) \
-	$(evptest_SOURCES) $(explicit_bzero_SOURCES) \
-	$(exportertest_SOURCES) $(freenull_SOURCES) \
-	$(gcm128test_SOURCES) $(gost2814789t_SOURCES) \
-	$(handshake_table_SOURCES) $(hkdftest_SOURCES) \
-	$(hmactest_SOURCES) $(ideatest_SOURCES) $(igetest_SOURCES) \
-	$(key_schedule_SOURCES) $(keypairtest_SOURCES) \
-	$(md_test_SOURCES) $(objectstest_SOURCES) $(ocsp_test_SOURCES) \
-	$(optionstest_SOURCES) $(pbkdf2_SOURCES) \
-	$(pidwraptest_SOURCES) $(pkcs7test_SOURCES) $(policy_SOURCES) \
-	$(poly1305test_SOURCES) $(pq_test_SOURCES) $(quictest_SOURCES) \
-	$(randtest_SOURCES) $(rc2_test_SOURCES) $(rc4_test_SOURCES) \
-	$(record_layer_test_SOURCES) $(recordtest_SOURCES) \
-	$(rfc3779_SOURCES) $(rfc5280time_SOURCES) $(rmd_test_SOURCES) \
-	$(rsa_test_SOURCES) $(servertest_SOURCES) $(sha_test_SOURCES) \
-	$(signertest_SOURCES) $(sm3test_SOURCES) $(sm4test_SOURCES) \
-	$(ssl_get_shared_ciphers_SOURCES) $(ssl_methods_SOURCES) \
-	$(ssl_set_alpn_protos_SOURCES) $(ssl_verify_param_SOURCES) \
-	$(ssl_versions_SOURCES) $(ssltest_SOURCES) \
-	$(string_table_SOURCES) $(timingsafe_SOURCES) \
-	$(tls_ext_alpn_SOURCES) $(tls_prf_SOURCES) \
-	$(tlsexttest_SOURCES) $(tlslegacytest_SOURCES) \
-	$(tlstest_SOURCES) $(utf8test_SOURCES) \
-	$(valid_handshakes_terminate_SOURCES) $(verifytest_SOURCES) \
-	$(x25519test_SOURCES) $(x509_asn1_SOURCES) \
-	$(x509_info_SOURCES) $(x509attribute_SOURCES) \
-	$(x509name_SOURCES) $(x509req_ext_SOURCES)
-DIST_SOURCES = $(libtest_la_SOURCES) $(aeadtest_SOURCES) \
-	$(aes_test_SOURCES) $(aes_wrap_SOURCES) $(apitest_SOURCES) \
-	$(am__arc4randomforktest_SOURCES_DIST) \
-	$(asn1_string_to_utf8_SOURCES) $(asn1api_SOURCES) \
-	$(asn1basic_SOURCES) $(asn1complex_SOURCES) $(asn1evp_SOURCES) \
-	$(asn1object_SOURCES) $(asn1oct_SOURCES) \
-	$(asn1string_copy_SOURCES) $(asn1test_SOURCES) \
-	$(asn1time_SOURCES) $(asn1x509_SOURCES) $(base64test_SOURCES) \
-	$(bf_test_SOURCES) $(bio_asn1_SOURCES) $(bio_chain_SOURCES) \
-	$(am__bio_host_SOURCES_DIST) $(bio_mem_SOURCES) \
+	$(bio_dump_SOURCES) $(bio_host_SOURCES) $(bio_mem_SOURCES) \
 	$(bn_add_sub_SOURCES) $(bn_cmp_SOURCES) $(bn_convert_SOURCES) \
 	$(bn_gcd_SOURCES) $(bn_isqrt_SOURCES) $(bn_mod_exp_SOURCES) \
 	$(bn_mod_inverse_SOURCES) $(bn_mod_sqrt_SOURCES) \
@@ -1059,12 +1012,64 @@ DIST_SOURCES = $(libtest_la_SOURCES) $(aeadtest_SOURCES) \
 	$(dhtest_SOURCES) $(dsatest_SOURCES) $(ec_asn1_test_SOURCES) \
 	$(ec_point_conversion_SOURCES) $(ecc_cdh_SOURCES) \
 	$(ecdhtest_SOURCES) $(ecdsatest_SOURCES) $(ectest_SOURCES) \
-	$(ed25519test_SOURCES) $(enginetest_SOURCES) \
-	$(evp_ecx_test_SOURCES) $(evp_pkey_check_SOURCES) \
-	$(evp_pkey_cleanup_SOURCES) $(evp_test_SOURCES) \
-	$(evptest_SOURCES) $(am__explicit_bzero_SOURCES_DIST) \
-	$(exportertest_SOURCES) $(freenull_SOURCES) \
-	$(gcm128test_SOURCES) $(gost2814789t_SOURCES) \
+	$(ed25519test_SOURCES) $(evp_ecx_test_SOURCES) \
+	$(evp_pkey_check_SOURCES) $(evp_pkey_cleanup_SOURCES) \
+	$(evp_test_SOURCES) $(evptest_SOURCES) $(exdata_test_SOURCES) \
+	$(explicit_bzero_SOURCES) $(exportertest_SOURCES) \
+	$(freenull_SOURCES) $(gcm128test_SOURCES) \
+	$(handshake_table_SOURCES) $(hkdftest_SOURCES) \
+	$(hmactest_SOURCES) $(ideatest_SOURCES) $(igetest_SOURCES) \
+	$(key_schedule_SOURCES) $(keypairtest_SOURCES) \
+	$(md_test_SOURCES) $(objectstest_SOURCES) $(ocsp_test_SOURCES) \
+	$(optionstest_SOURCES) $(pbkdf2_SOURCES) \
+	$(pidwraptest_SOURCES) $(pkcs7test_SOURCES) $(policy_SOURCES) \
+	$(poly1305test_SOURCES) $(pq_test_SOURCES) $(quictest_SOURCES) \
+	$(randtest_SOURCES) $(rc2_test_SOURCES) $(rc4_test_SOURCES) \
+	$(record_layer_test_SOURCES) $(recordtest_SOURCES) \
+	$(rfc3779_SOURCES) $(rfc5280time_SOURCES) $(rmd_test_SOURCES) \
+	$(rsa_test_SOURCES) $(servertest_SOURCES) $(sha_test_SOURCES) \
+	$(shutdowntest_SOURCES) $(signertest_SOURCES) \
+	$(sm3test_SOURCES) $(sm4test_SOURCES) \
+	$(ssl_get_shared_ciphers_SOURCES) $(ssl_methods_SOURCES) \
+	$(ssl_set_alpn_protos_SOURCES) $(ssl_verify_param_SOURCES) \
+	$(ssl_versions_SOURCES) $(ssltest_SOURCES) \
+	$(timingsafe_SOURCES) $(tls_ext_alpn_SOURCES) \
+	$(tls_prf_SOURCES) $(tlsexttest_SOURCES) \
+	$(tlslegacytest_SOURCES) $(tlstest_SOURCES) \
+	$(utf8test_SOURCES) $(valid_handshakes_terminate_SOURCES) \
+	$(verifytest_SOURCES) $(x25519test_SOURCES) \
+	$(x509_algor_SOURCES) $(x509_asn1_SOURCES) \
+	$(x509_info_SOURCES) $(x509attribute_SOURCES) \
+	$(x509name_SOURCES) $(x509req_ext_SOURCES)
+DIST_SOURCES = $(libtest_la_SOURCES) $(aeadtest_SOURCES) \
+	$(aes_test_SOURCES) $(aes_wrap_SOURCES) $(apitest_SOURCES) \
+	$(am__arc4randomforktest_SOURCES_DIST) \
+	$(asn1_string_to_utf8_SOURCES) $(asn1api_SOURCES) \
+	$(asn1basic_SOURCES) $(asn1complex_SOURCES) $(asn1evp_SOURCES) \
+	$(asn1object_SOURCES) $(asn1oct_SOURCES) \
+	$(asn1string_copy_SOURCES) $(asn1test_SOURCES) \
+	$(asn1time_SOURCES) $(asn1x509_SOURCES) $(base64test_SOURCES) \
+	$(bf_test_SOURCES) $(bio_asn1_SOURCES) $(bio_chain_SOURCES) \
+	$(bio_dump_SOURCES) $(am__bio_host_SOURCES_DIST) \
+	$(bio_mem_SOURCES) $(bn_add_sub_SOURCES) $(bn_cmp_SOURCES) \
+	$(bn_convert_SOURCES) $(bn_gcd_SOURCES) $(bn_isqrt_SOURCES) \
+	$(bn_mod_exp_SOURCES) $(bn_mod_inverse_SOURCES) \
+	$(bn_mod_sqrt_SOURCES) $(bn_mont_SOURCES) $(bn_primes_SOURCES) \
+	$(bn_print_SOURCES) $(bn_shift_SOURCES) $(bn_test_SOURCES) \
+	$(bn_to_string_SOURCES) $(bn_unit_SOURCES) $(bn_word_SOURCES) \
+	$(buffertest_SOURCES) $(bytestringtest_SOURCES) \
+	$(casttest_SOURCES) $(chachatest_SOURCES) \
+	$(cipher_list_SOURCES) $(cipherstest_SOURCES) \
+	$(clienttest_SOURCES) $(cmstest_SOURCES) $(configtest_SOURCES) \
+	$(constraints_SOURCES) $(cttest_SOURCES) $(destest_SOURCES) \
+	$(dhtest_SOURCES) $(dsatest_SOURCES) $(ec_asn1_test_SOURCES) \
+	$(ec_point_conversion_SOURCES) $(ecc_cdh_SOURCES) \
+	$(ecdhtest_SOURCES) $(ecdsatest_SOURCES) $(ectest_SOURCES) \
+	$(ed25519test_SOURCES) $(evp_ecx_test_SOURCES) \
+	$(evp_pkey_check_SOURCES) $(evp_pkey_cleanup_SOURCES) \
+	$(evp_test_SOURCES) $(evptest_SOURCES) $(exdata_test_SOURCES) \
+	$(am__explicit_bzero_SOURCES_DIST) $(exportertest_SOURCES) \
+	$(freenull_SOURCES) $(gcm128test_SOURCES) \
 	$(handshake_table_SOURCES) $(hkdftest_SOURCES) \
 	$(hmactest_SOURCES) $(ideatest_SOURCES) $(igetest_SOURCES) \
 	$(key_schedule_SOURCES) $(keypairtest_SOURCES) \
@@ -1077,19 +1082,19 @@ DIST_SOURCES = $(libtest_la_SOURCES) $(aeadtest_SOURCES) \
 	$(record_layer_test_SOURCES) $(recordtest_SOURCES) \
 	$(rfc3779_SOURCES) $(rfc5280time_SOURCES) $(rmd_test_SOURCES) \
 	$(rsa_test_SOURCES) $(servertest_SOURCES) $(sha_test_SOURCES) \
-	$(am__signertest_SOURCES_DIST) $(sm3test_SOURCES) \
-	$(sm4test_SOURCES) $(ssl_get_shared_ciphers_SOURCES) \
-	$(ssl_methods_SOURCES) $(ssl_set_alpn_protos_SOURCES) \
-	$(ssl_verify_param_SOURCES) $(ssl_versions_SOURCES) \
-	$(ssltest_SOURCES) $(string_table_SOURCES) \
+	$(shutdowntest_SOURCES) $(am__signertest_SOURCES_DIST) \
+	$(sm3test_SOURCES) $(sm4test_SOURCES) \
+	$(ssl_get_shared_ciphers_SOURCES) $(ssl_methods_SOURCES) \
+	$(ssl_set_alpn_protos_SOURCES) $(ssl_verify_param_SOURCES) \
+	$(ssl_versions_SOURCES) $(ssltest_SOURCES) \
 	$(timingsafe_SOURCES) $(tls_ext_alpn_SOURCES) \
 	$(tls_prf_SOURCES) $(tlsexttest_SOURCES) \
 	$(tlslegacytest_SOURCES) $(am__tlstest_SOURCES_DIST) \
 	$(utf8test_SOURCES) $(valid_handshakes_terminate_SOURCES) \
 	$(verifytest_SOURCES) $(x25519test_SOURCES) \
-	$(x509_asn1_SOURCES) $(x509_info_SOURCES) \
-	$(x509attribute_SOURCES) $(x509name_SOURCES) \
-	$(x509req_ext_SOURCES)
+	$(x509_algor_SOURCES) $(x509_asn1_SOURCES) \
+	$(x509_info_SOURCES) $(x509attribute_SOURCES) \
+	$(x509name_SOURCES) $(x509req_ext_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -1490,22 +1495,21 @@ EXTRA_DIST = CMakeLists.txt aeadtest.sh aeadtests.txt \
 	policy_root.pem policy_root2.pem \
 	policy_root_cross_inhibit_mapping.pem pq_test.sh pq_test.bat \
 	pq_expected.txt quictest.sh quictest.bat \
-	rfc5280time_small.test servertest.sh servertest.bat ssltest.sh \
-	ssltest.bat testssl testssl.bat ca-int-ecdsa.crl \
-	ca-int-ecdsa.pem ca-int-rsa.crl ca-int-rsa.pem \
-	ca-root-ecdsa.pem ca-root-rsa.pem ca.pem client.pem \
-	client1-ecdsa-chain.pem client1-ecdsa.pem \
+	rfc5280time_small.test servertest.sh servertest.bat \
+	shutdowntest.sh shutdowntest.bat ssltest.sh ssltest.bat \
+	testssl testssl.bat ca-int-ecdsa.crl ca-int-ecdsa.pem \
+	ca-int-rsa.crl ca-int-rsa.pem ca-root-ecdsa.pem \
+	ca-root-rsa.pem client1-ecdsa-chain.pem client1-ecdsa.pem \
 	client1-rsa-chain.pem client1-rsa.pem client2-ecdsa-chain.pem \
 	client2-ecdsa.pem client2-rsa-chain.pem client2-rsa.pem \
 	client3-ecdsa-chain.pem client3-ecdsa.pem \
-	client3-rsa-chain.pem client3-rsa.pem server.pem \
-	server1-ecdsa-chain.pem server1-ecdsa.pem \
-	server1-rsa-chain.pem server1-rsa.pem server2-ecdsa-chain.pem \
-	server2-ecdsa.pem server2-rsa-chain.pem server2-rsa.pem \
-	server3-ecdsa-chain.pem server3-ecdsa.pem \
-	server3-rsa-chain.pem server3-rsa.pem testdsa.sh testdsa.bat \
-	openssl.cnf testenc.sh testenc.bat testrsa.sh testrsa.bat \
-	tlstest.sh tlstest.bat
+	client3-rsa-chain.pem client3-rsa.pem server1-ecdsa-chain.pem \
+	server1-ecdsa.pem server1-rsa-chain.pem server1-rsa.pem \
+	server2-ecdsa-chain.pem server2-ecdsa.pem \
+	server2-rsa-chain.pem server2-rsa.pem server3-ecdsa-chain.pem \
+	server3-ecdsa.pem server3-rsa-chain.pem server3-rsa.pem \
+	testdsa.sh testdsa.bat openssl.cnf testenc.sh testenc.bat \
+	testrsa.sh testrsa.bat tlstest.sh tlstest.bat
 DISTCLEANFILES = pidwraptest.txt
 aeadtest_SOURCES = aeadtest.c
 aes_test_SOURCES = aes_test.c
@@ -1528,6 +1532,7 @@ base64test_SOURCES = base64test.c
 bf_test_SOURCES = bf_test.c
 bio_asn1_SOURCES = bio_asn1.c
 bio_chain_SOURCES = bio_chain.c
+bio_dump_SOURCES = bio_dump.c
 @ENABLE_EXTRATESTS_TRUE@bio_host_SOURCES = bio_host.c
 bio_mem_SOURCES = bio_mem.c
 bn_add_sub_SOURCES = bn_add_sub.c
@@ -1571,12 +1576,12 @@ ecdhtest_SOURCES = ecdhtest.c
 ecdsatest_SOURCES = ecdsatest.c
 ectest_SOURCES = ectest.c
 ed25519test_SOURCES = ed25519test.c
-enginetest_SOURCES = enginetest.c
 evp_ecx_test_SOURCES = evp_ecx_test.c
 evp_pkey_check_SOURCES = evp_pkey_check.c
 evp_pkey_cleanup_SOURCES = evp_pkey_cleanup.c
 evptest_SOURCES = evptest.c
 evp_test_SOURCES = evp_test.c
+exdata_test_SOURCES = exdata_test.c
 @HOST_CYGWIN_FALSE@@HOST_WIN_FALSE@explicit_bzero_SOURCES =  \
 @HOST_CYGWIN_FALSE@@HOST_WIN_FALSE@	explicit_bzero.c \
 @HOST_CYGWIN_FALSE@@HOST_WIN_FALSE@	$(am__append_7)
@@ -1584,7 +1589,6 @@ exportertest_SOURCES = exportertest.c
 freenull_CPPFLAGS = $(AM_CPPFLAGS) -ULIBRESSL_INTERNAL
 freenull_SOURCES = freenull.c
 gcm128test_SOURCES = gcm128test.c
-gost2814789t_SOURCES = gost2814789t.c
 handshake_table_SOURCES = handshake_table.c
 hkdftest_SOURCES = hkdf_test.c
 hmactest_SOURCES = hmactest.c
@@ -1617,6 +1621,7 @@ rmd_test_SOURCES = rmd_test.c
 rsa_test_SOURCES = rsa_test.c
 servertest_SOURCES = servertest.c
 sha_test_SOURCES = sha_test.c
+shutdowntest_SOURCES = shutdowntest.c
 signertest_CPPFLAGS = -I $(top_srcdir)/tls $(AM_CPPFLAGS) -DCERTSDIR=\"$(srcdir)\"
 signertest_SOURCES = signertest.c $(am__append_14)
 sm3test_SOURCES = sm3test.c
@@ -1628,7 +1633,6 @@ ssl_set_alpn_protos_SOURCES = ssl_set_alpn_protos.c
 ssl_verify_param_SOURCES = ssl_verify_param.c
 ssl_versions_SOURCES = ssl_versions.c
 ssltest_SOURCES = ssltest.c
-string_table_SOURCES = string_table.c
 timingsafe_SOURCES = timingsafe.c
 tlsexttest_SOURCES = tlsexttest.c
 tlslegacytest_SOURCES = tlslegacytest.c
@@ -1640,6 +1644,7 @@ valid_handshakes_terminate_SOURCES = valid_handshakes_terminate.c
 verifytest_SOURCES = verifytest.c
 x25519test_SOURCES = x25519test.c
 x509attribute_SOURCES = x509attribute.c
+x509_algor_SOURCES = x509_algor.c
 x509_asn1_SOURCES = x509_asn1.c
 x509_info_SOURCES = x509_info.c
 x509name_SOURCES = x509name.c
@@ -1781,6 +1786,10 @@ bio_asn1$(EXEEXT): $(bio_asn1_OBJECTS) $(bio_asn1_DEPENDENCIES) $(EXTRA_bio_asn1
 bio_chain$(EXEEXT): $(bio_chain_OBJECTS) $(bio_chain_DEPENDENCIES) $(EXTRA_bio_chain_DEPENDENCIES) 
 	@rm -f bio_chain$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(bio_chain_OBJECTS) $(bio_chain_LDADD) $(LIBS)
+
+bio_dump$(EXEEXT): $(bio_dump_OBJECTS) $(bio_dump_DEPENDENCIES) $(EXTRA_bio_dump_DEPENDENCIES) 
+	@rm -f bio_dump$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(bio_dump_OBJECTS) $(bio_dump_LDADD) $(LIBS)
 
 bio_host$(EXEEXT): $(bio_host_OBJECTS) $(bio_host_DEPENDENCIES) $(EXTRA_bio_host_DEPENDENCIES) 
 	@rm -f bio_host$(EXEEXT)
@@ -1938,10 +1947,6 @@ ed25519test$(EXEEXT): $(ed25519test_OBJECTS) $(ed25519test_DEPENDENCIES) $(EXTRA
 	@rm -f ed25519test$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(ed25519test_OBJECTS) $(ed25519test_LDADD) $(LIBS)
 
-enginetest$(EXEEXT): $(enginetest_OBJECTS) $(enginetest_DEPENDENCIES) $(EXTRA_enginetest_DEPENDENCIES) 
-	@rm -f enginetest$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(enginetest_OBJECTS) $(enginetest_LDADD) $(LIBS)
-
 evp_ecx_test$(EXEEXT): $(evp_ecx_test_OBJECTS) $(evp_ecx_test_DEPENDENCIES) $(EXTRA_evp_ecx_test_DEPENDENCIES) 
 	@rm -f evp_ecx_test$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(evp_ecx_test_OBJECTS) $(evp_ecx_test_LDADD) $(LIBS)
@@ -1961,6 +1966,10 @@ evp_test$(EXEEXT): $(evp_test_OBJECTS) $(evp_test_DEPENDENCIES) $(EXTRA_evp_test
 evptest$(EXEEXT): $(evptest_OBJECTS) $(evptest_DEPENDENCIES) $(EXTRA_evptest_DEPENDENCIES) 
 	@rm -f evptest$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(evptest_OBJECTS) $(evptest_LDADD) $(LIBS)
+
+exdata_test$(EXEEXT): $(exdata_test_OBJECTS) $(exdata_test_DEPENDENCIES) $(EXTRA_exdata_test_DEPENDENCIES) 
+	@rm -f exdata_test$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(exdata_test_OBJECTS) $(exdata_test_LDADD) $(LIBS)
 compat/$(am__dirstamp):
 	@$(MKDIR_P) compat
 	@: > compat/$(am__dirstamp)
@@ -1985,10 +1994,6 @@ freenull$(EXEEXT): $(freenull_OBJECTS) $(freenull_DEPENDENCIES) $(EXTRA_freenull
 gcm128test$(EXEEXT): $(gcm128test_OBJECTS) $(gcm128test_DEPENDENCIES) $(EXTRA_gcm128test_DEPENDENCIES) 
 	@rm -f gcm128test$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(gcm128test_OBJECTS) $(gcm128test_LDADD) $(LIBS)
-
-gost2814789t$(EXEEXT): $(gost2814789t_OBJECTS) $(gost2814789t_DEPENDENCIES) $(EXTRA_gost2814789t_DEPENDENCIES) 
-	@rm -f gost2814789t$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(gost2814789t_OBJECTS) $(gost2814789t_LDADD) $(LIBS)
 
 handshake_table$(EXEEXT): $(handshake_table_OBJECTS) $(handshake_table_DEPENDENCIES) $(EXTRA_handshake_table_DEPENDENCIES) 
 	@rm -f handshake_table$(EXEEXT)
@@ -2105,6 +2110,10 @@ servertest$(EXEEXT): $(servertest_OBJECTS) $(servertest_DEPENDENCIES) $(EXTRA_se
 sha_test$(EXEEXT): $(sha_test_OBJECTS) $(sha_test_DEPENDENCIES) $(EXTRA_sha_test_DEPENDENCIES) 
 	@rm -f sha_test$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(sha_test_OBJECTS) $(sha_test_LDADD) $(LIBS)
+
+shutdowntest$(EXEEXT): $(shutdowntest_OBJECTS) $(shutdowntest_DEPENDENCIES) $(EXTRA_shutdowntest_DEPENDENCIES) 
+	@rm -f shutdowntest$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(shutdowntest_OBJECTS) $(shutdowntest_LDADD) $(LIBS)
 compat/signertest-pipe2.$(OBJEXT): compat/$(am__dirstamp) \
 	compat/$(DEPDIR)/$(am__dirstamp)
 
@@ -2143,10 +2152,6 @@ ssl_versions$(EXEEXT): $(ssl_versions_OBJECTS) $(ssl_versions_DEPENDENCIES) $(EX
 ssltest$(EXEEXT): $(ssltest_OBJECTS) $(ssltest_DEPENDENCIES) $(EXTRA_ssltest_DEPENDENCIES) 
 	@rm -f ssltest$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(ssltest_OBJECTS) $(ssltest_LDADD) $(LIBS)
-
-string_table$(EXEEXT): $(string_table_OBJECTS) $(string_table_DEPENDENCIES) $(EXTRA_string_table_DEPENDENCIES) 
-	@rm -f string_table$(EXEEXT)
-	$(AM_V_CCLD)$(LINK) $(string_table_OBJECTS) $(string_table_LDADD) $(LIBS)
 
 timingsafe$(EXEEXT): $(timingsafe_OBJECTS) $(timingsafe_DEPENDENCIES) $(EXTRA_timingsafe_DEPENDENCIES) 
 	@rm -f timingsafe$(EXEEXT)
@@ -2189,6 +2194,10 @@ verifytest$(EXEEXT): $(verifytest_OBJECTS) $(verifytest_DEPENDENCIES) $(EXTRA_ve
 x25519test$(EXEEXT): $(x25519test_OBJECTS) $(x25519test_DEPENDENCIES) $(EXTRA_x25519test_DEPENDENCIES) 
 	@rm -f x25519test$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(x25519test_OBJECTS) $(x25519test_LDADD) $(LIBS)
+
+x509_algor$(EXEEXT): $(x509_algor_OBJECTS) $(x509_algor_DEPENDENCIES) $(EXTRA_x509_algor_DEPENDENCIES) 
+	@rm -f x509_algor$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(x509_algor_OBJECTS) $(x509_algor_LDADD) $(LIBS)
 
 x509_asn1$(EXEEXT): $(x509_asn1_OBJECTS) $(x509_asn1_DEPENDENCIES) $(EXTRA_x509_asn1_DEPENDENCIES) 
 	@rm -f x509_asn1$(EXEEXT)
@@ -2237,6 +2246,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bf_test.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bio_asn1.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bio_chain.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bio_dump.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bio_host.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bio_mem.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bn_add_sub.Po@am__quote@ # am--include-marker
@@ -2277,17 +2287,16 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ectest.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ed25519test.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/empty.Plo@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/enginetest.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/evp_ecx_test.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/evp_pkey_check.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/evp_pkey_cleanup.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/evp_test.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/evptest.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/exdata_test.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/explicit_bzero.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/exportertest.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/freenull-freenull.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gcm128test.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gost2814789t.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/handshake_table.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hkdf_test.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/hmactest.Po@am__quote@ # am--include-marker
@@ -2317,6 +2326,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rsa_test.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/servertest.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sha_test.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/shutdowntest.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/signertest-signertest.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sm3test.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sm4test.Po@am__quote@ # am--include-marker
@@ -2326,7 +2336,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ssl_verify_param.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ssl_versions.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ssltest.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/string_table.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/timingsafe.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tls_ext_alpn.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tls_prf.Po@am__quote@ # am--include-marker
@@ -2337,6 +2346,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/valid_handshakes_terminate.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/verifytest.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/x25519test.Po@am__quote@ # am--include-marker
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/x509_algor.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/x509_asn1.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/x509_info.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/x509attribute.Po@am__quote@ # am--include-marker
@@ -2869,6 +2879,13 @@ bio_chain.log: bio_chain$(EXEEXT)
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
+bio_dump.log: bio_dump$(EXEEXT)
+	@p='bio_dump$(EXEEXT)'; \
+	b='bio_dump'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
 bio_host.log: bio_host$(EXEEXT)
 	@p='bio_host$(EXEEXT)'; \
 	b='bio_host'; \
@@ -3142,13 +3159,6 @@ ed25519test.log: ed25519test$(EXEEXT)
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
-enginetest.log: enginetest$(EXEEXT)
-	@p='enginetest$(EXEEXT)'; \
-	b='enginetest'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
 evp_ecx_test.log: evp_ecx_test$(EXEEXT)
 	@p='evp_ecx_test$(EXEEXT)'; \
 	b='evp_ecx_test'; \
@@ -3184,6 +3194,13 @@ evp_test.log: evp_test$(EXEEXT)
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
+exdata_test.log: exdata_test$(EXEEXT)
+	@p='exdata_test$(EXEEXT)'; \
+	b='exdata_test'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
 explicit_bzero.log: explicit_bzero$(EXEEXT)
 	@p='explicit_bzero$(EXEEXT)'; \
 	b='explicit_bzero'; \
@@ -3208,13 +3225,6 @@ freenull.log: freenull$(EXEEXT)
 gcm128test.log: gcm128test$(EXEEXT)
 	@p='gcm128test$(EXEEXT)'; \
 	b='gcm128test'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
-gost2814789t.log: gost2814789t$(EXEEXT)
-	@p='gost2814789t$(EXEEXT)'; \
-	b='gost2814789t'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
@@ -3422,6 +3432,13 @@ sha_test.log: sha_test$(EXEEXT)
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
+shutdowntest.sh.log: shutdowntest.sh
+	@p='shutdowntest.sh'; \
+	b='shutdowntest.sh'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
 signertest.log: signertest$(EXEEXT)
 	@p='signertest$(EXEEXT)'; \
 	b='signertest'; \
@@ -3481,13 +3498,6 @@ ssl_versions.log: ssl_versions$(EXEEXT)
 ssltest.sh.log: ssltest.sh
 	@p='ssltest.sh'; \
 	b='ssltest.sh'; \
-	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
-	--log-file $$b.log --trs-file $$b.trs \
-	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
-	"$$tst" $(AM_TESTS_FD_REDIRECT)
-string_table.log: string_table$(EXEEXT)
-	@p='string_table$(EXEEXT)'; \
-	b='string_table'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
@@ -3586,6 +3596,13 @@ x25519test.log: x25519test$(EXEEXT)
 x509attribute.log: x509attribute$(EXEEXT)
 	@p='x509attribute$(EXEEXT)'; \
 	b='x509attribute'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+x509_algor.log: x509_algor$(EXEEXT)
+	@p='x509_algor$(EXEEXT)'; \
+	b='x509_algor'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
@@ -3733,6 +3750,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/bf_test.Po
 	-rm -f ./$(DEPDIR)/bio_asn1.Po
 	-rm -f ./$(DEPDIR)/bio_chain.Po
+	-rm -f ./$(DEPDIR)/bio_dump.Po
 	-rm -f ./$(DEPDIR)/bio_host.Po
 	-rm -f ./$(DEPDIR)/bio_mem.Po
 	-rm -f ./$(DEPDIR)/bn_add_sub.Po
@@ -3773,17 +3791,16 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/ectest.Po
 	-rm -f ./$(DEPDIR)/ed25519test.Po
 	-rm -f ./$(DEPDIR)/empty.Plo
-	-rm -f ./$(DEPDIR)/enginetest.Po
 	-rm -f ./$(DEPDIR)/evp_ecx_test.Po
 	-rm -f ./$(DEPDIR)/evp_pkey_check.Po
 	-rm -f ./$(DEPDIR)/evp_pkey_cleanup.Po
 	-rm -f ./$(DEPDIR)/evp_test.Po
 	-rm -f ./$(DEPDIR)/evptest.Po
+	-rm -f ./$(DEPDIR)/exdata_test.Po
 	-rm -f ./$(DEPDIR)/explicit_bzero.Po
 	-rm -f ./$(DEPDIR)/exportertest.Po
 	-rm -f ./$(DEPDIR)/freenull-freenull.Po
 	-rm -f ./$(DEPDIR)/gcm128test.Po
-	-rm -f ./$(DEPDIR)/gost2814789t.Po
 	-rm -f ./$(DEPDIR)/handshake_table.Po
 	-rm -f ./$(DEPDIR)/hkdf_test.Po
 	-rm -f ./$(DEPDIR)/hmactest.Po
@@ -3813,6 +3830,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/rsa_test.Po
 	-rm -f ./$(DEPDIR)/servertest.Po
 	-rm -f ./$(DEPDIR)/sha_test.Po
+	-rm -f ./$(DEPDIR)/shutdowntest.Po
 	-rm -f ./$(DEPDIR)/signertest-signertest.Po
 	-rm -f ./$(DEPDIR)/sm3test.Po
 	-rm -f ./$(DEPDIR)/sm4test.Po
@@ -3822,7 +3840,6 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/ssl_verify_param.Po
 	-rm -f ./$(DEPDIR)/ssl_versions.Po
 	-rm -f ./$(DEPDIR)/ssltest.Po
-	-rm -f ./$(DEPDIR)/string_table.Po
 	-rm -f ./$(DEPDIR)/timingsafe.Po
 	-rm -f ./$(DEPDIR)/tls_ext_alpn.Po
 	-rm -f ./$(DEPDIR)/tls_prf.Po
@@ -3833,6 +3850,7 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/valid_handshakes_terminate.Po
 	-rm -f ./$(DEPDIR)/verifytest.Po
 	-rm -f ./$(DEPDIR)/x25519test.Po
+	-rm -f ./$(DEPDIR)/x509_algor.Po
 	-rm -f ./$(DEPDIR)/x509_asn1.Po
 	-rm -f ./$(DEPDIR)/x509_info.Po
 	-rm -f ./$(DEPDIR)/x509attribute.Po
@@ -3906,6 +3924,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/bf_test.Po
 	-rm -f ./$(DEPDIR)/bio_asn1.Po
 	-rm -f ./$(DEPDIR)/bio_chain.Po
+	-rm -f ./$(DEPDIR)/bio_dump.Po
 	-rm -f ./$(DEPDIR)/bio_host.Po
 	-rm -f ./$(DEPDIR)/bio_mem.Po
 	-rm -f ./$(DEPDIR)/bn_add_sub.Po
@@ -3946,17 +3965,16 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/ectest.Po
 	-rm -f ./$(DEPDIR)/ed25519test.Po
 	-rm -f ./$(DEPDIR)/empty.Plo
-	-rm -f ./$(DEPDIR)/enginetest.Po
 	-rm -f ./$(DEPDIR)/evp_ecx_test.Po
 	-rm -f ./$(DEPDIR)/evp_pkey_check.Po
 	-rm -f ./$(DEPDIR)/evp_pkey_cleanup.Po
 	-rm -f ./$(DEPDIR)/evp_test.Po
 	-rm -f ./$(DEPDIR)/evptest.Po
+	-rm -f ./$(DEPDIR)/exdata_test.Po
 	-rm -f ./$(DEPDIR)/explicit_bzero.Po
 	-rm -f ./$(DEPDIR)/exportertest.Po
 	-rm -f ./$(DEPDIR)/freenull-freenull.Po
 	-rm -f ./$(DEPDIR)/gcm128test.Po
-	-rm -f ./$(DEPDIR)/gost2814789t.Po
 	-rm -f ./$(DEPDIR)/handshake_table.Po
 	-rm -f ./$(DEPDIR)/hkdf_test.Po
 	-rm -f ./$(DEPDIR)/hmactest.Po
@@ -3986,6 +4004,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/rsa_test.Po
 	-rm -f ./$(DEPDIR)/servertest.Po
 	-rm -f ./$(DEPDIR)/sha_test.Po
+	-rm -f ./$(DEPDIR)/shutdowntest.Po
 	-rm -f ./$(DEPDIR)/signertest-signertest.Po
 	-rm -f ./$(DEPDIR)/sm3test.Po
 	-rm -f ./$(DEPDIR)/sm4test.Po
@@ -3995,7 +4014,6 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/ssl_verify_param.Po
 	-rm -f ./$(DEPDIR)/ssl_versions.Po
 	-rm -f ./$(DEPDIR)/ssltest.Po
-	-rm -f ./$(DEPDIR)/string_table.Po
 	-rm -f ./$(DEPDIR)/timingsafe.Po
 	-rm -f ./$(DEPDIR)/tls_ext_alpn.Po
 	-rm -f ./$(DEPDIR)/tls_prf.Po
@@ -4006,6 +4024,7 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/valid_handshakes_terminate.Po
 	-rm -f ./$(DEPDIR)/verifytest.Po
 	-rm -f ./$(DEPDIR)/x25519test.Po
+	-rm -f ./$(DEPDIR)/x509_algor.Po
 	-rm -f ./$(DEPDIR)/x509_asn1.Po
 	-rm -f ./$(DEPDIR)/x509_info.Po
 	-rm -f ./$(DEPDIR)/x509attribute.Po

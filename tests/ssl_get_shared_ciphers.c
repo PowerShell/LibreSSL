@@ -462,7 +462,7 @@ main(int argc, char **argv)
 	size_t i;
 	int failed = 0;
 
-	if (asprintf(&server_cert, "%s/server.pem", CERTSDIR) == -1) {
+	if (asprintf(&server_cert, "%s/server1-rsa.pem", CERTSDIR) == -1) {
 		fprintf(stderr, "asprintf server_cert failed\n");
 		failed = 1;
 		goto err;

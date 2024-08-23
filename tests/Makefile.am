@@ -147,6 +147,11 @@ TESTS += bio_chain
 check_PROGRAMS += bio_chain
 bio_chain_SOURCES = bio_chain.c
 
+# bio_dump
+TESTS += bio_dump
+check_PROGRAMS += bio_dump
+bio_dump_SOURCES = bio_dump.c
+
 # bio_host
 # this test relies on resolver results that are OS and environment-specific
 if ENABLE_EXTRATESTS
@@ -366,11 +371,6 @@ TESTS += ed25519test
 check_PROGRAMS += ed25519test
 ed25519test_SOURCES = ed25519test.c
 
-# enginetest
-TESTS += enginetest
-check_PROGRAMS += enginetest
-enginetest_SOURCES = enginetest.c
-
 # evp_ecx_test
 TESTS += evp_ecx_test
 check_PROGRAMS += evp_ecx_test
@@ -397,6 +397,11 @@ EXTRA_DIST += evptests.txt
 TESTS += evp_test
 check_PROGRAMS += evp_test
 evp_test_SOURCES = evp_test.c
+
+# exdata_test
+TESTS += exdata_test
+check_PROGRAMS += exdata_test
+exdata_test_SOURCES = exdata_test.c
 
 # expirecallback.c
 
@@ -428,11 +433,6 @@ freenull_SOURCES = freenull.c
 TESTS += gcm128test
 check_PROGRAMS += gcm128test
 gcm128test_SOURCES = gcm128test.c
-
-# gost2814789t
-TESTS += gost2814789t
-check_PROGRAMS += gost2814789t
-gost2814789t_SOURCES = gost2814789t.c
 
 # handshake_table
 TESTS += handshake_table
@@ -631,6 +631,12 @@ TESTS += sha_test
 check_PROGRAMS += sha_test
 sha_test_SOURCES = sha_test.c
 
+# shutdowntest
+TESTS += shutdowntest.sh
+check_PROGRAMS += shutdowntest
+shutdowntest_SOURCES = shutdowntest.c
+EXTRA_DIST += shutdowntest.sh shutdowntest.bat
+
 # signertest
 TESTS += signertest
 check_PROGRAMS += signertest
@@ -687,21 +693,16 @@ ssltest_SOURCES = ssltest.c
 EXTRA_DIST += ssltest.sh ssltest.bat
 EXTRA_DIST += testssl testssl.bat
 EXTRA_DIST += ca-int-ecdsa.crl ca-int-ecdsa.pem ca-int-rsa.crl ca-int-rsa.pem
-EXTRA_DIST += ca-root-ecdsa.pem ca-root-rsa.pem ca.pem client.pem
+EXTRA_DIST += ca-root-ecdsa.pem ca-root-rsa.pem
 EXTRA_DIST += client1-ecdsa-chain.pem client1-ecdsa.pem client1-rsa-chain.pem
 EXTRA_DIST += client1-rsa.pem client2-ecdsa-chain.pem client2-ecdsa.pem
 EXTRA_DIST += client2-rsa-chain.pem client2-rsa.pem client3-ecdsa-chain.pem
 EXTRA_DIST += client3-ecdsa.pem client3-rsa-chain.pem client3-rsa.pem
-EXTRA_DIST += server.pem server1-ecdsa-chain.pem server1-ecdsa.pem
+EXTRA_DIST += server1-ecdsa-chain.pem server1-ecdsa.pem
 EXTRA_DIST += server1-rsa-chain.pem server1-rsa.pem server2-ecdsa-chain.pem
 EXTRA_DIST += server2-ecdsa.pem server2-rsa-chain.pem server2-rsa.pem
 EXTRA_DIST += server3-ecdsa-chain.pem server3-ecdsa.pem server3-rsa-chain.pem
 EXTRA_DIST += server3-rsa.pem
-
-# string_table
-TESTS += string_table
-check_PROGRAMS += string_table
-string_table_SOURCES = string_table.c
 
 # testdsa
 TESTS += testdsa.sh
@@ -774,6 +775,11 @@ x25519test_SOURCES = x25519test.c
 TESTS += x509attribute
 check_PROGRAMS += x509attribute
 x509attribute_SOURCES = x509attribute.c
+
+# x509_algor
+TESTS += x509_algor
+check_PROGRAMS += x509_algor
+x509_algor_SOURCES = x509_algor.c
 
 # x509_asn1
 TESTS += x509_asn1

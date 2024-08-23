@@ -1,4 +1,4 @@
-/*	$OpenBSD: freenull.c.head,v 1.6 2023/07/28 17:13:56 tb Exp $	*/
+/*	$OpenBSD: freenull.c.head,v 1.9 2024/02/29 20:00:53 tb Exp $	*/
 
 #include <openssl/asn1.h>
 #include <openssl/cmac.h>
@@ -6,10 +6,10 @@
 #include <openssl/comp.h>
 #include <openssl/conf_api.h>
 #include <openssl/ct.h>
-#ifndef OPENSSL_NO_ENGINE
 #include <openssl/engine.h>
-#endif
+#ifndef OPENSSL_NO_GOST
 #include <openssl/gost.h>
+#endif
 #include <openssl/hmac.h>
 #include <openssl/ocsp.h>
 #include <openssl/pkcs12.h>
@@ -41,7 +41,6 @@ main(int argc, char **argv)
 	ASN1_NULL_free(NULL);
 	ASN1_OBJECT_free(NULL);
 	ASN1_OCTET_STRING_free(NULL);
-	ASN1_PCTX_free(NULL);
 	ASN1_PRINTABLESTRING_free(NULL);
 	ASN1_PRINTABLE_free(NULL);
 	ASN1_STRING_free(NULL);
@@ -89,9 +88,7 @@ main(int argc, char **argv)
 	EC_POINT_clear_free(NULL);
 	EC_POINT_free(NULL);
 	EDIPARTYNAME_free(NULL);
-#ifndef OPENSSL_NO_ENGINE
 	ENGINE_free(NULL);
-#endif
 	ESS_CERT_ID_free(NULL);
 	ESS_ISSUER_SERIAL_free(NULL);
 	ESS_SIGNING_CERT_free(NULL);
@@ -100,17 +97,12 @@ main(int argc, char **argv)
 	EVP_CIPHER_meth_free(NULL);
 	EVP_ENCODE_CTX_free(NULL);
 	EVP_MD_CTX_free(NULL);
-	EVP_MD_meth_free(NULL);
 	EVP_PKEY_CTX_free(NULL);
-	EVP_PKEY_asn1_free(NULL);
 	EVP_PKEY_free(NULL);
-	EVP_PKEY_meth_free(NULL);
 	EXTENDED_KEY_USAGE_free(NULL);
 	GENERAL_NAMES_free(NULL);
 	GENERAL_NAME_free(NULL);
 	GENERAL_SUBTREE_free(NULL);
-	GOST_CIPHER_PARAMS_free(NULL);
-	GOST_KEY_free(NULL);
 	HMAC_CTX_free(NULL);
 	IPAddressChoice_free(NULL);
 	IPAddressFamily_free(NULL);
@@ -139,11 +131,6 @@ main(int argc, char **argv)
 	OCSP_SIGNATURE_free(NULL);
 	OCSP_SINGLERESP_free(NULL);
 	OTHERNAME_free(NULL);
-	PBE2PARAM_free(NULL);
-	PBEPARAM_free(NULL);
-	PBKDF2PARAM_free(NULL);
-	PKCS12_BAGS_free(NULL);
-	PKCS12_MAC_DATA_free(NULL);
 	PKCS12_SAFEBAG_free(NULL);
 	PKCS12_free(NULL);
 	PKCS7_DIGEST_free(NULL);
@@ -184,10 +171,8 @@ main(int argc, char **argv)
 	X509V3_conf_free(NULL);
 	X509_ALGOR_free(NULL);
 	X509_ATTRIBUTE_free(NULL);
-	X509_CERT_AUX_free(NULL);
 	X509_CINF_free(NULL);
 	X509_CRL_INFO_free(NULL);
-	X509_CRL_METHOD_free(NULL);
 	X509_CRL_free(NULL);
 	X509_EXTENSION_free(NULL);
 	X509_INFO_free(NULL);
