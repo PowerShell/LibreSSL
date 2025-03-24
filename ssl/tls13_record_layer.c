@@ -1,4 +1,4 @@
-/* $OpenBSD: tls13_record_layer.c,v 1.72 2022/11/11 17:15:27 jsing Exp $ */
+/* $OpenBSD: tls13_record_layer.c,v 1.74 2024/09/09 03:32:29 tb Exp $ */
 /*
  * Copyright (c) 2018, 2019 Joel Sing <jsing@openbsd.org>
  *
@@ -327,9 +327,16 @@ tls13_record_layer_process_alert(struct tls13_record_layer *rl)
 		return tls13_send_alert(rl, TLS13_ALERT_ILLEGAL_PARAMETER);
 	}
 
-	rl->cb.alert_recv(alert_desc, rl->cb_arg);
+	rl->cb.alert_recv(alert_level, alert_desc, rl->cb_arg);
 
 	return ret;
+}
+
+void
+tls13_record_layer_alert_sent(struct tls13_record_layer *rl,
+    uint8_t alert_level, uint8_t alert_desc)
+{
+	rl->cb.alert_sent(alert_level, alert_desc, rl->cb_arg);
 }
 
 static ssize_t
@@ -361,7 +368,7 @@ tls13_record_layer_send_alert(struct tls13_record_layer *rl)
 		ret = TLS13_IO_ALERT;
 	}
 
-	rl->cb.alert_sent(rl->alert_desc, rl->cb_arg);
+	tls13_record_layer_alert_sent(rl, rl->alert_level, rl->alert_desc);
 
 	return ret;
 }

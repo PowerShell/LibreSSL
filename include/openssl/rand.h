@@ -1,4 +1,4 @@
-/* $OpenBSD: rand.h,v 1.23 2022/07/12 14:42:50 kn Exp $ */
+/* $OpenBSD: rand.h,v 1.25 2024/04/10 14:53:01 beck Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -83,12 +83,8 @@ struct rand_meth_st {
 
 int RAND_set_rand_method(const RAND_METHOD *meth);
 const RAND_METHOD *RAND_get_rand_method(void);
-#ifndef OPENSSL_NO_ENGINE
-int RAND_set_rand_engine(ENGINE *engine);
-#endif
 RAND_METHOD *RAND_SSLeay(void);
 
-#ifndef LIBRESSL_INTERNAL
 void RAND_cleanup(void );
 int  RAND_bytes(unsigned char *buf, int num);
 int  RAND_pseudo_bytes(unsigned char *buf, int num);
@@ -99,7 +95,6 @@ int  RAND_write_file(const char *file);
 const char *RAND_file_name(char *file, size_t num);
 int RAND_status(void);
 int RAND_poll(void);
-#endif
 
 void ERR_load_RAND_strings(void);
 

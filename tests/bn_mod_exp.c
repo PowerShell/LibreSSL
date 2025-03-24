@@ -1,4 +1,4 @@
-/*	$OpenBSD: bn_mod_exp.c,v 1.38 2023/05/09 05:39:24 tb Exp $ */
+/*	$OpenBSD: bn_mod_exp.c,v 1.40 2023/10/19 13:38:12 tb Exp $ */
 
 /*
  * Copyright (c) 2022,2023 Theo Buehler <tb@openbsd.org>
@@ -561,6 +561,154 @@ test_bn_mod_exp2_mont_crash(void)
 	return failed;
 }
 
+const struct aliasing_test_case {
+	BN_ULONG a;
+	BN_ULONG p;
+	BN_ULONG m;
+} aliasing_test_cases[] = {
+	{
+		.a = 1031,
+		.p = 1033,
+		.m = 1039,
+	},
+	{
+		.a = 3,
+		.p = 4,
+		.m = 5,
+	},
+	{
+		.a = 97,
+		.p = 17,
+		.m = 11,
+	},
+	{
+		.a = 999961,
+		.p = 999979,
+		.m = 999983,
+	},
+};
+
+#define N_ALIASING_TEST_CASES \
+	(sizeof(aliasing_test_cases) / sizeof(aliasing_test_cases[0]))
+
+static void
+test_bn_mod_exp_aliasing_setup(BIGNUM *want, BIGNUM *a, BIGNUM *p, BIGNUM *m,
+    BN_CTX *ctx, const struct aliasing_test_case *tc)
+{
+	if (!BN_set_word(a, tc->a))
+		errx(1, "BN_set_word");
+	if (!BN_set_word(p, tc->p))
+		errx(1, "BN_set_word");
+	if (!BN_set_word(m, tc->m))
+		errx(1, "BN_set_word");
+
+	if (!BN_mod_exp_simple(want, a, p, m, ctx))
+		errx(1, "BN_mod_exp");
+}
+
+static int
+test_mod_exp_aliased(const char *alias, int want_ret, BIGNUM *got,
+    const BIGNUM *want, const BIGNUM *a, const BIGNUM *p, const BIGNUM *m,
+    BN_CTX *ctx, const struct mod_exp_test *test)
+{
+	int mod_exp_ret;
+	int ret = 0;
+
+	BN_CTX_start(ctx);
+
+	if (test->mod_exp_fn != NULL)
+		mod_exp_ret = test->mod_exp_fn(got, a, p, m, ctx);
+	else
+		mod_exp_ret = test->mod_exp_mont_fn(got, a, p, m, ctx, NULL);
+
+	if (mod_exp_ret != want_ret) {
+		warnx("%s() %s aliased with result failed", test->name, alias);
+		goto err;
+	}
+
+	if (!mod_exp_ret)
+		goto done;
+
+	if (BN_cmp(want, got) != 0) {
+		dump_results(a, p, NULL, NULL, m, want, got, test->name);
+		goto err;
+	}
+
+ done:
+	ret = 1;
+
+ err:
+	BN_CTX_end(ctx);
+
+	return ret;
+}
+
+static int
+test_bn_mod_exp_aliasing_test(const struct mod_exp_test *test,
+    BIGNUM *a, BIGNUM *p, BIGNUM *m, BIGNUM *want, BIGNUM *got, BN_CTX *ctx)
+{
+	int modulus_alias_works = test->mod_exp_fn != BN_mod_exp_simple;
+	size_t i;
+	int failed = 0;
+
+	for (i = 0; i < N_ALIASING_TEST_CASES; i++) {
+		const struct aliasing_test_case *tc = &aliasing_test_cases[i];
+
+		test_bn_mod_exp_aliasing_setup(want, a, p, m, ctx, tc);
+		if (!test_mod_exp_aliased("nothing", 1, got, want, a, p, m, ctx,
+		    test))
+			failed |= 1;
+		test_bn_mod_exp_aliasing_setup(want, a, p, m, ctx, tc);
+		if (!test_mod_exp_aliased("a", 1, a, want, a, p, m, ctx, test))
+			failed |= 1;
+		test_bn_mod_exp_aliasing_setup(want, a, p, m, ctx, tc);
+		if (!test_mod_exp_aliased("p", 1, p, want, a, p, m, ctx, test))
+			failed |= 1;
+		test_bn_mod_exp_aliasing_setup(want, a, p, m, ctx, tc);
+		if (!test_mod_exp_aliased("m", modulus_alias_works, m, want,
+		    a, p, m, ctx, test))
+			failed |= 1;
+	}
+
+	return failed;
+}
+
+static int
+test_bn_mod_exp_aliasing(void)
+{
+	BN_CTX *ctx;
+	BIGNUM *a, *p, *m, *want, *got;
+	size_t i;
+	int failed = 0;
+
+	if ((ctx = BN_CTX_new()) == NULL)
+		errx(1, "BN_CTX_new");
+
+	BN_CTX_start(ctx);
+
+	if ((a = BN_CTX_get(ctx)) == NULL)
+		errx(1, "a = BN_CTX_get()");
+	if ((p = BN_CTX_get(ctx)) == NULL)
+		errx(1, "p = BN_CTX_get()");
+	if ((m = BN_CTX_get(ctx)) == NULL)
+		errx(1, "m = BN_CTX_get()");
+	if ((want = BN_CTX_get(ctx)) == NULL)
+		errx(1, "want = BN_CTX_get()");
+	if ((got = BN_CTX_get(ctx)) == NULL)
+		errx(1, "got = BN_CTX_get()");
+
+	for (i = 0; i < N_MOD_EXP_FN; i++) {
+		const struct mod_exp_test *test = &mod_exp_fn[i];
+		failed |= test_bn_mod_exp_aliasing_test(test, a, p, m,
+		    want, got, ctx);
+	}
+
+	BN_CTX_end(ctx);
+	BN_CTX_free(ctx);
+
+	return failed;
+}
+
 int
 main(void)
 {
@@ -570,6 +718,7 @@ main(void)
 	failed |= test_bn_mod_exp();
 	failed |= test_bn_mod_exp2();
 	failed |= test_bn_mod_exp2_mont_crash();
+	failed |= test_bn_mod_exp_aliasing();
 
 	return failed;
 }

@@ -1,4 +1,4 @@
-/* $OpenBSD: cms_sd.c,v 1.28 2023/09/11 09:29:30 tb Exp $ */
+/* $OpenBSD: cms_sd.c,v 1.33 2024/04/20 10:11:55 tb Exp $ */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project.
@@ -52,18 +52,22 @@
  * ====================================================================
  */
 
+#include <stdlib.h>
 #include <string.h>
 
-#include "cryptlib.h"
-#include <openssl/asn1t.h>
-#include <openssl/pem.h>
+#include <openssl/asn1.h>
+#include <openssl/bio.h>
+#include <openssl/err.h>
+#include <openssl/evp.h>
+#include <openssl/cms.h>
+#include <openssl/objects.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
-#include <openssl/err.h>
-#include <openssl/cms.h>
+
+#include "asn1_local.h"
 #include "cms_local.h"
-#include "asn1/asn1_local.h"
-#include "evp/evp_local.h"
+#include "evp_local.h"
+#include "x509_local.h"
 
 /* CMS SignedData Utilities */
 
@@ -273,13 +277,71 @@ cms_sd_asn1_ctrl(CMS_SignerInfo *si, int cmd)
 	return 1;
 }
 
+static const EVP_MD *
+cms_SignerInfo_default_digest_md(const CMS_SignerInfo *si)
+{
+	int rv, nid;
+
+	if (si->pkey == NULL) {
+		CMSerror(CMS_R_NO_PUBLIC_KEY);
+		return NULL;
+	}
+
+	/* On failure or unsupported operation, give up. */
+	if ((rv = EVP_PKEY_get_default_digest_nid(si->pkey, &nid)) <= 0)
+		return NULL;
+	if (rv > 2)
+		return NULL;
+
+	/*
+	 * XXX - we need to identify EdDSA in a better way. Figure out where
+	 * and how. This mimics EdDSA checks in openssl/ca.c and openssl/req.c.
+	 */
+
+	/* The digest md is required to be EVP_sha512() (EdDSA). */
+	if (rv == 2 && nid == NID_undef)
+		return EVP_sha512();
+
+	/* Use mandatory or default digest. */
+	return EVP_get_digestbynid(nid);
+}
+
+static const EVP_MD *
+cms_SignerInfo_signature_md(const CMS_SignerInfo *si)
+{
+	int rv, nid;
+
+	if (si->pkey == NULL) {
+		CMSerror(CMS_R_NO_PUBLIC_KEY);
+		return NULL;
+	}
+
+	/* Fall back to digestAlgorithm unless pkey has a mandatory digest. */
+	if ((rv = EVP_PKEY_get_default_digest_nid(si->pkey, &nid)) <= 1)
+		return EVP_get_digestbyobj(si->digestAlgorithm->algorithm);
+	if (rv > 2)
+		return NULL;
+
+	/*
+	 * XXX - we need to identify EdDSA in a better way. Figure out where
+	 * and how. This mimics EdDSA checks in openssl/ca.c and openssl/req.c.
+	 */
+
+	/* The signature md is required to be EVP_md_null() (EdDSA). */
+	if (nid == NID_undef)
+		return EVP_md_null();
+
+	/* Use mandatory digest. */
+	return EVP_get_digestbynid(nid);
+}
+
 CMS_SignerInfo *
 CMS_add1_signer(CMS_ContentInfo *cms, X509 *signer, EVP_PKEY *pk,
     const EVP_MD *md, unsigned int flags)
 {
 	CMS_SignedData *sd;
 	CMS_SignerInfo *si = NULL;
-	X509_ALGOR *alg;
+	X509_ALGOR *alg = NULL;
 	int i, type;
 
 	if (!X509_check_private_key(signer, pk)) {
@@ -321,42 +383,36 @@ CMS_add1_signer(CMS_ContentInfo *cms, X509 *signer, EVP_PKEY *pk,
 	if (!cms_set1_SignerIdentifier(si->sid, signer, type))
 		goto err;
 
+	if (md == NULL)
+		md = cms_SignerInfo_default_digest_md(si);
 	if (md == NULL) {
-		int def_nid;
-		if (EVP_PKEY_get_default_digest_nid(pk, &def_nid) <= 0)
-			goto err;
-		md = EVP_get_digestbynid(def_nid);
-		if (md == NULL) {
-			CMSerror(CMS_R_NO_DEFAULT_DIGEST);
-			goto err;
-		}
-	}
-
-	if (!md) {
-		CMSerror(CMS_R_NO_DIGEST_SET);
+		CMSerror(CMS_R_NO_DEFAULT_DIGEST);
 		goto err;
 	}
 
-	X509_ALGOR_set_md(si->digestAlgorithm, md);
+	if (!X509_ALGOR_set_evp_md(si->digestAlgorithm, md))
+		goto err;
 
 	/* See if digest is present in digestAlgorithms */
 	for (i = 0; i < sk_X509_ALGOR_num(sd->digestAlgorithms); i++) {
+		const X509_ALGOR *x509_alg;
 		const ASN1_OBJECT *aoid;
-		alg = sk_X509_ALGOR_value(sd->digestAlgorithms, i);
-		X509_ALGOR_get0(&aoid, NULL, NULL, alg);
+
+		x509_alg = sk_X509_ALGOR_value(sd->digestAlgorithms, i);
+		X509_ALGOR_get0(&aoid, NULL, NULL, x509_alg);
 		if (OBJ_obj2nid(aoid) == EVP_MD_type(md))
 			break;
 	}
 
 	if (i == sk_X509_ALGOR_num(sd->digestAlgorithms)) {
-		alg = X509_ALGOR_new();
-		if (alg == NULL)
+		if ((alg = X509_ALGOR_new()) == NULL)
 			goto merr;
-		X509_ALGOR_set_md(alg, md);
+		if (!X509_ALGOR_set_evp_md(alg, md))
+			goto merr;
 		if (!sk_X509_ALGOR_push(sd->digestAlgorithms, alg)) {
-			X509_ALGOR_free(alg);
 			goto merr;
 		}
+		alg = NULL;
 	}
 
 	if (!(flags & CMS_KEY_PARAM) && !cms_sd_asn1_ctrl(si, 0))
@@ -422,6 +478,7 @@ CMS_add1_signer(CMS_ContentInfo *cms, X509 *signer, EVP_PKEY *pk,
 	CMSerror(ERR_R_MALLOC_FAILURE);
  err:
 	ASN1_item_free((ASN1_VALUE *)si, &CMS_SignerInfo_it);
+	X509_ALGOR_free(alg);
 
 	return NULL;
 }
@@ -727,7 +784,7 @@ CMS_SignerInfo_sign(CMS_SignerInfo *si)
 	size_t sig_len = 0;
 	int ret = 0;
 
-	if ((md = EVP_get_digestbyobj(si->digestAlgorithm->algorithm)) == NULL)
+	if ((md = cms_SignerInfo_signature_md(si)) == NULL)
 		goto err;
 
 	if (CMS_signed_get_attr_by_NID(si, NID_pkcs9_signingTime, -1) < 0) {
@@ -736,7 +793,7 @@ CMS_SignerInfo_sign(CMS_SignerInfo *si)
 	}
 
 	if (si->pctx == NULL) {
-		EVP_MD_CTX_reset(si->mctx);
+		(void)EVP_MD_CTX_reset(si->mctx);
 		if (!EVP_DigestSignInit(si->mctx, &si->pctx, md, NULL, si->pkey))
 			goto err;
 	}
@@ -771,8 +828,7 @@ CMS_SignerInfo_sign(CMS_SignerInfo *si)
 	ret = 1;
 
  err:
-	if (si->mctx != NULL)
-		EVP_MD_CTX_reset(si->mctx);
+	(void)EVP_MD_CTX_reset(si->mctx);
 	freezero(buf, buf_len);
 	freezero(sig, sig_len);
 
@@ -788,13 +844,8 @@ CMS_SignerInfo_verify(CMS_SignerInfo *si)
 	int buf_len = 0;
 	int ret = -1;
 
-	if ((md = EVP_get_digestbyobj(si->digestAlgorithm->algorithm)) == NULL)
+	if ((md = cms_SignerInfo_signature_md(si)) == NULL)
 		goto err;
-
-	if (si->pkey == NULL) {
-		CMSerror(CMS_R_NO_PUBLIC_KEY);
-		goto err;
-	}
 
 	if (si->mctx == NULL)
 		si->mctx = EVP_MD_CTX_new();
@@ -823,8 +874,7 @@ CMS_SignerInfo_verify(CMS_SignerInfo *si)
 	}
 
  err:
-	if (si->mctx != NULL)
-		EVP_MD_CTX_reset(si->mctx);
+	(void)EVP_MD_CTX_reset(si->mctx);
 	freezero(buf, buf_len);
 
 	return ret;
@@ -958,36 +1008,55 @@ CMS_add_smimecap(CMS_SignerInfo *si, STACK_OF(X509_ALGOR) *algs)
 }
 LCRYPTO_ALIAS(CMS_add_smimecap);
 
+/*
+ * Add AlgorithmIdentifier OID of type |nid| to the SMIMECapability attribute
+ * set |*out_algs| (see RFC 3851, section 2.5.2). If keysize > 0, the OID has
+ * an integer parameter of value |keysize|, otherwise parameters are omitted.
+ */
 int
-CMS_add_simple_smimecap(STACK_OF(X509_ALGOR) **algs, int algnid, int keysize)
+CMS_add_simple_smimecap(STACK_OF(X509_ALGOR) **out_algs, int nid, int keysize)
 {
-	X509_ALGOR *alg;
-	ASN1_INTEGER *key = NULL;
+	STACK_OF(X509_ALGOR) *algs;
+	X509_ALGOR *alg = NULL;
+	ASN1_INTEGER *parameter = NULL;
+	int parameter_type = V_ASN1_UNDEF;
+	int ret = 0;
+
+	if ((algs = *out_algs) == NULL)
+		algs = sk_X509_ALGOR_new_null();
+	if (algs == NULL)
+		goto err;
 
 	if (keysize > 0) {
-		if ((key = ASN1_INTEGER_new()) == NULL)
-			return 0;
-		if (!ASN1_INTEGER_set(key, keysize)) {
-			ASN1_INTEGER_free(key);
-			return 0;
-		}
-	}
-	alg = X509_ALGOR_new();
-	if (alg == NULL) {
-		ASN1_INTEGER_free(key);
-		return 0;
+		if ((parameter = ASN1_INTEGER_new()) == NULL)
+			goto err;
+		if (!ASN1_INTEGER_set(parameter, keysize))
+			goto err;
+		parameter_type = V_ASN1_INTEGER;
 	}
 
-	X509_ALGOR_set0(alg, OBJ_nid2obj(algnid),
-	    key ? V_ASN1_INTEGER : V_ASN1_UNDEF, key);
-	if (*algs == NULL)
-		*algs = sk_X509_ALGOR_new_null();
-	if (*algs == NULL || !sk_X509_ALGOR_push(*algs, alg)) {
-		X509_ALGOR_free(alg);
-		return 0;
-	}
+	if ((alg = X509_ALGOR_new()) == NULL)
+		goto err;
+	if (!X509_ALGOR_set0_by_nid(alg, nid, parameter_type, parameter))
+		goto err;
+	parameter = NULL;
 
-	return 1;
+	if (sk_X509_ALGOR_push(algs, alg) <= 0)
+		goto err;
+	alg = NULL;
+
+	*out_algs = algs;
+	algs = NULL;
+
+	ret = 1;
+
+ err:
+	if (algs != *out_algs)
+		sk_X509_ALGOR_pop_free(algs, X509_ALGOR_free);
+	X509_ALGOR_free(alg);
+	ASN1_INTEGER_free(parameter);
+
+	return ret;
 }
 LCRYPTO_ALIAS(CMS_add_simple_smimecap);
 
@@ -1001,20 +1070,10 @@ cms_add_cipher_smcap(STACK_OF(X509_ALGOR) **sk, int nid, int arg)
 	return 1;
 }
 
-static int
-cms_add_digest_smcap(STACK_OF(X509_ALGOR) **sk, int nid, int arg)
-{
-	if (EVP_get_digestbynid(nid))
-		return CMS_add_simple_smimecap(sk, nid, arg);
-	return 1;
-}
-
 int
 CMS_add_standard_smimecap(STACK_OF(X509_ALGOR) **smcap)
 {
 	if (!cms_add_cipher_smcap(smcap, NID_aes_256_cbc, -1) ||
-	    !cms_add_digest_smcap(smcap, NID_id_GostR3411_94, -1) ||
-	    !cms_add_cipher_smcap(smcap, NID_id_Gost28147_89, -1) ||
 	    !cms_add_cipher_smcap(smcap, NID_aes_192_cbc, -1) ||
 	    !cms_add_cipher_smcap(smcap, NID_aes_128_cbc, -1) ||
 	    !cms_add_cipher_smcap(smcap, NID_des_ede3_cbc, -1) ||

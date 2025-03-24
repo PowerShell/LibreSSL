@@ -1,4 +1,4 @@
-/* $OpenBSD: cms_ess.c,v 1.23 2023/07/08 08:26:26 beck Exp $ */
+/* $OpenBSD: cms_ess.c,v 1.25 2024/03/30 01:53:05 joshua Exp $ */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project.
@@ -54,15 +54,15 @@
 
 #include <string.h>
 
-#include "cryptlib.h"
 #include <openssl/asn1t.h>
 #include <openssl/pem.h>
 #include <openssl/rand.h>
 #include <openssl/x509v3.h>
 #include <openssl/err.h>
 #include <openssl/cms.h>
-#include "cms_local.h"
 
+#include "cms_local.h"
+#include "x509_local.h"
 
 CMS_ReceiptRequest *
 d2i_CMS_ReceiptRequest(CMS_ReceiptRequest **a, const unsigned char **in, long len)
@@ -118,6 +118,7 @@ CMS_get1_ReceiptRequest(CMS_SignerInfo *si, CMS_ReceiptRequest **prr)
 
 	return 1;
 }
+LCRYPTO_ALIAS(CMS_get1_ReceiptRequest);
 
 CMS_ReceiptRequest *
 CMS_ReceiptRequest_create0(unsigned char *id, int idlen, int allorfirst,
@@ -155,6 +156,7 @@ CMS_ReceiptRequest_create0(unsigned char *id, int idlen, int allorfirst,
 
 	return NULL;
 }
+LCRYPTO_ALIAS(CMS_ReceiptRequest_create0);
 
 int
 CMS_add1_ReceiptRequest(CMS_SignerInfo *si, CMS_ReceiptRequest *rr)
@@ -180,6 +182,7 @@ CMS_add1_ReceiptRequest(CMS_SignerInfo *si, CMS_ReceiptRequest *rr)
 
 	return r;
 }
+LCRYPTO_ALIAS(CMS_add1_ReceiptRequest);
 
 void
 CMS_ReceiptRequest_get0_values(CMS_ReceiptRequest *rr, ASN1_STRING **pcid,
@@ -202,6 +205,7 @@ CMS_ReceiptRequest_get0_values(CMS_ReceiptRequest *rr, ASN1_STRING **pcid,
 	if (prto)
 		*prto = rr->receiptsTo;
 }
+LCRYPTO_ALIAS(CMS_ReceiptRequest_get0_values);
 
 /* Digest a SignerInfo structure for msgSigDigest attribute processing */
 

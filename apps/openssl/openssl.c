@@ -1,4 +1,4 @@
-/* $OpenBSD: openssl.c,v 1.35 2023/06/11 13:02:10 jsg Exp $ */
+/* $OpenBSD: openssl.c,v 1.37 2024/07/08 05:59:10 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -184,7 +184,6 @@ FUNCTION functions[] = {
 #ifndef OPENSSL_NO_SPEED
 	{ FUNC_TYPE_GENERAL, "speed", speed_main },
 #endif
-	{ FUNC_TYPE_GENERAL, "spkac", spkac_main },
 	{ FUNC_TYPE_GENERAL, "ts", ts_main },
 	{ FUNC_TYPE_GENERAL, "verify", verify_main },
 	{ FUNC_TYPE_GENERAL, "version", version_main },
@@ -211,12 +210,6 @@ FUNCTION functions[] = {
 #endif
 
 	/* Message Digests. */
-#ifndef OPENSSL_NO_GOST
-	{ FUNC_TYPE_MD, "gost-mac", dgst_main },
-	{ FUNC_TYPE_MD, "md_gost94", dgst_main },
-	{ FUNC_TYPE_MD, "streebog256", dgst_main },
-	{ FUNC_TYPE_MD, "streebog512", dgst_main },
-#endif
 #ifndef OPENSSL_NO_MD4
 	{ FUNC_TYPE_MD, "md4", dgst_main },
 #endif

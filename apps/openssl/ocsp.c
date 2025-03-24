@@ -1,4 +1,4 @@
-/* $OpenBSD: ocsp.c,v 1.23 2023/03/06 14:32:06 tb Exp $ */
+/* $OpenBSD: ocsp.c,v 1.26 2024/08/31 18:39:25 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2000.
  */
@@ -70,6 +70,7 @@
 #include "apps.h"
 
 #include <openssl/bn.h>
+#include <openssl/conf.h>
 #include <openssl/crypto.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
@@ -168,7 +169,7 @@ ocsp_opt_cert(char *arg)
 	}
 	return (0);
 }
-	
+
 static int
 ocsp_opt_cert_id_md(int argc, char **argv, int *argsused)
 {
@@ -185,12 +186,63 @@ ocsp_opt_cert_id_md(int argc, char **argv, int *argsused)
 }
 
 static int
+x509v3_add_value(const char *name, const char *value,
+    STACK_OF(CONF_VALUE) **out_extlist)
+{
+	STACK_OF(CONF_VALUE) *extlist = NULL;
+	CONF_VALUE *conf_value = NULL;
+	int ret = 0;
+
+	if ((conf_value = calloc(1, sizeof(*conf_value))) == NULL) {
+		X509V3error(ERR_R_MALLOC_FAILURE);
+		goto err;
+	}
+	if (name != NULL) {
+		if ((conf_value->name = strdup(name)) == NULL) {
+			X509V3error(ERR_R_MALLOC_FAILURE);
+			goto err;
+		}
+	}
+	if (value != NULL) {
+		if ((conf_value->value = strdup(value)) == NULL) {
+			X509V3error(ERR_R_MALLOC_FAILURE);
+			goto err;
+		}
+	}
+
+	if ((extlist = *out_extlist) == NULL)
+		extlist = sk_CONF_VALUE_new_null();
+	if (extlist == NULL) {
+		X509V3error(ERR_R_MALLOC_FAILURE);
+		goto err;
+	}
+
+	if (!sk_CONF_VALUE_push(extlist, conf_value)) {
+		X509V3error(ERR_R_MALLOC_FAILURE);
+		goto err;
+	}
+	conf_value = NULL;
+
+	*out_extlist = extlist;
+	extlist = NULL;
+
+	ret = 1;
+
+ err:
+	if (extlist != *out_extlist)
+		sk_CONF_VALUE_pop_free(extlist, X509V3_conf_free);
+	X509V3_conf_free(conf_value);
+
+	return ret;
+}
+
+static int
 ocsp_opt_header(int argc, char **argv, int *argsused)
 {
 	if (argc < 3 || argv[1] == NULL || argv[2] == NULL)
 		return (1);
 
-	if (!X509V3_add_value(argv[1], argv[2], &cfg.headers)) {
+	if (!x509v3_add_value(argv[1], argv[2], &cfg.headers)) {
 		cfg.no_usage = 1;
 		return (1);
 	}

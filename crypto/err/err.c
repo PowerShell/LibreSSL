@@ -1,4 +1,4 @@
-/* $OpenBSD: err.c,v 1.56 2023/07/28 10:23:19 tb Exp $ */
+/* $OpenBSD: err.c,v 1.63 2024/08/31 10:09:15 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -122,14 +122,29 @@
 #include <openssl/err.h>
 #include <openssl/lhash.h>
 
+#include "crypto_local.h"
+
 DECLARE_LHASH_OF(ERR_STRING_DATA);
 DECLARE_LHASH_OF(ERR_STATE);
 
 typedef struct st_ERR_FNS ERR_FNS;
 
+typedef struct err_state_st {
+	CRYPTO_THREADID tid;
+	int err_flags[ERR_NUM_ERRORS];
+	unsigned long err_buffer[ERR_NUM_ERRORS];
+	char *err_data[ERR_NUM_ERRORS];
+	int err_data_flags[ERR_NUM_ERRORS];
+	const char *err_file[ERR_NUM_ERRORS];
+	int err_line[ERR_NUM_ERRORS];
+	int top, bottom;
+} ERR_STATE;
+
 static void err_load_strings(int lib, ERR_STRING_DATA *str);
 
+static ERR_STATE *ERR_get_state(void);
 static void ERR_STATE_free(ERR_STATE *s);
+
 #ifndef OPENSSL_NO_ERR
 static ERR_STRING_DATA ERR_str_libraries[] = {
 	{ERR_PACK(ERR_LIB_NONE,0,0),		"unknown library"},
@@ -229,9 +244,9 @@ struct st_ERR_FNS {
 	/* Works on the "error_hash" string table */
 	LHASH_OF(ERR_STRING_DATA) *(*cb_err_get)(int create);
 	void (*cb_err_del)(void);
-	ERR_STRING_DATA *(*cb_err_get_item)(const ERR_STRING_DATA *);
-	ERR_STRING_DATA *(*cb_err_set_item)(ERR_STRING_DATA *);
-	ERR_STRING_DATA *(*cb_err_del_item)(ERR_STRING_DATA *);
+	const ERR_STRING_DATA *(*cb_err_get_item)(const ERR_STRING_DATA *);
+	const ERR_STRING_DATA *(*cb_err_set_item)(const ERR_STRING_DATA *);
+	const ERR_STRING_DATA *(*cb_err_del_item)(const ERR_STRING_DATA *);
 	/* Works on the "thread_hash" error-state table */
 	LHASH_OF(ERR_STATE) *(*cb_thread_get)(int create);
 	void (*cb_thread_release)(LHASH_OF(ERR_STATE) **hash);
@@ -245,9 +260,9 @@ struct st_ERR_FNS {
 /* Predeclarations of the "err_defaults" functions */
 static LHASH_OF(ERR_STRING_DATA) *int_err_get(int create);
 static void int_err_del(void);
-static ERR_STRING_DATA *int_err_get_item(const ERR_STRING_DATA *);
-static ERR_STRING_DATA *int_err_set_item(ERR_STRING_DATA *);
-static ERR_STRING_DATA *int_err_del_item(ERR_STRING_DATA *);
+static const ERR_STRING_DATA *int_err_get_item(const ERR_STRING_DATA *);
+static const ERR_STRING_DATA *int_err_set_item(const ERR_STRING_DATA *);
+static const ERR_STRING_DATA *int_err_del_item(const ERR_STRING_DATA *);
 static LHASH_OF(ERR_STATE) *int_thread_get(int create);
 static void int_thread_release(LHASH_OF(ERR_STATE) **hash);
 static ERR_STATE *int_thread_get_item(const ERR_STATE *);
@@ -328,17 +343,14 @@ err_string_data_cmp(const ERR_STRING_DATA *a, const ERR_STRING_DATA *b)
 }
 static IMPLEMENT_LHASH_COMP_FN(err_string_data, ERR_STRING_DATA)
 
-static
-LHASH_OF(ERR_STRING_DATA) *int_err_get(int create)
+static LHASH_OF(ERR_STRING_DATA) *
+int_err_get(int create)
 {
 	LHASH_OF(ERR_STRING_DATA) *ret = NULL;
 
 	CRYPTO_w_lock(CRYPTO_LOCK_ERR);
-	if (!int_error_hash && create) {
-		CRYPTO_push_info("int_err_get (err.c)");
+	if (!int_error_hash && create)
 		int_error_hash = lh_ERR_STRING_DATA_new();
-		CRYPTO_pop_info();
-	}
 	if (int_error_hash)
 		ret = int_error_hash;
 	CRYPTO_w_unlock(CRYPTO_LOCK_ERR);
@@ -357,7 +369,7 @@ int_err_del(void)
 	CRYPTO_w_unlock(CRYPTO_LOCK_ERR);
 }
 
-static ERR_STRING_DATA *
+static const ERR_STRING_DATA *
 int_err_get_item(const ERR_STRING_DATA *d)
 {
 	ERR_STRING_DATA *p;
@@ -375,10 +387,10 @@ int_err_get_item(const ERR_STRING_DATA *d)
 	return p;
 }
 
-static ERR_STRING_DATA *
-int_err_set_item(ERR_STRING_DATA *d)
+static const ERR_STRING_DATA *
+int_err_set_item(const ERR_STRING_DATA *d)
 {
-	ERR_STRING_DATA *p;
+	const ERR_STRING_DATA *p;
 	LHASH_OF(ERR_STRING_DATA) *hash;
 
 	err_fns_check();
@@ -387,14 +399,14 @@ int_err_set_item(ERR_STRING_DATA *d)
 		return NULL;
 
 	CRYPTO_w_lock(CRYPTO_LOCK_ERR);
-	p = lh_ERR_STRING_DATA_insert(hash, d);
+	p = lh_ERR_STRING_DATA_insert(hash, (void *)d);
 	CRYPTO_w_unlock(CRYPTO_LOCK_ERR);
 
 	return p;
 }
 
-static ERR_STRING_DATA *
-int_err_del_item(ERR_STRING_DATA *d)
+static const ERR_STRING_DATA *
+int_err_del_item(const ERR_STRING_DATA *d)
 {
 	ERR_STRING_DATA *p;
 	LHASH_OF(ERR_STRING_DATA) *hash;
@@ -425,17 +437,14 @@ err_state_cmp(const ERR_STATE *a, const ERR_STATE *b)
 }
 static IMPLEMENT_LHASH_COMP_FN(err_state, ERR_STATE)
 
-static
-LHASH_OF(ERR_STATE) *int_thread_get(int create)
+static LHASH_OF(ERR_STATE) *
+int_thread_get(int create)
 {
 	LHASH_OF(ERR_STATE) *ret = NULL;
 
 	CRYPTO_w_lock(CRYPTO_LOCK_ERR);
-	if (!int_thread_hash && create) {
-		CRYPTO_push_info("int_thread_get (err.c)");
+	if (!int_thread_hash && create)
 		int_thread_hash = lh_ERR_STATE_new();
-		CRYPTO_pop_info();
-	}
 	if (int_thread_hash) {
 		int_thread_hash_references++;
 		ret = int_thread_hash;
@@ -682,6 +691,16 @@ ERR_load_strings(int lib, ERR_STRING_DATA *str)
 	err_load_strings(lib, str);
 }
 LCRYPTO_ALIAS(ERR_load_strings);
+
+void
+ERR_load_const_strings(const ERR_STRING_DATA *str)
+{
+	ERR_load_ERR_strings();
+	while (str->error) {
+		ERRFN(err_set_item)(str);
+		str++;
+	}
+}
 
 void
 ERR_unload_strings(int lib, ERR_STRING_DATA *str)
@@ -955,7 +974,8 @@ LCRYPTO_ALIAS(ERR_error_string);
 const char *
 ERR_lib_error_string(unsigned long e)
 {
-	ERR_STRING_DATA d, *p;
+	const ERR_STRING_DATA *p;
+	ERR_STRING_DATA d;
 	unsigned long l;
 
 	if (!OPENSSL_init_crypto(0, NULL))
@@ -972,7 +992,8 @@ LCRYPTO_ALIAS(ERR_lib_error_string);
 const char *
 ERR_func_error_string(unsigned long e)
 {
-	ERR_STRING_DATA d, *p;
+	const ERR_STRING_DATA *p;
+	ERR_STRING_DATA d;
 	unsigned long l, f;
 
 	err_fns_check();
@@ -987,7 +1008,8 @@ LCRYPTO_ALIAS(ERR_func_error_string);
 const char *
 ERR_reason_error_string(unsigned long e)
 {
-	ERR_STRING_DATA d, *p = NULL;
+	const ERR_STRING_DATA *p = NULL;
+	ERR_STRING_DATA d;
 	unsigned long l, r;
 
 	err_fns_check();
@@ -1026,7 +1048,7 @@ ERR_remove_state(unsigned long pid)
 }
 LCRYPTO_ALIAS(ERR_remove_state);
 
-ERR_STATE *
+static ERR_STATE *
 ERR_get_state(void)
 {
 	static ERR_STATE fallback;
@@ -1064,7 +1086,6 @@ ERR_get_state(void)
 	}
 	return ret;
 }
-LCRYPTO_ALIAS(ERR_get_state);
 
 int
 ERR_get_next_error_library(void)
@@ -1108,35 +1129,6 @@ ERR_asprintf_error_data(char * format, ...)
 		ERR_set_error_data(errbuf, ERR_TXT_MALLOCED|ERR_TXT_STRING);
 }
 LCRYPTO_ALIAS(ERR_asprintf_error_data);
-
-void
-ERR_add_error_vdata(int num, va_list args)
-{
-	char format[129];
-	char *errbuf;
-	int i;
-
-	format[0] = '\0';
-	for (i = 0; i < num; i++) {
-		if (strlcat(format, "%s", sizeof(format)) >= sizeof(format)) {
-			ERR_set_error_data("too many errors", ERR_TXT_STRING);
-			return;
-		}
-	}
-	if (vasprintf(&errbuf, format, args) == -1)
-		ERR_set_error_data("malloc failed", ERR_TXT_STRING);
-	else
-		ERR_set_error_data(errbuf, ERR_TXT_MALLOCED|ERR_TXT_STRING);
-}
-
-void
-ERR_add_error_data(int num, ...)
-{
-	va_list args;
-	va_start(args, num);
-	ERR_add_error_vdata(num, args);
-	va_end(args);
-}
 
 int
 ERR_set_mark(void)

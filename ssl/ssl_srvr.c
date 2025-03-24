@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_srvr.c,v 1.156 2023/07/08 16:40:13 beck Exp $ */
+/* $OpenBSD: ssl_srvr.c,v 1.165 2024/07/22 14:47:15 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -162,11 +162,8 @@
 #include <openssl/opensslconf.h>
 #include <openssl/x509.h>
 
-#ifndef OPENSSL_NO_GOST
-#include <openssl/gost.h>
-#endif
-
 #include "bytestring.h"
+#include "crypto_internal.h"
 #include "dtls_local.h"
 #include "ssl_local.h"
 #include "ssl_sigalgs.h"
@@ -564,15 +561,7 @@ ssl3_accept(SSL *s)
 			}
 
 			alg_k = s->s3->hs.cipher->algorithm_mkey;
-			if (s->s3->flags & TLS1_FLAGS_SKIP_CERT_VERIFY) {
-				/*
-				 * A GOST client may use the key from its
-				 * certificate for key exchange, in which case
-				 * the CertificateVerify message is not sent.
-				 */
-				s->s3->hs.state = SSL3_ST_SR_FINISHED_A;
-				s->init_num = 0;
-			} else if (SSL_USE_SIGALGS(s) || (alg_k & SSL_kGOST)) {
+			if (SSL_USE_SIGALGS(s)) {
 				s->s3->hs.state = SSL3_ST_SR_CERT_VRFY_A;
 				s->init_num = 0;
 				if (!s->session->peer_cert)
@@ -662,7 +651,7 @@ ssl3_accept(SSL *s)
 				goto end;
 			s->s3->hs.state = SSL3_ST_SW_FINISHED_A;
 			s->init_num = 0;
-			s->session->cipher = s->s3->hs.cipher;
+			s->session->cipher_value = s->s3->hs.cipher->value;
 
 			if (!tls1_setup_key_block(s)) {
 				ret = -1;
@@ -740,12 +729,6 @@ ssl3_accept(SSL *s)
 		}
 
 		if (!s->s3->hs.tls12.reuse_message && !skip) {
-			if (s->debug) {
-				if ((ret = BIO_flush(s->wbio)) <= 0)
-					goto end;
-			}
-
-
 			if (s->s3->hs.state != state) {
 				new_state = s->s3->hs.state;
 				s->s3->hs.state = state;
@@ -798,10 +781,8 @@ ssl3_get_client_hello(SSL *s)
 	uint8_t comp_method;
 	int comp_null;
 	int i, j, al, ret, cookie_valid = 0;
-	unsigned long id;
 	SSL_CIPHER *c;
 	STACK_OF(SSL_CIPHER) *ciphers = NULL;
-	unsigned long alg_k;
 	const SSL_METHOD *method;
 	uint16_t shared_version;
 
@@ -996,11 +977,10 @@ ssl3_get_client_hello(SSL *s)
 	/* XXX - CBS_len(&cipher_suites) will always be zero here... */
 	if (s->hit && CBS_len(&cipher_suites) > 0) {
 		j = 0;
-		id = s->session->cipher->id;
 
 		for (i = 0; i < sk_SSL_CIPHER_num(ciphers); i++) {
 			c = sk_SSL_CIPHER_value(ciphers, i);
-			if (c->id == id) {
+			if (c->value == s->session->cipher_value) {
 				j = 1;
 				break;
 			}
@@ -1096,23 +1076,31 @@ ssl3_get_client_hello(SSL *s)
 		s->hit = 1;
 		s->session->verify_result = X509_V_OK;
 
-		sk_SSL_CIPHER_free(s->session->ciphers);
-		s->session->ciphers = ciphers;
+		sk_SSL_CIPHER_free(s->s3->hs.client_ciphers);
+		s->s3->hs.client_ciphers = ciphers;
 		ciphers = NULL;
+
+		/*
+		 * XXX - this allows the callback to use any client cipher and
+		 * completely ignore the server cipher list. We should ensure
+		 * that the pref_cipher is in both the client list and the
+		 * server list.
+		 */
 
 		/* Check if some cipher was preferred by the callback. */
 		if (pref_cipher == NULL)
-			pref_cipher = ssl3_choose_cipher(s, s->session->ciphers,
+			pref_cipher = ssl3_choose_cipher(s, s->s3->hs.client_ciphers,
 			    SSL_get_ciphers(s));
 		if (pref_cipher == NULL) {
 			al = SSL_AD_HANDSHAKE_FAILURE;
 			SSLerror(s, SSL_R_NO_SHARED_CIPHER);
 			goto fatal_err;
 		}
-		s->session->cipher = pref_cipher;
+		s->s3->hs.cipher = pref_cipher;
 
+		/* XXX - why? */
 		sk_SSL_CIPHER_free(s->cipher_list);
-		s->cipher_list = sk_SSL_CIPHER_dup(s->session->ciphers);
+		s->cipher_list = sk_SSL_CIPHER_dup(s->s3->hs.client_ciphers);
 	}
 
 	/*
@@ -1126,27 +1114,28 @@ ssl3_get_client_hello(SSL *s)
 			SSLerror(s, SSL_R_NO_CIPHERS_PASSED);
 			goto fatal_err;
 		}
-		sk_SSL_CIPHER_free(s->session->ciphers);
-		s->session->ciphers = ciphers;
+		sk_SSL_CIPHER_free(s->s3->hs.client_ciphers);
+		s->s3->hs.client_ciphers = ciphers;
 		ciphers = NULL;
 
-		if ((c = ssl3_choose_cipher(s, s->session->ciphers,
+		if ((c = ssl3_choose_cipher(s, s->s3->hs.client_ciphers,
 		    SSL_get_ciphers(s))) == NULL) {
 			al = SSL_AD_HANDSHAKE_FAILURE;
 			SSLerror(s, SSL_R_NO_SHARED_CIPHER);
 			goto fatal_err;
 		}
 		s->s3->hs.cipher = c;
+		s->session->cipher_value = s->s3->hs.cipher->value;
 	} else {
-		s->s3->hs.cipher = s->session->cipher;
+		s->s3->hs.cipher = ssl3_get_cipher_by_value(s->session->cipher_value);
+		if (s->s3->hs.cipher == NULL)
+			goto fatal_err;
 	}
 
 	if (!tls1_transcript_hash_init(s))
 		goto err;
 
-	alg_k = s->s3->hs.cipher->algorithm_mkey;
-	if (!(SSL_USE_SIGALGS(s) || (alg_k & SSL_kGOST)) ||
-	    !(s->verify_mode & SSL_VERIFY_PEER))
+	if (!SSL_USE_SIGALGS(s) || !(s->verify_mode & SSL_VERIFY_PEER))
 		tls1_transcript_free(s);
 
 	/*
@@ -1278,8 +1267,7 @@ ssl3_send_server_hello(SSL *s)
 			goto err;
 
 		/* Cipher suite. */
-		if (!CBB_add_u16(&server_hello,
-		    ssl3_cipher_get_value(s->s3->hs.cipher)))
+		if (!CBB_add_u16(&server_hello, s->s3->hs.cipher->value))
 			goto err;
 
 		/* Compression method (null). */
@@ -1642,98 +1630,104 @@ ssl3_send_certificate_request(SSL *s)
 static int
 ssl3_get_client_kex_rsa(SSL *s, CBS *cbs)
 {
-	unsigned char fakekey[SSL_MAX_MASTER_KEY_LENGTH];
-	unsigned char *pms = NULL;
-	unsigned char *p;
+	uint8_t fakepms[SSL_MAX_MASTER_KEY_LENGTH];
+	uint8_t *pms = NULL;
 	size_t pms_len = 0;
+	size_t pad_len;
 	EVP_PKEY *pkey = NULL;
 	RSA *rsa = NULL;
 	CBS enc_pms;
 	int decrypt_len;
-	int al = -1;
+	uint8_t mask;
+	size_t i;
+	int valid = 1;
+	int ret = 0;
 
-	arc4random_buf(fakekey, sizeof(fakekey));
+	/*
+	 * Handle key exchange in the form of an RSA-Encrypted Premaster Secret
+	 * Message. See RFC 5246, section 7.4.7.1.
+	 */
 
-	fakekey[0] = s->s3->hs.peer_legacy_version >> 8;
-	fakekey[1] = s->s3->hs.peer_legacy_version & 0xff;
+	arc4random_buf(fakepms, sizeof(fakepms));
+
+	fakepms[0] = s->s3->hs.peer_legacy_version >> 8;
+	fakepms[1] = s->s3->hs.peer_legacy_version & 0xff;
 
 	pkey = s->cert->pkeys[SSL_PKEY_RSA].privatekey;
 	if (pkey == NULL || (rsa = EVP_PKEY_get0_RSA(pkey)) == NULL) {
-		al = SSL_AD_HANDSHAKE_FAILURE;
 		SSLerror(s, SSL_R_MISSING_RSA_CERTIFICATE);
-		goto fatal_err;
+		ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_HANDSHAKE_FAILURE);
+		goto err;
 	}
 
+	/*
+	 * The minimum size of an encrypted premaster secret is 11 bytes of
+	 * padding (00 02 <8 or more non-zero bytes> 00) (RFC 8017, section
+	 * 9.2) and 48 bytes of premaster secret (RFC 5246, section 7.4.7.1).
+	 * This means an RSA key size of at least 472 bits.
+	 */
 	pms_len = RSA_size(rsa);
-	if (pms_len < SSL_MAX_MASTER_KEY_LENGTH)
-		goto err;
-	if ((pms = malloc(pms_len)) == NULL)
-		goto err;
-	p = pms;
-
-	if (!CBS_get_u16_length_prefixed(cbs, &enc_pms))
-		goto decode_err;
-	if (CBS_len(cbs) != 0 || CBS_len(&enc_pms) != RSA_size(rsa)) {
-		SSLerror(s, SSL_R_TLS_RSA_ENCRYPTED_VALUE_LENGTH_IS_WRONG);
+	if (pms_len < 11 + SSL_MAX_MASTER_KEY_LENGTH) {
+		SSLerror(s, SSL_R_DECRYPTION_FAILED);
+		ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_DECRYPT_ERROR);
 		goto err;
 	}
+	pad_len = pms_len - SSL_MAX_MASTER_KEY_LENGTH;
+
+	if (!CBS_get_u16_length_prefixed(cbs, &enc_pms)) {
+		SSLerror(s, SSL_R_BAD_PACKET_LENGTH);
+		ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_DECODE_ERROR);
+		goto err;
+	}
+	if (CBS_len(&enc_pms) != pms_len || CBS_len(cbs) != 0) {
+		SSLerror(s, SSL_R_TLS_RSA_ENCRYPTED_VALUE_LENGTH_IS_WRONG);
+		ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_DECODE_ERROR);
+		goto err;
+	}
+
+	if ((pms = calloc(1, pms_len)) == NULL)
+		goto err;
 
 	decrypt_len = RSA_private_decrypt(CBS_len(&enc_pms), CBS_data(&enc_pms),
-	    pms, rsa, RSA_PKCS1_PADDING);
+	    pms, rsa, RSA_NO_PADDING);
 
-	ERR_clear_error();
-
-	if (decrypt_len != SSL_MAX_MASTER_KEY_LENGTH) {
-		al = SSL_AD_DECODE_ERROR;
-		/* SSLerror(s, SSL_R_BAD_RSA_DECRYPT); */
+	if (decrypt_len != pms_len) {
+		SSLerror(s, SSL_R_DECRYPTION_FAILED);
+		ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_DECRYPT_ERROR);
+		goto err;
 	}
 
-	if ((al == -1) && !((pms[0] == (s->s3->hs.peer_legacy_version >> 8)) &&
-	    (pms[1] == (s->s3->hs.peer_legacy_version & 0xff)))) {
-		/*
-		 * The premaster secret must contain the same version number
-		 * as the ClientHello to detect version rollback attacks
-		 * (strangely, the protocol does not offer such protection for
-		 * DH ciphersuites).
-		 *
-		 * The Klima-Pokorny-Rosa extension of Bleichenbacher's attack
-		 * (http://eprint.iacr.org/2003/052/) exploits the version
-		 * number check as a "bad version oracle" -- an alert would
-		 * reveal that the plaintext corresponding to some ciphertext
-		 * made up by the adversary is properly formatted except that
-		 * the version number is wrong. To avoid such attacks, we should
-		 * treat this just like any other decryption error.
-		 */
-		al = SSL_AD_DECODE_ERROR;
-		/* SSLerror(s, SSL_R_BAD_PROTOCOL_VERSION_NUMBER); */
-	}
+	/*
+	 * All processing from here on needs to avoid leaking any information
+	 * about the decrypted content, in order to prevent oracle attacks and
+	 * minimise timing attacks.
+	 */
 
-	if (al != -1) {
-		/*
-		 * Some decryption failure -- use random value instead
-		 * as countermeasure against Bleichenbacher's attack
-		 * on PKCS #1 v1.5 RSA padding (see RFC 2246,
-		 * section 7.4.7.1).
-		 */
-		p = fakekey;
-	}
+	/* Check padding - 00 02 <8 or more non-zero bytes> 00 */
+	valid &= crypto_ct_eq_u8(pms[0], 0x00);
+	valid &= crypto_ct_eq_u8(pms[1], 0x02);
+	for (i = 2; i < pad_len - 1; i++)
+		valid &= crypto_ct_ne_u8(pms[i], 0x00);
+	valid &= crypto_ct_eq_u8(pms[pad_len - 1], 0x00);
 
-	if (!tls12_derive_master_secret(s, p, SSL_MAX_MASTER_KEY_LENGTH))
+	/* Ensure client version in premaster secret matches ClientHello version. */
+	valid &= crypto_ct_eq_u8(pms[pad_len + 0], s->s3->hs.peer_legacy_version >> 8);
+	valid &= crypto_ct_eq_u8(pms[pad_len + 1], s->s3->hs.peer_legacy_version & 0xff);
+
+	/* Use the premaster secret if padding is correct, if not use the fake. */
+	mask = crypto_ct_eq_mask_u8(valid, 1);
+	for (i = 0; i < SSL_MAX_MASTER_KEY_LENGTH; i++)
+		pms[i] = (pms[pad_len + i] & mask) | (fakepms[i] & ~mask);
+
+	if (!tls12_derive_master_secret(s, pms, SSL_MAX_MASTER_KEY_LENGTH))
 		goto err;
 
-	freezero(pms, pms_len);
+	ret = 1;
 
-	return 1;
-
- decode_err:
-	al = SSL_AD_DECODE_ERROR;
-	SSLerror(s, SSL_R_BAD_PACKET_LENGTH);
- fatal_err:
-	ssl3_send_alert(s, SSL3_AL_FATAL, al);
  err:
 	freezero(pms, pms_len);
 
-	return 0;
+	return ret;
 }
 
 static int
@@ -1822,75 +1816,6 @@ ssl3_get_client_kex_ecdhe(SSL *s, CBS *cbs)
 }
 
 static int
-ssl3_get_client_kex_gost(SSL *s, CBS *cbs)
-{
-	unsigned char premaster_secret[32];
-	EVP_PKEY_CTX *pkey_ctx = NULL;
-	EVP_PKEY *client_pubkey;
-	EVP_PKEY *pkey = NULL;
-	size_t outlen;
-	CBS gostblob;
-
-	/* Get our certificate private key*/
-#ifndef OPENSSL_NO_GOST
-	if ((s->s3->hs.cipher->algorithm_auth & SSL_aGOST01) != 0)
-		pkey = s->cert->pkeys[SSL_PKEY_GOST01].privatekey;
-#endif
-
-	if ((pkey_ctx = EVP_PKEY_CTX_new(pkey, NULL)) == NULL)
-		goto err;
-	if (EVP_PKEY_decrypt_init(pkey_ctx) <= 0)
-		goto err;
-
-	/*
-	 * If client certificate is present and is of the same type,
-	 * maybe use it for key exchange.
-	 * Don't mind errors from EVP_PKEY_derive_set_peer, because
-	 * it is completely valid to use a client certificate for
-	 * authorization only.
-	 */
-	if ((client_pubkey = X509_get0_pubkey(s->session->peer_cert)) != NULL) {
-		if (EVP_PKEY_derive_set_peer(pkey_ctx, client_pubkey) <= 0)
-			ERR_clear_error();
-	}
-
-	/* Decrypt session key */
-	if (!CBS_get_asn1(cbs, &gostblob, CBS_ASN1_SEQUENCE))
-		goto decode_err;
-	if (CBS_len(cbs) != 0)
-		goto decode_err;
-	outlen = sizeof(premaster_secret);
-	if (EVP_PKEY_decrypt(pkey_ctx, premaster_secret, &outlen,
-	    CBS_data(&gostblob), CBS_len(&gostblob)) <= 0) {
-		SSLerror(s, SSL_R_DECRYPTION_FAILED);
-		goto err;
-	}
-
-	if (!tls12_derive_master_secret(s, premaster_secret,
-	    sizeof(premaster_secret)))
-		goto err;
-
-	/* Check if pubkey from client certificate was used */
-	if (EVP_PKEY_CTX_ctrl(pkey_ctx, -1, -1, EVP_PKEY_CTRL_PEER_KEY,
-	    2, NULL) > 0)
-		s->s3->flags |= TLS1_FLAGS_SKIP_CERT_VERIFY;
-
-	explicit_bzero(premaster_secret, sizeof(premaster_secret));
-	EVP_PKEY_CTX_free(pkey_ctx);
-
-	return 1;
-
- decode_err:
-	SSLerror(s, SSL_R_BAD_PACKET_LENGTH);
-	ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_DECODE_ERROR);
- err:
-	explicit_bzero(premaster_secret, sizeof(premaster_secret));
-	EVP_PKEY_CTX_free(pkey_ctx);
-
-	return 0;
-}
-
-static int
 ssl3_get_client_key_exchange(SSL *s)
 {
 	unsigned long alg_k;
@@ -1917,9 +1842,6 @@ ssl3_get_client_key_exchange(SSL *s)
 			goto err;
 	} else if (alg_k & SSL_kECDHE) {
 		if (!ssl3_get_client_kex_ecdhe(s, &cbs))
-			goto err;
-	} else if (alg_k & SSL_kGOST) {
-		if (!ssl3_get_client_kex_gost(s, &cbs))
 			goto err;
 	} else {
 		al = SSL_AD_HANDSHAKE_FAILURE;
@@ -2049,15 +1971,6 @@ ssl3_get_cert_verify(SSL *s)
 			al = SSL_AD_INTERNAL_ERROR;
 			goto fatal_err;
 		}
-#ifndef OPENSSL_NO_GOST
-		if (sigalg->key_type == EVP_PKEY_GOSTR01 &&
-		    EVP_PKEY_CTX_ctrl(pctx, -1, EVP_PKEY_OP_VERIFY,
-		    EVP_PKEY_CTRL_GOST_SIG_FORMAT, GOST_SIG_FORMAT_RS_LE,
-		    NULL) <= 0) {
-			al = SSL_AD_INTERNAL_ERROR;
-			goto fatal_err;
-		}
-#endif
 		if (EVP_DigestVerify(mctx, CBS_data(&signature),
 		    CBS_len(&signature), hdata, hdatalen) <= 0) {
 			SSLerror(s, ERR_R_EVP_LIB);
@@ -2102,54 +2015,6 @@ ssl3_get_cert_verify(SSL *s)
 			SSLerror(s, SSL_R_BAD_ECDSA_SIGNATURE);
 			goto fatal_err;
 		}
-#ifndef OPENSSL_NO_GOST
-	} else if (EVP_PKEY_id(pkey) == NID_id_GostR3410_94 ||
-	    EVP_PKEY_id(pkey) == NID_id_GostR3410_2001) {
-		unsigned char sigbuf[128];
-		unsigned int siglen = sizeof(sigbuf);
-		EVP_PKEY_CTX *pctx;
-		const EVP_MD *md;
-		int nid;
-
-		if (!tls1_transcript_data(s, &hdata, &hdatalen)) {
-			SSLerror(s, ERR_R_INTERNAL_ERROR);
-			al = SSL_AD_INTERNAL_ERROR;
-			goto fatal_err;
-		}
-		if (!EVP_PKEY_get_default_digest_nid(pkey, &nid) ||
-		    !(md = EVP_get_digestbynid(nid))) {
-			SSLerror(s, ERR_R_EVP_LIB);
-			al = SSL_AD_INTERNAL_ERROR;
-			goto fatal_err;
-		}
-		if ((pctx = EVP_PKEY_CTX_new(pkey, NULL)) == NULL) {
-			SSLerror(s, ERR_R_EVP_LIB);
-			al = SSL_AD_INTERNAL_ERROR;
-			goto fatal_err;
-		}
-		if (!EVP_DigestInit_ex(mctx, md, NULL) ||
-		    !EVP_DigestUpdate(mctx, hdata, hdatalen) ||
-		    !EVP_DigestFinal(mctx, sigbuf, &siglen) ||
-		    (EVP_PKEY_verify_init(pctx) <= 0) ||
-		    (EVP_PKEY_CTX_set_signature_md(pctx, md) <= 0) ||
-		    (EVP_PKEY_CTX_ctrl(pctx, -1, EVP_PKEY_OP_VERIFY,
-		    EVP_PKEY_CTRL_GOST_SIG_FORMAT,
-		    GOST_SIG_FORMAT_RS_LE, NULL) <= 0)) {
-			SSLerror(s, ERR_R_EVP_LIB);
-			al = SSL_AD_INTERNAL_ERROR;
-			EVP_PKEY_CTX_free(pctx);
-			goto fatal_err;
-		}
-		if (EVP_PKEY_verify(pctx, CBS_data(&signature),
-		    CBS_len(&signature), sigbuf, siglen) <= 0) {
-			al = SSL_AD_DECRYPT_ERROR;
-			SSLerror(s, SSL_R_BAD_SIGNATURE);
-			EVP_PKEY_CTX_free(pctx);
-			goto fatal_err;
-		}
-
-		EVP_PKEY_CTX_free(pctx);
-#endif
 	} else {
 		SSLerror(s, ERR_R_INTERNAL_ERROR);
 		al = SSL_AD_UNSUPPORTED_CERTIFICATE;
@@ -2343,7 +2208,7 @@ ssl3_send_newsession_ticket(SSL *s)
 	unsigned int hlen;
 	EVP_CIPHER_CTX *ctx = NULL;
 	HMAC_CTX *hctx = NULL;
-	int len;
+	int iv_len, len;
 
 	/*
 	 * New Session Ticket - RFC 5077, section 3.3.
@@ -2426,7 +2291,9 @@ ssl3_send_newsession_ticket(SSL *s)
 			goto err;
 		if (!CBB_add_bytes(&ticket, key_name, sizeof(key_name)))
 			goto err;
-		if (!CBB_add_bytes(&ticket, iv, EVP_CIPHER_CTX_iv_length(ctx)))
+		if ((iv_len = EVP_CIPHER_CTX_iv_length(ctx)) < 0)
+			goto err;
+		if (!CBB_add_bytes(&ticket, iv, iv_len))
 			goto err;
 		if (!CBB_add_bytes(&ticket, enc_session, enc_session_len))
 			goto err;

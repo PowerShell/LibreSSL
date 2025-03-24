@@ -1,4 +1,4 @@
-/* $OpenBSD: o_fips.c,v 1.6 2021/10/23 13:57:00 schwarze Exp $ */
+/* $OpenBSD: o_fips.c,v 1.9 2024/04/17 22:43:42 tb Exp $ */
 /* Written by Stephen Henson (steve@openssl.org) for the OpenSSL
  * project 2011.
  */
@@ -56,15 +56,15 @@
  *
  */
 
+#include <openssl/crypto.h>
 #include <openssl/err.h>
-
-#include "cryptlib.h"
 
 int
 FIPS_mode(void)
 {
 	return 0;
 }
+LCRYPTO_ALIAS(FIPS_mode);
 
 int
 FIPS_mode_set(int r)
@@ -74,3 +74,4 @@ FIPS_mode_set(int r)
 	CRYPTOerror(CRYPTO_R_FIPS_MODE_NOT_SUPPORTED);
 	return 0;
 }
+LCRYPTO_ALIAS(FIPS_mode_set);

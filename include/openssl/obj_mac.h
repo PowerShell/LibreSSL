@@ -899,6 +899,10 @@
 #define NID_id_ct_signedTAL		1024
 #define OBJ_id_ct_signedTAL		OBJ_id_smime_ct,50L
 
+#define SN_id_ct_rpkiSignedPrefixList		"id-ct-rpkiSignedPrefixList"
+#define NID_id_ct_rpkiSignedPrefixList		1054
+#define OBJ_id_ct_rpkiSignedPrefixList		OBJ_id_smime_ct,51L
+
 #define SN_id_smime_aa_receiptRequest		"id-smime-aa-receiptRequest"
 #define NID_id_smime_aa_receiptRequest		212
 #define OBJ_id_smime_aa_receiptRequest		OBJ_id_smime_aa,1L
@@ -1560,6 +1564,11 @@
 #define SN_sbgp_autonomousSysNumv2		"sbgp-autonomousSysNumv2"
 #define NID_sbgp_autonomousSysNumv2		1007
 #define OBJ_sbgp_autonomousSysNumv2		OBJ_id_pe,29L
+
+#define SN_acmeIdentifier		"acmeIdentifier"
+#define LN_acmeIdentifier		"ACME Identifier"
+#define NID_acmeIdentifier		1053
+#define OBJ_acmeIdentifier		OBJ_id_pe,31L
 
 #define SN_id_qt_cps		"id-qt-cps"
 #define LN_id_qt_cps		"Policy Qualifier CPS"
@@ -4397,6 +4406,10 @@
 #define LN_ct_cert_scts		"CT Certificate SCTs"
 #define NID_ct_cert_scts		1021
 #define OBJ_ct_cert_scts		1L,3L,6L,1L,4L,1L,11129L,2L,4L,5L
+
+#define SN_tls1_prf		"TLS1-PRF"
+#define LN_tls1_prf		"tls1-prf"
+#define NID_tls1_prf		1055
 
 #define SN_hkdf		"HKDF"
 #define LN_hkdf		"hkdf"

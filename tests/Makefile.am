@@ -6,6 +6,7 @@ include $(top_srcdir)/Makefile.am.common
 
 AM_CPPFLAGS += -DLIBRESSL_CRYPTO_INTERNAL
 
+AM_CPPFLAGS += -I $(top_srcdir)/crypto/
 AM_CPPFLAGS += -I $(top_srcdir)/crypto/asn1
 AM_CPPFLAGS += -I $(top_srcdir)/crypto/bio
 AM_CPPFLAGS += -I $(top_srcdir)/crypto/bn
@@ -17,6 +18,47 @@ AM_CPPFLAGS += -I $(top_srcdir)/ssl
 AM_CPPFLAGS += -I $(top_srcdir)/apps/openssl
 AM_CPPFLAGS += -I $(top_srcdir)/apps/openssl/compat
 AM_CPPFLAGS += -D_PATH_SSL_CA_FILE=\"$(top_srcdir)/cert.pem\"
+
+# arch
+if HOST_AARCH64
+AM_CPPFLAGS += -I$(top_srcdir)/crypto/arch/aarch64/
+endif
+
+if HOST_ARM
+AM_CPPFLAGS += -I$(top_srcdir)/crypto/arch/arm/
+endif
+
+if HOST_I386
+AM_CPPFLAGS += -I$(top_srcdir)/crypto/arch/i386/
+endif
+
+# XXX - do we still need this?
+if HOST_MIPS
+endif
+
+if HOST_MIPS64
+AM_CPPFLAGS += -I$(top_srcdir)/crypto/arch/mips64/
+endif
+
+if HOST_POWERPC
+AM_CPPFLAGS += -I$(top_srcdir)/crypto/arch/powerpc/
+endif
+
+if HOST_POWERPC64
+AM_CPPFLAGS += -I$(top_srcdir)/crypto/arch/powerpc64/
+endif
+
+if HOST_RISCV64
+AM_CPPFLAGS += -I$(top_srcdir)/crypto/arch/riscv64/
+endif
+
+if HOST_SPARC64
+AM_CPPFLAGS += -I$(top_srcdir)/crypto/arch/sparc64/
+endif
+
+if HOST_X86_64
+AM_CPPFLAGS += -I$(top_srcdir)/crypto/arch/amd64/
+endif
 
 noinst_LTLIBRARIES = libtest.la
 libtest_la_LIBADD = $(libcrypto_la_objects)
@@ -31,6 +73,7 @@ LDADD = libtest.la $(PLATFORM_LDADD) $(PROG_LDADD)
 TEST_LOG_DRIVER = env AM_TAP_AWK='$(AWK)' $(SHELL) $(top_srcdir)/tap-driver.sh
 
 TESTS =
+XFAIL_TESTS =
 check_PROGRAMS =
 EXTRA_DIST = CMakeLists.txt
 DISTCLEANFILES = pidwraptest.txt
@@ -118,9 +161,15 @@ check_PROGRAMS += asn1test
 asn1test_SOURCES = asn1test.c
 
 # asn1time
-TESTS += asn1time
 check_PROGRAMS += asn1time
 asn1time_SOURCES = asn1time.c
+if SMALL_TIME_T
+TESTS += asn1time_small.test
+XFAIL_TESTS += asn1time_small.test
+else
+TESTS += asn1time
+endif
+EXTRA_DIST += asn1time_small.test
 
 # asn1x509
 TESTS += asn1x509
@@ -147,6 +196,11 @@ TESTS += bio_chain
 check_PROGRAMS += bio_chain
 bio_chain_SOURCES = bio_chain.c
 
+# bio_dump
+TESTS += bio_dump
+check_PROGRAMS += bio_dump
+bio_dump_SOURCES = bio_dump.c
+
 # bio_host
 # this test relies on resolver results that are OS and environment-specific
 if ENABLE_EXTRATESTS
@@ -164,6 +218,11 @@ bio_mem_SOURCES = bio_mem.c
 TESTS += bn_add_sub
 check_PROGRAMS += bn_add_sub
 bn_add_sub_SOURCES = bn_add_sub.c
+
+# bn_bits
+TESTS += bn_bits
+check_PROGRAMS += bn_bits
+bn_bits_SOURCES = bn_bits.c
 
 # bn_cmp
 TESTS += bn_cmp
@@ -278,7 +337,7 @@ TESTS += cipherstest
 check_PROGRAMS += cipherstest
 cipherstest_SOURCES = cipherstest.c
 
-# clienttest
+## clienttest
 TESTS += clienttest
 check_PROGRAMS += clienttest
 clienttest_SOURCES = clienttest.c
@@ -297,6 +356,11 @@ configtest_SOURCES = configtest.c
 TESTS += constraints
 check_PROGRAMS += constraints
 constraints_SOURCES = constraints.c
+
+# crypto_test
+TESTS += crypto_test
+check_PROGRAMS += crypto_test
+crypto_test_SOURCES = crypto_test.c
 
 # cttest
 TESTS += cttest
@@ -366,20 +430,10 @@ TESTS += ed25519test
 check_PROGRAMS += ed25519test
 ed25519test_SOURCES = ed25519test.c
 
-# enginetest
-TESTS += enginetest
-check_PROGRAMS += enginetest
-enginetest_SOURCES = enginetest.c
-
 # evp_ecx_test
 TESTS += evp_ecx_test
 check_PROGRAMS += evp_ecx_test
 evp_ecx_test_SOURCES = evp_ecx_test.c
-
-# evp_pkey_check
-TESTS += evp_pkey_check
-check_PROGRAMS += evp_pkey_check
-evp_pkey_check_SOURCES = evp_pkey_check.c
 
 # evp_pkey_cleanup
 TESTS += evp_pkey_cleanup
@@ -397,6 +451,11 @@ EXTRA_DIST += evptests.txt
 TESTS += evp_test
 check_PROGRAMS += evp_test
 evp_test_SOURCES = evp_test.c
+
+# exdata_test
+TESTS += exdata_test
+check_PROGRAMS += exdata_test
+exdata_test_SOURCES = exdata_test.c
 
 # expirecallback.c
 
@@ -428,11 +487,6 @@ freenull_SOURCES = freenull.c
 TESTS += gcm128test
 check_PROGRAMS += gcm128test
 gcm128test_SOURCES = gcm128test.c
-
-# gost2814789t
-TESTS += gost2814789t
-check_PROGRAMS += gost2814789t
-gost2814789t_SOURCES = gost2814789t.c
 
 # handshake_table
 TESTS += handshake_table
@@ -472,6 +526,11 @@ keypairtest_CPPFLAGS = -I $(top_srcdir)/tls $(AM_CPPFLAGS)
 check_PROGRAMS += keypairtest
 keypairtest_SOURCES = keypairtest.c
 EXTRA_DIST += keypairtest.sh
+
+# lhash_test
+TESTS += lhash_test
+check_PROGRAMS += lhash_test
+lhash_test_SOURCES = lhash_test.c
 
 # md_test
 TESTS += md_test
@@ -603,6 +662,7 @@ check_PROGRAMS += rfc5280time
 rfc5280time_SOURCES = rfc5280time.c
 if SMALL_TIME_T
 TESTS += rfc5280time_small.test
+XFAIL_TESTS += rfc5280time_small.test
 else
 TESTS += rfc5280time
 endif
@@ -612,6 +672,11 @@ EXTRA_DIST += rfc5280time_small.test
 TESTS += rmd_test
 check_PROGRAMS += rmd_test
 rmd_test_SOURCES = rmd_test.c
+
+# rsa_padding_test
+TESTS += rsa_padding_test
+check_PROGRAMS += rsa_padding_test
+rsa_padding_test_SOURCES = rsa_padding_test.c
 
 # rsa_test
 TESTS += rsa_test
@@ -630,6 +695,12 @@ EXTRA_DIST += servertest.sh servertest.bat
 TESTS += sha_test
 check_PROGRAMS += sha_test
 sha_test_SOURCES = sha_test.c
+
+# shutdowntest
+TESTS += shutdowntest.sh
+check_PROGRAMS += shutdowntest
+shutdowntest_SOURCES = shutdowntest.c
+EXTRA_DIST += shutdowntest.sh shutdowntest.bat
 
 # signertest
 TESTS += signertest
@@ -687,21 +758,16 @@ ssltest_SOURCES = ssltest.c
 EXTRA_DIST += ssltest.sh ssltest.bat
 EXTRA_DIST += testssl testssl.bat
 EXTRA_DIST += ca-int-ecdsa.crl ca-int-ecdsa.pem ca-int-rsa.crl ca-int-rsa.pem
-EXTRA_DIST += ca-root-ecdsa.pem ca-root-rsa.pem ca.pem client.pem
+EXTRA_DIST += ca-root-ecdsa.pem ca-root-rsa.pem
 EXTRA_DIST += client1-ecdsa-chain.pem client1-ecdsa.pem client1-rsa-chain.pem
 EXTRA_DIST += client1-rsa.pem client2-ecdsa-chain.pem client2-ecdsa.pem
 EXTRA_DIST += client2-rsa-chain.pem client2-rsa.pem client3-ecdsa-chain.pem
 EXTRA_DIST += client3-ecdsa.pem client3-rsa-chain.pem client3-rsa.pem
-EXTRA_DIST += server.pem server1-ecdsa-chain.pem server1-ecdsa.pem
+EXTRA_DIST += server1-ecdsa-chain.pem server1-ecdsa.pem
 EXTRA_DIST += server1-rsa-chain.pem server1-rsa.pem server2-ecdsa-chain.pem
 EXTRA_DIST += server2-ecdsa.pem server2-rsa-chain.pem server2-rsa.pem
 EXTRA_DIST += server3-ecdsa-chain.pem server3-ecdsa.pem server3-rsa-chain.pem
 EXTRA_DIST += server3-rsa.pem
-
-# string_table
-TESTS += string_table
-check_PROGRAMS += string_table
-string_table_SOURCES = string_table.c
 
 # testdsa
 TESTS += testdsa.sh
@@ -775,10 +841,20 @@ TESTS += x509attribute
 check_PROGRAMS += x509attribute
 x509attribute_SOURCES = x509attribute.c
 
+# x509_algor
+TESTS += x509_algor
+check_PROGRAMS += x509_algor
+x509_algor_SOURCES = x509_algor.c
+
 # x509_asn1
 TESTS += x509_asn1
 check_PROGRAMS += x509_asn1
 x509_asn1_SOURCES = x509_asn1.c
+
+# x509_extensions_test
+TESTS += x509_extensions_test
+check_PROGRAMS += x509_extensions_test
+x509_extensions_test_SOURCES = x509_extensions_test.c
 
 # x509_info
 TESTS += x509_info

@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_pcons.c,v 1.3 2023/02/16 08:38:17 tb Exp $ */
+/* $OpenBSD: x509_pcons.c,v 1.6 2024/08/31 10:03:03 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project.
  */
@@ -65,13 +65,15 @@
 #include <openssl/err.h>
 #include <openssl/x509v3.h>
 
+#include "x509_local.h"
+
 static STACK_OF(CONF_VALUE) *
 i2v_POLICY_CONSTRAINTS(const X509V3_EXT_METHOD *method, void *bcons,
     STACK_OF(CONF_VALUE) *extlist);
 static void *v2i_POLICY_CONSTRAINTS(const X509V3_EXT_METHOD *method,
     X509V3_CTX *ctx, STACK_OF(CONF_VALUE) *values);
 
-const X509V3_EXT_METHOD v3_policy_constraints = {
+static const X509V3_EXT_METHOD x509v3_ext_policy_constraints = {
 	.ext_nid = NID_policy_constraints,
 	.ext_flags = 0,
 	.it = &POLICY_CONSTRAINTS_it,
@@ -87,6 +89,12 @@ const X509V3_EXT_METHOD v3_policy_constraints = {
 	.r2i = NULL,
 	.usr_data = NULL,
 };
+
+const X509V3_EXT_METHOD *
+x509v3_ext_method_policy_constraints(void)
+{
+	return &x509v3_ext_policy_constraints;
+}
 
 static const ASN1_TEMPLATE POLICY_CONSTRAINTS_seq_tt[] = {
 	{
@@ -114,6 +122,7 @@ const ASN1_ITEM POLICY_CONSTRAINTS_it = {
 	.size = sizeof(POLICY_CONSTRAINTS),
 	.sname = "POLICY_CONSTRAINTS",
 };
+LCRYPTO_ALIAS(POLICY_CONSTRAINTS_it);
 
 
 POLICY_CONSTRAINTS *

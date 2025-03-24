@@ -1,4 +1,4 @@
-/* $OpenBSD: a_pkey.c,v 1.6 2023/07/07 19:37:52 beck Exp $ */
+/* $OpenBSD: a_pkey.c,v 1.8 2024/04/09 13:52:41 beck Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -67,10 +67,6 @@
 #include <openssl/objects.h>
 #include <openssl/x509.h>
 
-#ifndef OPENSSL_NO_ENGINE
-#include <openssl/engine.h>
-#endif
-
 #include "asn1_local.h"
 #include "evp_local.h"
 
@@ -87,10 +83,6 @@ d2i_PrivateKey(int type, EVP_PKEY **a, const unsigned char **pp, long length)
 		}
 	} else {
 		ret = *a;
-#ifndef OPENSSL_NO_ENGINE
-		ENGINE_finish(ret->engine);
-		ret->engine = NULL;
-#endif
 	}
 
 	if (!EVP_PKEY_set_type(ret, type)) {
@@ -123,6 +115,7 @@ d2i_PrivateKey(int type, EVP_PKEY **a, const unsigned char **pp, long length)
 		EVP_PKEY_free(ret);
 	return (NULL);
 }
+LCRYPTO_ALIAS(d2i_PrivateKey);
 
 int
 i2d_PrivateKey(EVP_PKEY *a, unsigned char **pp)
@@ -139,6 +132,7 @@ i2d_PrivateKey(EVP_PKEY *a, unsigned char **pp)
 	ASN1error(ASN1_R_UNSUPPORTED_PUBLIC_KEY_TYPE);
 	return (-1);
 }
+LCRYPTO_ALIAS(i2d_PrivateKey);
 
 /* This works like d2i_PrivateKey() except it automatically works out the type */
 
@@ -184,3 +178,4 @@ d2i_AutoPrivateKey(EVP_PKEY **a, const unsigned char **pp, long length)
 	sk_ASN1_TYPE_pop_free(inkey, ASN1_TYPE_free);
 	return d2i_PrivateKey(keytype, a, pp, length);
 }
+LCRYPTO_ALIAS(d2i_AutoPrivateKey);

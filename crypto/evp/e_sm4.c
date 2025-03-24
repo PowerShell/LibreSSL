@@ -1,4 +1,4 @@
-/*	$OpenBSD: e_sm4.c,v 1.9 2023/07/07 19:37:53 beck Exp $	*/
+/*	$OpenBSD: e_sm4.c,v 1.13 2024/04/09 13:52:41 beck Exp $	*/
 /*
  * Copyright (c) 2017, 2019 Ribose Inc
  *
@@ -154,10 +154,9 @@ static const EVP_CIPHER sm4_cbc = {
 	.do_cipher = sm4_cbc_cipher,
 	.cleanup = NULL,
 	.ctx_size = sizeof(EVP_SM4_KEY),
-	.set_asn1_parameters = 0,
-	.get_asn1_parameters = 0,
-	.ctrl = 0,
-	.app_data = NULL,
+	.set_asn1_parameters = NULL,
+	.get_asn1_parameters = NULL,
+	.ctrl = NULL,
 };
 
 const EVP_CIPHER *
@@ -165,6 +164,7 @@ EVP_sm4_cbc(void)
 {
 	return &sm4_cbc;
 }
+LCRYPTO_ALIAS(EVP_sm4_cbc);
 
 static const EVP_CIPHER sm4_cfb128 = {
 	.nid = NID_sm4_cfb128,
@@ -176,10 +176,9 @@ static const EVP_CIPHER sm4_cfb128 = {
 	.do_cipher = sm4_cfb128_cipher,
 	.cleanup = NULL,
 	.ctx_size = sizeof(EVP_SM4_KEY),
-	.set_asn1_parameters = 0,
-	.get_asn1_parameters = 0,
-	.ctrl = 0,
-	.app_data = NULL,
+	.set_asn1_parameters = NULL,
+	.get_asn1_parameters = NULL,
+	.ctrl = NULL,
 };
 
 const EVP_CIPHER *
@@ -187,6 +186,7 @@ EVP_sm4_cfb128(void)
 {
 	return &sm4_cfb128;
 }
+LCRYPTO_ALIAS(EVP_sm4_cfb128);
 
 static const EVP_CIPHER sm4_ofb = {
 	.nid = NID_sm4_ofb128,
@@ -198,10 +198,9 @@ static const EVP_CIPHER sm4_ofb = {
 	.do_cipher = sm4_ofb_cipher,
 	.cleanup = NULL,
 	.ctx_size = sizeof(EVP_SM4_KEY),
-	.set_asn1_parameters = 0,
-	.get_asn1_parameters = 0,
-	.ctrl = 0,
-	.app_data = NULL,
+	.set_asn1_parameters = NULL,
+	.get_asn1_parameters = NULL,
+	.ctrl = NULL,
 };
 
 const EVP_CIPHER *
@@ -209,6 +208,7 @@ EVP_sm4_ofb(void)
 {
 	return &sm4_ofb;
 }
+LCRYPTO_ALIAS(EVP_sm4_ofb);
 
 static const EVP_CIPHER sm4_ecb = {
 	.nid = NID_sm4_ecb,
@@ -220,10 +220,9 @@ static const EVP_CIPHER sm4_ecb = {
 	.do_cipher = sm4_ecb_cipher,
 	.cleanup = NULL,
 	.ctx_size = sizeof(EVP_SM4_KEY),
-	.set_asn1_parameters = 0,
-	.get_asn1_parameters = 0,
-	.ctrl = 0,
-	.app_data = NULL,
+	.set_asn1_parameters = NULL,
+	.get_asn1_parameters = NULL,
+	.ctrl = NULL,
 };
 
 const EVP_CIPHER *
@@ -231,6 +230,7 @@ EVP_sm4_ecb(void)
 {
 	return &sm4_ecb;
 }
+LCRYPTO_ALIAS(EVP_sm4_ecb);
 
 static int
 sm4_ctr_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out, const unsigned char *in,
@@ -256,7 +256,6 @@ static const EVP_CIPHER sm4_ctr_mode = {
 	.set_asn1_parameters = NULL,
 	.get_asn1_parameters = NULL,
 	.ctrl = NULL,
-	.app_data = NULL,
 };
 
 const EVP_CIPHER *
@@ -264,4 +263,5 @@ EVP_sm4_ctr(void)
 {
 	return &sm4_ctr_mode;
 }
+LCRYPTO_ALIAS(EVP_sm4_ctr);
 #endif

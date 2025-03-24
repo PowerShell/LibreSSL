@@ -1,4 +1,4 @@
-/* $OpenBSD: rsa_pmeth.c,v 1.39 2023/07/08 12:26:45 beck Exp $ */
+/* $OpenBSD: rsa_pmeth.c,v 1.41 2024/08/26 22:01:28 op Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2006.
  */
@@ -58,6 +58,7 @@
 
 #include <limits.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <openssl/opensslconf.h>
@@ -630,6 +631,8 @@ pkey_rsa_ctrl(EVP_PKEY_CTX *ctx, int type, int p1, void *p2)
 static int
 pkey_rsa_ctrl_str(EVP_PKEY_CTX *ctx, const char *type, const char *value)
 {
+	const char *errstr;
+
 	if (!value) {
 		RSAerror(RSA_R_VALUE_MISSING);
 		return 0;
@@ -664,13 +667,24 @@ pkey_rsa_ctrl_str(EVP_PKEY_CTX *ctx, const char *type, const char *value)
 			saltlen = RSA_PSS_SALTLEN_MAX;
 		else if (!strcmp(value, "auto"))
 			saltlen = RSA_PSS_SALTLEN_AUTO;
-		else
-			saltlen = atoi(value);
+		else {
+			saltlen = strtonum(value, 0, INT_MAX, &errstr);
+			if (errstr != NULL) {
+				RSAerror(RSA_R_INVALID_PSS_SALTLEN);
+				return -2;
+			}
+		}
 		return EVP_PKEY_CTX_set_rsa_pss_saltlen(ctx, saltlen);
 	}
 
 	if (strcmp(type, "rsa_keygen_bits") == 0) {
-		int nbits = atoi(value);
+		int nbits;
+
+		nbits = strtonum(value, 0, INT_MAX, &errstr);
+		if (errstr != NULL) {
+			RSAerror(RSA_R_INVALID_KEYBITS);
+			return -2;
+		}
 
 		return EVP_PKEY_CTX_set_rsa_keygen_bits(ctx, nbits);
 	}
@@ -702,7 +716,13 @@ pkey_rsa_ctrl_str(EVP_PKEY_CTX *ctx, const char *type, const char *value)
 			    EVP_PKEY_CTRL_MD, value);
 
 		if (strcmp(type, "rsa_pss_keygen_saltlen") == 0) {
-			int saltlen = atoi(value);
+			int saltlen;
+
+			saltlen = strtonum(value, 0, INT_MAX, &errstr);
+			if (errstr != NULL) {
+				RSAerror(RSA_R_INVALID_PSS_SALTLEN);
+				return -2;
+			}
 
 			return EVP_PKEY_CTX_set_rsa_pss_keygen_saltlen(ctx, saltlen);
 		}
@@ -756,32 +776,36 @@ pkey_rsa_keygen(EVP_PKEY_CTX *ctx, EVP_PKEY *pkey)
 {
 	RSA *rsa = NULL;
 	RSA_PKEY_CTX *rctx = ctx->data;
-	BN_GENCB *pcb, cb;
-	int ret;
+	BN_GENCB *pcb = NULL;
+	BN_GENCB cb = {0};
+	int ret = 0;
 
 	if (rctx->pub_exp == NULL) {
 		if ((rctx->pub_exp = BN_new()) == NULL)
-			return 0;
+			goto err;
 		if (!BN_set_word(rctx->pub_exp, RSA_F4))
-			return 0;
+			goto err;
 	}
+
 	if ((rsa = RSA_new()) == NULL)
-		return 0;
+		goto err;
 	if (ctx->pkey_gencb != NULL) {
 		pcb = &cb;
 		evp_pkey_set_cb_translate(pcb, ctx);
-	} else {
-		pcb = NULL;
 	}
-	ret = RSA_generate_key_ex(rsa, rctx->nbits, rctx->pub_exp, pcb);
-	if (ret > 0 && !rsa_set_pss_param(rsa, ctx)) {
-		RSA_free(rsa);
-		return 0;
-	}
-	if (ret > 0)
-		EVP_PKEY_assign(pkey, ctx->pmeth->pkey_id, rsa);
-	else
-		RSA_free(rsa);
+	if (!RSA_generate_key_ex(rsa, rctx->nbits, rctx->pub_exp, pcb))
+		goto err;
+	if (!rsa_set_pss_param(rsa, ctx))
+		goto err;
+	if (!EVP_PKEY_assign(pkey, ctx->pmeth->pkey_id, rsa))
+		goto err;
+	rsa = NULL;
+
+	ret = 1;
+
+ err:
+	RSA_free(rsa);
+
 	return ret;
 }
 

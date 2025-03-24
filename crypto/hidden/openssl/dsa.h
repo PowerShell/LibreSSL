@@ -1,4 +1,4 @@
-/* $OpenBSD: dsa.h,v 1.1 2023/07/08 14:28:15 beck Exp $ */
+/* $OpenBSD: dsa.h,v 1.3 2024/07/08 17:11:05 beck Exp $ */
 /*
  * Copyright (c) 2023 Bob Beck <beck@openbsd.org>
  *
@@ -61,7 +61,6 @@ LCRYPTO_USED(d2i_DSAPrivateKey);
 LCRYPTO_USED(i2d_DSAPrivateKey);
 LCRYPTO_USED(d2i_DSAparams);
 LCRYPTO_USED(i2d_DSAparams);
-LCRYPTO_USED(DSA_generate_parameters);
 LCRYPTO_USED(DSA_generate_parameters_ex);
 LCRYPTO_USED(DSA_generate_key);
 LCRYPTO_USED(DSAparams_print);
@@ -90,5 +89,10 @@ LCRYPTO_USED(DSA_meth_set1_name);
 LCRYPTO_USED(DSA_meth_set_sign);
 LCRYPTO_USED(DSA_meth_set_finish);
 LCRYPTO_USED(ERR_load_DSA_strings);
+#if defined(LIBRESSL_NAMESPACE)
+extern LCRYPTO_USED(DSAPublicKey_it);
+extern LCRYPTO_USED(DSAPrivateKey_it);
+extern LCRYPTO_USED(DSAparams_it);
+#endif
 
 #endif /* _LIBCRYPTO_DSA_H */

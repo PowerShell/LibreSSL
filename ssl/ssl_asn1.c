@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_asn1.c,v 1.67 2023/07/08 16:40:13 beck Exp $ */
+/* $OpenBSD: ssl_asn1.c,v 1.69 2024/07/22 14:47:15 jsing Exp $ */
 /*
  * Copyright (c) 2016 Joel Sing <jsing@openbsd.org>
  *
@@ -51,7 +51,6 @@ SSL_SESSION_encode(SSL_SESSION *s, unsigned char **out, size_t *out_len,
 	CBB peer_cert, sidctx, verify_result, hostname, lifetime, ticket, value;
 	unsigned char *peer_cert_bytes = NULL;
 	int len, rv = 0;
-	uint16_t cid;
 
 	if (!CBB_init(&cbb, 0))
 		goto err;
@@ -69,14 +68,10 @@ SSL_SESSION_encode(SSL_SESSION *s, unsigned char **out, size_t *out_len,
 	if (!CBB_add_asn1_uint64(&session, s->ssl_version))
 		goto err;
 
-	/* Cipher suite ID. */
-	/* XXX - require cipher to be non-NULL or always/only use cipher_id. */
-	cid = (uint16_t)(s->cipher_id & SSL3_CK_VALUE_MASK);
-	if (s->cipher != NULL)
-		cid = ssl3_cipher_get_value(s->cipher);
+	/* Cipher suite value. */
 	if (!CBB_add_asn1(&session, &cipher_suite, CBS_ASN1_OCTETSTRING))
 		goto err;
-	if (!CBB_add_u16(&cipher_suite, cid))
+	if (!CBB_add_u16(&cipher_suite, s->cipher_value))
 		goto err;
 
 	/* Session ID - zero length for a ticket. */
@@ -196,7 +191,7 @@ SSL_SESSION_ticket(SSL_SESSION *ss, unsigned char **out, size_t *out_len)
 	if (ss == NULL)
 		return 0;
 
-	if (ss->cipher == NULL && ss->cipher_id == 0)
+	if (ss->cipher_value == 0)
 		return 0;
 
 	return SSL_SESSION_encode(ss, out, out_len, 1);
@@ -212,7 +207,7 @@ i2d_SSL_SESSION(SSL_SESSION *ss, unsigned char **pp)
 	if (ss == NULL)
 		return 0;
 
-	if (ss->cipher == NULL && ss->cipher_id == 0)
+	if (ss->cipher_value == 0)
 		return 0;
 
 	if (!SSL_SESSION_encode(ss, &data, &data_len, 0))
@@ -247,7 +242,6 @@ d2i_SSL_SESSION(SSL_SESSION **a, const unsigned char **pp, long length)
 	CBS hostname, ticket;
 	uint64_t version, tls_version, stime, timeout, verify_result, lifetime;
 	const unsigned char *peer_cert_bytes;
-	uint16_t cipher_value;
 	SSL_SESSION *s = NULL;
 	size_t data_len;
 	int present;
@@ -280,17 +274,13 @@ d2i_SSL_SESSION(SSL_SESSION **a, const unsigned char **pp, long length)
 		goto err;
 	s->ssl_version = (int)tls_version;
 
-	/* Cipher suite. */
+	/* Cipher suite value. */
 	if (!CBS_get_asn1(&session, &cipher_suite, CBS_ASN1_OCTETSTRING))
 		goto err;
-	if (!CBS_get_u16(&cipher_suite, &cipher_value))
+	if (!CBS_get_u16(&cipher_suite, &s->cipher_value))
 		goto err;
 	if (CBS_len(&cipher_suite) != 0)
 		goto err;
-
-	/* XXX - populate cipher instead? */
-	s->cipher = NULL;
-	s->cipher_id = SSL3_CK_ID | cipher_value;
 
 	/* Session ID. */
 	if (!CBS_get_asn1(&session, &session_id, CBS_ASN1_OCTETSTRING))

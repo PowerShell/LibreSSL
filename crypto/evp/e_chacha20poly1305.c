@@ -1,4 +1,4 @@
-/* $OpenBSD: e_chacha20poly1305.c,v 1.32 2023/09/28 11:29:10 tb Exp $ */
+/* $OpenBSD: e_chacha20poly1305.c,v 1.36 2024/05/22 14:02:08 tb Exp $ */
 
 /*
  * Copyright (c) 2022 Joel Sing <jsing@openbsd.org>
@@ -345,10 +345,11 @@ static const EVP_AEAD aead_chacha20_poly1305 = {
 };
 
 const EVP_AEAD *
-EVP_aead_chacha20_poly1305()
+EVP_aead_chacha20_poly1305(void)
 {
 	return &aead_chacha20_poly1305;
 }
+LCRYPTO_ALIAS(EVP_aead_chacha20_poly1305);
 
 static const EVP_AEAD aead_xchacha20_poly1305 = {
 	.key_len = 32,
@@ -363,10 +364,11 @@ static const EVP_AEAD aead_xchacha20_poly1305 = {
 };
 
 const EVP_AEAD *
-EVP_aead_xchacha20_poly1305()
+EVP_aead_xchacha20_poly1305(void)
 {
 	return &aead_xchacha20_poly1305;
 }
+LCRYPTO_ALIAS(EVP_aead_xchacha20_poly1305);
 
 struct chacha20_poly1305_ctx {
 	ChaCha_ctx chacha;
@@ -477,7 +479,7 @@ chacha20_poly1305_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
 
 	if (len > SIZE_MAX - cpx->in_len) {
 		EVPerror(EVP_R_TOO_LARGE);
-		return 0;
+		return -1;
 	}
 
 	/* Disallow authenticated data after plaintext/ciphertext. */
@@ -491,6 +493,8 @@ chacha20_poly1305_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
 
 	/* Update with AD or plaintext/ciphertext. */
 	if (in != NULL) {
+		if (!ctx->encrypt || out == NULL)
+			CRYPTO_poly1305_update(&cpx->poly1305, in, len);
 		if (out == NULL) {
 			cpx->ad_len += len;
 			cpx->in_ad = 1;
@@ -500,8 +504,6 @@ chacha20_poly1305_cipher(EVP_CIPHER_CTX *ctx, unsigned char *out,
 		}
 		if (ctx->encrypt && out != NULL)
 			CRYPTO_poly1305_update(&cpx->poly1305, out, len);
-		else
-			CRYPTO_poly1305_update(&cpx->poly1305, in, len);
 
 		return len;
 	}
@@ -614,5 +616,6 @@ EVP_chacha20_poly1305(void)
 {
 	return &cipher_chacha20_poly1305;
 }
+LCRYPTO_ALIAS(EVP_chacha20_poly1305);
 
 #endif  /* !OPENSSL_NO_CHACHA && !OPENSSL_NO_POLY1305 */

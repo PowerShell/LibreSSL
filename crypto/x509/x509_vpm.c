@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_vpm.c,v 1.40 2023/05/28 05:25:24 tb Exp $ */
+/* $OpenBSD: x509_vpm.c,v 1.45 2024/03/29 04:50:11 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2004.
  */
@@ -61,6 +61,7 @@
 
 #include <openssl/buffer.h>
 #include <openssl/crypto.h>
+#include <openssl/err.h>
 #include <openssl/lhash.h>
 #include <openssl/stack.h>
 #include <openssl/x509.h>
@@ -81,44 +82,34 @@ int X509_VERIFY_PARAM_set1_ip(X509_VERIFY_PARAM *param, const unsigned char *ip,
 static void
 str_free(char *s)
 {
-    free(s);
+	free(s);
 }
 
-/*
- * Post 1.0.1 sk function "deep_copy".  For the moment we simply make
- * these take void * and use them directly without a glorious blob of
- * obfuscating macros of dubious value in front of them. All this in
- * preparation for a rototilling of safestack.h (likely inspired by
- * this).
- */
-static void *
-sk_deep_copy(void *sk_void, void *copy_func_void, void *free_func_void)
+static STACK_OF(OPENSSL_STRING) *
+sk_OPENSSL_STRING_deep_copy(const STACK_OF(OPENSSL_STRING) *sk)
 {
-	_STACK *sk = sk_void;
-	void *(*copy_func)(void *) = copy_func_void;
-	void (*free_func)(void *) = free_func_void;
-	_STACK *ret = sk_dup(sk);
-	size_t i;
+	STACK_OF(OPENSSL_STRING) *new;
+	char *copy = NULL;
+	int i;
 
-	if (ret == NULL)
-		return NULL;
+	if ((new = sk_OPENSSL_STRING_new_null()) == NULL)
+		goto err;
 
-	for (i = 0; i < ret->num; i++) {
-		if (ret->data[i] == NULL)
-			continue;
-		ret->data[i] = copy_func(ret->data[i]);
-		if (ret->data[i] == NULL) {
-			size_t j;
-			for (j = 0; j < i; j++) {
-				if (ret->data[j] != NULL)
-					free_func(ret->data[j]);
-			}
-			sk_free(ret);
-			return NULL;
-		}
+	for (i = 0; i < sk_OPENSSL_STRING_num(sk); i++) {
+		if ((copy = strdup(sk_OPENSSL_STRING_value(sk, i))) == NULL)
+			goto err;
+		if (sk_OPENSSL_STRING_push(new, copy) <= 0)
+			goto err;
+		copy = NULL;
 	}
 
-	return ret;
+	return new;
+
+ err:
+	sk_OPENSSL_STRING_pop_free(new, str_free);
+	free(copy);
+
+	return NULL;
 }
 
 static int
@@ -313,7 +304,7 @@ X509_VERIFY_PARAM_inherit(X509_VERIFY_PARAM *dest, const X509_VERIFY_PARAM *src)
 			dest->hosts = NULL;
 		}
 		if (src->hosts) {
-			dest->hosts = sk_deep_copy(src->hosts, strdup, str_free);
+			dest->hosts = sk_OPENSSL_STRING_deep_copy(src->hosts);
 			if (dest->hosts == NULL)
 				return 0;
 		}
@@ -418,14 +409,26 @@ LCRYPTO_ALIAS(X509_VERIFY_PARAM_get_flags);
 int
 X509_VERIFY_PARAM_set_purpose(X509_VERIFY_PARAM *param, int purpose)
 {
-	return X509_PURPOSE_set(&param->purpose, purpose);
+	if (purpose < X509_PURPOSE_MIN || purpose > X509_PURPOSE_MAX) {
+		X509V3error(X509V3_R_INVALID_PURPOSE);
+		return 0;
+	}
+
+	param->purpose = purpose;
+	return 1;
 }
 LCRYPTO_ALIAS(X509_VERIFY_PARAM_set_purpose);
 
 int
 X509_VERIFY_PARAM_set_trust(X509_VERIFY_PARAM *param, int trust)
 {
-	return X509_TRUST_set(&param->trust, trust);
+	if (trust < X509_TRUST_MIN || trust > X509_TRUST_MAX) {
+		X509error(X509_R_INVALID_TRUST);
+		return 0;
+	}
+
+	param->trust = trust;
+	return 1;
 }
 LCRYPTO_ALIAS(X509_VERIFY_PARAM_set_trust);
 
@@ -461,48 +464,59 @@ LCRYPTO_ALIAS(X509_VERIFY_PARAM_set_time);
 int
 X509_VERIFY_PARAM_add0_policy(X509_VERIFY_PARAM *param, ASN1_OBJECT *policy)
 {
-	if (!param->policies) {
+	if (param->policies == NULL)
 		param->policies = sk_ASN1_OBJECT_new_null();
-		if (!param->policies)
-			return 0;
-	}
-	if (!sk_ASN1_OBJECT_push(param->policies, policy))
+	if (param->policies == NULL)
+		return 0;
+	if (sk_ASN1_OBJECT_push(param->policies, policy) <= 0)
 		return 0;
 	return 1;
 }
 LCRYPTO_ALIAS(X509_VERIFY_PARAM_add0_policy);
 
+static STACK_OF(ASN1_OBJECT) *
+sk_ASN1_OBJECT_deep_copy(const STACK_OF(ASN1_OBJECT) *sk)
+{
+	STACK_OF(ASN1_OBJECT) *objs;
+	ASN1_OBJECT *obj = NULL;
+	int i;
+
+	if ((objs = sk_ASN1_OBJECT_new_null()) == NULL)
+		goto err;
+
+	for (i = 0; i < sk_ASN1_OBJECT_num(sk); i++) {
+		if ((obj = OBJ_dup(sk_ASN1_OBJECT_value(sk, i))) == NULL)
+			goto err;
+		if (sk_ASN1_OBJECT_push(objs, obj) <= 0)
+			goto err;
+		obj = NULL;
+	}
+
+	return objs;
+
+ err:
+	sk_ASN1_OBJECT_pop_free(objs, ASN1_OBJECT_free);
+	ASN1_OBJECT_free(obj);
+
+	return NULL;
+}
+
 int
 X509_VERIFY_PARAM_set1_policies(X509_VERIFY_PARAM *param,
     STACK_OF(ASN1_OBJECT) *policies)
 {
-	int i;
-	ASN1_OBJECT *oid, *doid;
-
-	if (!param)
+	if (param == NULL)
 		return 0;
-	if (param->policies)
-		sk_ASN1_OBJECT_pop_free(param->policies, ASN1_OBJECT_free);
 
-	if (!policies) {
-		param->policies = NULL;
+	sk_ASN1_OBJECT_pop_free(param->policies, ASN1_OBJECT_free);
+	param->policies = NULL;
+
+	if (policies == NULL)
 		return 1;
-	}
 
-	param->policies = sk_ASN1_OBJECT_new_null();
-	if (!param->policies)
+	if ((param->policies = sk_ASN1_OBJECT_deep_copy(policies)) == NULL)
 		return 0;
 
-	for (i = 0; i < sk_ASN1_OBJECT_num(policies); i++) {
-		oid = sk_ASN1_OBJECT_value(policies, i);
-		doid = OBJ_dup(oid);
-		if (!doid)
-			return 0;
-		if (!sk_ASN1_OBJECT_push(param->policies, doid)) {
-			ASN1_OBJECT_free(doid);
-			return 0;
-		}
-	}
 	return 1;
 }
 LCRYPTO_ALIAS(X509_VERIFY_PARAM_set1_policies);

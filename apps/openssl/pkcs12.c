@@ -1,4 +1,4 @@
-/* $OpenBSD: pkcs12.c,v 1.25 2023/03/06 14:32:06 tb Exp $ */
+/* $OpenBSD: pkcs12.c,v 1.28 2024/08/22 12:14:33 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project.
  */
@@ -70,6 +70,7 @@
 #include <openssl/err.h>
 #include <openssl/pem.h>
 #include <openssl/pkcs12.h>
+#include <openssl/x509.h>
 
 #define NOKEYS		0x1
 #define NOCERTS 	0x2
@@ -92,14 +93,12 @@ static int alg_print(BIO *x, const X509_ALGOR *alg);
 static int set_pbe(BIO *err, int *ppbe, const char *str);
 
 static struct {
-	int add_lmk;
 	char *CAfile;
 	STACK_OF(OPENSSL_STRING) *canames;
 	char *CApath;
 	int cert_pbe;
 	char *certfile;
 	int chain;
-	char *csp_name;
 	const EVP_CIPHER *enc;
 	int export_cert;
 	int key_pbe;
@@ -321,13 +320,6 @@ static const struct option pkcs12_options[] = {
 		.value = CLCERTS,
 	},
 	{
-		.name = "CSP",
-		.argname = "name",
-		.desc = "Microsoft CSP name",
-		.type = OPTION_ARG,
-		.opt.arg = &cfg.csp_name,
-	},
-	{
 		.name = "descert",
 		.desc = "Encrypt PKCS#12 certificates with triple DES (default RC2-40)",
 		.type = OPTION_VALUE,
@@ -381,12 +373,6 @@ static const struct option pkcs12_options[] = {
 		.type = OPTION_VALUE,
 		.opt.value = &cfg.keytype,
 		.value = KEY_SIG,
-	},
-	{
-		.name = "LMK",
-		.desc = "Add local machine keyset attribute to private key",
-		.type = OPTION_FLAG,
-		.opt.flag = &cfg.add_lmk,
 	},
 	{
 		.name = "macalg",
@@ -718,15 +704,6 @@ pkcs12_main(int argc, char **argv)
 			X509_alias_set1(sk_X509_value(certs, i), catmp, -1);
 		}
 
-		if (cfg.csp_name != NULL && key != NULL)
-			EVP_PKEY_add1_attr_by_NID(key, NID_ms_csp_name,
-			    MBSTRING_ASC,
-			    (unsigned char *) cfg.csp_name, -1);
-
-		if (cfg.add_lmk && key != NULL)
-			EVP_PKEY_add1_attr_by_NID(key, NID_LocalKeySet, 0, NULL,
-			    -1);
-
 		if (!cfg.noprompt &&
 		    EVP_read_pw_string(pass, sizeof pass,
 		    "Enter Export Password:", 1)) {
@@ -1010,17 +987,20 @@ get_cert_chain(X509 *cert, X509_STORE *store, STACK_OF(X509) **out_chain)
 static int
 alg_print(BIO *x, const X509_ALGOR *alg)
 {
-	PBEPARAM *pbe;
-	const unsigned char *p;
+	PBEPARAM *pbe = NULL;
+	const ASN1_OBJECT *aobj;
+	int param_type;
+	const void *param;
 
-	p = alg->parameter->value.sequence->data;
-	pbe = d2i_PBEPARAM(NULL, &p, alg->parameter->value.sequence->length);
+	X509_ALGOR_get0(&aobj, &param_type, &param, alg);
+	if (param_type == V_ASN1_SEQUENCE)
+		pbe = ASN1_item_unpack(param, &PBEPARAM_it);
 	if (pbe == NULL)
 		return 1;
 	BIO_printf(bio_err, "%s, Iteration %ld\n",
-	    OBJ_nid2ln(OBJ_obj2nid(alg->algorithm)),
+	    OBJ_nid2ln(OBJ_obj2nid(aobj)),
 	    ASN1_INTEGER_get(pbe->iter));
-	PBEPARAM_free(pbe);
+	ASN1_item_free((ASN1_VALUE *)pbe, &PBEPARAM_it);
 	return 1;
 }
 

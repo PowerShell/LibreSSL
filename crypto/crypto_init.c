@@ -1,4 +1,4 @@
-/*	$OpenBSD: crypto_init.c,v 1.11 2023/07/08 08:28:23 beck Exp $ */
+/*	$OpenBSD: crypto_init.c,v 1.21 2024/04/10 14:51:02 beck Exp $ */
 /*
  * Copyright (c) 2018 Bob Beck <beck@openbsd.org>
  *
@@ -22,9 +22,6 @@
 
 #include <openssl/asn1.h>
 #include <openssl/conf.h>
-#ifndef OPENSSL_NO_ENGINE
-#include <openssl/engine.h>
-#endif
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/objects.h>
@@ -40,6 +37,12 @@ static pthread_once_t crypto_init_once = PTHREAD_ONCE_INIT;
 static pthread_t crypto_init_thread;
 static int crypto_init_cleaned_up;
 
+void
+OPENSSL_init(void)
+{
+}
+LCRYPTO_ALIAS(OPENSSL_init);
+
 static void
 OPENSSL_init_crypto_internal(void)
 {
@@ -47,8 +50,6 @@ OPENSSL_init_crypto_internal(void)
 
 	OPENSSL_cpuid_setup();
 	ERR_load_crypto_strings();
-	OpenSSL_add_all_ciphers();
-	OpenSSL_add_all_digests();
 }
 
 int
@@ -84,15 +85,8 @@ OPENSSL_cleanup(void)
 	ERR_free_strings();
 
 	CRYPTO_cleanup_all_ex_data();
-#ifndef OPENSSL_NO_ENGINE
-	ENGINE_cleanup();
-#endif
 	EVP_cleanup();
 
-	ASN1_STRING_TABLE_cleanup();
-	X509V3_EXT_cleanup();
-	X509_PURPOSE_cleanup();
-	X509_TRUST_cleanup();
 	X509_VERIFY_PARAM_table_cleanup();
 
 	x509_issuer_cache_free();
@@ -100,3 +94,28 @@ OPENSSL_cleanup(void)
 	crypto_init_cleaned_up = 1;
 }
 LCRYPTO_ALIAS(OPENSSL_cleanup);
+
+void
+OpenSSL_add_all_ciphers(void)
+{
+}
+LCRYPTO_ALIAS(OpenSSL_add_all_ciphers);
+
+void
+OpenSSL_add_all_digests(void)
+{
+}
+LCRYPTO_ALIAS(OpenSSL_add_all_digests);
+
+void
+OPENSSL_add_all_algorithms_noconf(void)
+{
+}
+LCRYPTO_ALIAS(OPENSSL_add_all_algorithms_noconf);
+
+void
+OPENSSL_add_all_algorithms_conf(void)
+{
+	OPENSSL_config(NULL);
+}
+LCRYPTO_ALIAS(OPENSSL_add_all_algorithms_conf);

@@ -1,10 +1,16 @@
+#if defined(__CET__)
+#include <cet.h>
+#else
+#define _CET_ENDBR
+#endif
+
 #include "x86_arch.h"
 
 .text	
 .type	_x86_64_AES_encrypt,@function
 .align	16
 _x86_64_AES_encrypt:
-	endbr64
+_CET_ENDBR
 	xorl	0(%r15),%eax
 	xorl	4(%r15),%ebx
 	xorl	8(%r15),%ecx
@@ -158,7 +164,7 @@ _x86_64_AES_encrypt:
 .type	_x86_64_AES_encrypt_compact,@function
 .align	16
 _x86_64_AES_encrypt_compact:
-	endbr64
+_CET_ENDBR
 	leaq	128(%r14),%r8
 	movl	0-128(%r8),%edi
 	movl	32-128(%r8),%ebp
@@ -331,14 +337,14 @@ _x86_64_AES_encrypt_compact:
 	xorl	12(%r15),%edx
 	retq
 .size	_x86_64_AES_encrypt_compact,.-_x86_64_AES_encrypt_compact
-.globl	AES_encrypt
-.type	AES_encrypt,@function
+.globl	aes_encrypt_internal
+.type	aes_encrypt_internal,@function
 .align	16
 .globl	asm_AES_encrypt
 .hidden	asm_AES_encrypt
 asm_AES_encrypt:
-AES_encrypt:
-	endbr64
+aes_encrypt_internal:
+_CET_ENDBR
 	pushq	%rbx
 	pushq	%rbp
 	pushq	%r12
@@ -398,11 +404,11 @@ AES_encrypt:
 	leaq	48(%rsi),%rsp
 .Lenc_epilogue:
 	retq
-.size	AES_encrypt,.-AES_encrypt
+.size	aes_encrypt_internal,.-aes_encrypt_internal
 .type	_x86_64_AES_decrypt,@function
 .align	16
 _x86_64_AES_decrypt:
-	endbr64
+_CET_ENDBR
 	xorl	0(%r15),%eax
 	xorl	4(%r15),%ebx
 	xorl	8(%r15),%ecx
@@ -558,7 +564,7 @@ _x86_64_AES_decrypt:
 .type	_x86_64_AES_decrypt_compact,@function
 .align	16
 _x86_64_AES_decrypt_compact:
-	endbr64
+_CET_ENDBR
 	leaq	128(%r14),%r8
 	movl	0-128(%r8),%edi
 	movl	32-128(%r8),%ebp
@@ -782,14 +788,14 @@ _x86_64_AES_decrypt_compact:
 	xorl	12(%r15),%edx
 	retq
 .size	_x86_64_AES_decrypt_compact,.-_x86_64_AES_decrypt_compact
-.globl	AES_decrypt
-.type	AES_decrypt,@function
+.globl	aes_decrypt_internal
+.type	aes_decrypt_internal,@function
 .align	16
 .globl	asm_AES_decrypt
 .hidden	asm_AES_decrypt
 asm_AES_decrypt:
-AES_decrypt:
-	endbr64
+aes_decrypt_internal:
+_CET_ENDBR
 	pushq	%rbx
 	pushq	%rbp
 	pushq	%r12
@@ -851,12 +857,12 @@ AES_decrypt:
 	leaq	48(%rsi),%rsp
 .Ldec_epilogue:
 	retq
-.size	AES_decrypt,.-AES_decrypt
-.globl	AES_set_encrypt_key
-.type	AES_set_encrypt_key,@function
+.size	aes_decrypt_internal,.-aes_decrypt_internal
+.globl	aes_set_encrypt_key_internal
+.type	aes_set_encrypt_key_internal,@function
 .align	16
-AES_set_encrypt_key:
-	endbr64
+aes_set_encrypt_key_internal:
+_CET_ENDBR
 	pushq	%rbx
 	pushq	%rbp
 	pushq	%r12
@@ -877,12 +883,12 @@ AES_set_encrypt_key:
 	addq	$56,%rsp
 .Lenc_key_epilogue:
 	retq
-.size	AES_set_encrypt_key,.-AES_set_encrypt_key
+.size	aes_set_encrypt_key_internal,.-aes_set_encrypt_key_internal
 
 .type	_x86_64_AES_set_encrypt_key,@function
 .align	16
 _x86_64_AES_set_encrypt_key:
-	endbr64
+_CET_ENDBR
 	movl	%esi,%ecx
 	movq	%rdi,%rsi
 	movq	%rdx,%rdi
@@ -1119,11 +1125,11 @@ _x86_64_AES_set_encrypt_key:
 .Lexit:
 	retq
 .size	_x86_64_AES_set_encrypt_key,.-_x86_64_AES_set_encrypt_key
-.globl	AES_set_decrypt_key
-.type	AES_set_decrypt_key,@function
+.globl	aes_set_decrypt_key_internal
+.type	aes_set_decrypt_key_internal,@function
 .align	16
-AES_set_decrypt_key:
-	endbr64
+aes_set_decrypt_key_internal:
+_CET_ENDBR
 	pushq	%rbx
 	pushq	%rbp
 	pushq	%r12
@@ -1306,17 +1312,17 @@ AES_set_decrypt_key:
 	addq	$56,%rsp
 .Ldec_key_epilogue:
 	retq
-.size	AES_set_decrypt_key,.-AES_set_decrypt_key
-.globl	AES_cbc_encrypt
-.type	AES_cbc_encrypt,@function
+.size	aes_set_decrypt_key_internal,.-aes_set_decrypt_key_internal
+.globl	aes_cbc_encrypt_internal
+.type	aes_cbc_encrypt_internal,@function
 .align	16
 
 .hidden	OPENSSL_ia32cap_P
 .globl	asm_AES_cbc_encrypt
 .hidden	asm_AES_cbc_encrypt
 asm_AES_cbc_encrypt:
-AES_cbc_encrypt:
-	endbr64
+aes_cbc_encrypt_internal:
+_CET_ENDBR
 	cmpq	$0,%rdx
 	je	.Lcbc_epilogue
 	pushfq
@@ -1765,7 +1771,7 @@ AES_cbc_encrypt:
 	popfq
 .Lcbc_epilogue:
 	retq
-.size	AES_cbc_encrypt,.-AES_cbc_encrypt
+.size	aes_cbc_encrypt_internal,.-aes_cbc_encrypt_internal
 .section	.rodata
 .align	64
 .LAES_Te:

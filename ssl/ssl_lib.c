@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_lib.c,v 1.314 2023/09/19 01:22:31 tb Exp $ */
+/* $OpenBSD: ssl_lib.c,v 1.330 2024/09/22 14:59:48 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -154,18 +154,12 @@
 #include <openssl/opensslconf.h>
 #include <openssl/x509v3.h>
 
-#ifndef OPENSSL_NO_ENGINE
-#include <openssl/engine.h>
-#endif
-
 #include "bytestring.h"
 #include "dtls_local.h"
 #include "ssl_local.h"
 #include "ssl_sigalgs.h"
 #include "ssl_tlsext.h"
 #include "tls12_internal.h"
-
-const char *SSL_version_str = OPENSSL_VERSION_TEXT;
 
 int
 SSL_clear(SSL *s)
@@ -609,8 +603,7 @@ LSSL_ALIAS(SSL_free);
 int
 SSL_up_ref(SSL *s)
 {
-	int refs = CRYPTO_add(&s->references, 1, CRYPTO_LOCK_SSL);
-	return (refs > 1) ? 1 : 0;
+	return CRYPTO_add(&s->references, 1, CRYPTO_LOCK_SSL) > 1;
 }
 LSSL_ALIAS(SSL_up_ref);
 
@@ -1072,7 +1065,7 @@ SSL_is_server(const SSL *s)
 LSSL_ALIAS(SSL_is_server);
 
 static long
-ssl_get_default_timeout()
+ssl_get_default_timeout(void)
 {
 	/*
 	 * 2 hours, the 24 hours mentioned in the TLSv1 spec
@@ -1379,10 +1372,8 @@ SSL_ctrl(SSL *s, int cmd, long larg, void *parg)
 		s->max_cert_list = larg;
 		return (l);
 	case SSL_CTRL_SET_MTU:
-#ifndef OPENSSL_NO_DTLS1
 		if (larg < (long)dtls1_min_mtu())
 			return (0);
-#endif
 		if (SSL_is_dtls(s)) {
 			s->d1->mtu = larg;
 			return (larg);
@@ -1520,18 +1511,6 @@ SSL_CTX_callback_ctrl(SSL_CTX *ctx, int cmd, void (*fp)(void))
 }
 LSSL_ALIAS(SSL_CTX_callback_ctrl);
 
-int
-ssl_cipher_id_cmp(const SSL_CIPHER *a, const SSL_CIPHER *b)
-{
-	long	l;
-
-	l = a->id - b->id;
-	if (l == 0L)
-		return (0);
-	else
-		return ((l > 0) ? 1:-1);
-}
-
 STACK_OF(SSL_CIPHER) *
 SSL_get_ciphers(const SSL *s)
 {
@@ -1547,9 +1526,9 @@ LSSL_ALIAS(SSL_get_ciphers);
 STACK_OF(SSL_CIPHER) *
 SSL_get_client_ciphers(const SSL *s)
 {
-	if (s == NULL || s->session == NULL || !s->server)
+	if (s == NULL || !s->server)
 		return NULL;
-	return s->session->ciphers;
+	return s->s3->hs.client_ciphers;
 }
 LSSL_ALIAS(SSL_get_client_ciphers);
 
@@ -1732,10 +1711,10 @@ SSL_get_shared_ciphers(const SSL *s, char *buf, int len)
 	char *end;
 	int i;
 
-	if (!s->server || s->session == NULL || len < 2)
+	if (!s->server || len < 2)
 		return NULL;
 
-	if ((client_ciphers = s->session->ciphers) == NULL)
+	if ((client_ciphers = s->s3->hs.client_ciphers) == NULL)
 		return NULL;
 	if ((server_ciphers = SSL_get_ciphers(s)) == NULL)
 		return NULL;
@@ -1804,45 +1783,72 @@ LSSL_ALIAS(SSL_get_servername_type);
  * It returns either:
  * OPENSSL_NPN_NEGOTIATED if a common protocol was found, or
  * OPENSSL_NPN_NO_OVERLAP if the fallback case was reached.
+ *
+ * XXX - the out argument points into server_list or client_list and should
+ * therefore really be const. We can't fix that without breaking the callers.
  */
 int
 SSL_select_next_proto(unsigned char **out, unsigned char *outlen,
-    const unsigned char *server, unsigned int server_len,
-    const unsigned char *client, unsigned int client_len)
+    const unsigned char *peer_list, unsigned int peer_list_len,
+    const unsigned char *supported_list, unsigned int supported_list_len)
 {
-	unsigned int		 i, j;
-	const unsigned char	*result;
-	int			 status = OPENSSL_NPN_UNSUPPORTED;
+	CBS peer, peer_proto, supported, supported_proto;
+
+	*out = NULL;
+	*outlen = 0;
+
+	/* First check that the supported list is well-formed. */
+	CBS_init(&supported, supported_list, supported_list_len);
+	if (!tlsext_alpn_check_format(&supported))
+		goto err;
 
 	/*
-	 * For each protocol in server preference order,
-	 * see if we support it.
+	 * Use first supported protocol as fallback. This is one way of doing
+	 * NPN's "opportunistic" protocol selection (see security considerations
+	 * in draft-agl-tls-nextprotoneg-04), and it is the documented behavior
+	 * of this API. For ALPN it's the callback's responsibility to fail on
+	 * OPENSSL_NPN_NO_OVERLAP.
 	 */
-	for (i = 0; i < server_len; ) {
-		for (j = 0; j < client_len; ) {
-			if (server[i] == client[j] &&
-			    memcmp(&server[i + 1],
-			    &client[j + 1], server[i]) == 0) {
-				/* We found a match */
-				result = &server[i];
-				status = OPENSSL_NPN_NEGOTIATED;
-				goto found;
+
+	if (!CBS_get_u8_length_prefixed(&supported, &supported_proto))
+		goto err;
+
+	*out = (unsigned char *)CBS_data(&supported_proto);
+	*outlen = CBS_len(&supported_proto);
+
+	/* Now check that the peer list is well-formed. */
+	CBS_init(&peer, peer_list, peer_list_len);
+	if (!tlsext_alpn_check_format(&peer))
+		goto err;
+
+	/*
+	 * Walk the peer list and select the first protocol that appears in
+	 * the supported list. Thus we honor peer preference rather than local
+	 * preference contrary to a SHOULD in RFC 7301, section 3.2.
+	 */
+	while (CBS_len(&peer) > 0) {
+		if (!CBS_get_u8_length_prefixed(&peer, &peer_proto))
+			goto err;
+
+		CBS_init(&supported, supported_list, supported_list_len);
+
+		while (CBS_len(&supported) > 0) {
+			if (!CBS_get_u8_length_prefixed(&supported,
+			    &supported_proto))
+				goto err;
+
+			if (CBS_mem_equal(&supported_proto,
+			    CBS_data(&peer_proto), CBS_len(&peer_proto))) {
+				*out = (unsigned char *)CBS_data(&peer_proto);
+				*outlen = CBS_len(&peer_proto);
+
+				return OPENSSL_NPN_NEGOTIATED;
 			}
-			j += client[j];
-			j++;
 		}
-		i += server[i];
-		i++;
 	}
 
-	/* There's no overlap between our protocols and the server's list. */
-	result = client;
-	status = OPENSSL_NPN_NO_OVERLAP;
-
- found:
-	*out = (unsigned char *) result + 1;
-	*outlen = result[0];
-	return (status);
+ err:
+	return OPENSSL_NPN_NO_OVERLAP;
 }
 LSSL_ALIAS(SSL_select_next_proto);
 
@@ -2164,26 +2170,6 @@ SSL_CTX_new(const SSL_METHOD *meth)
 	ret->tlsext_status_cb = 0;
 	ret->tlsext_status_arg = NULL;
 
-#ifndef OPENSSL_NO_ENGINE
-	ret->client_cert_engine = NULL;
-#ifdef OPENSSL_SSL_CLIENT_ENGINE_AUTO
-#define eng_strx(x)	#x
-#define eng_str(x)	eng_strx(x)
-	/* Use specific client engine automatically... ignore errors */
-	{
-		ENGINE *eng;
-		eng = ENGINE_by_id(eng_str(OPENSSL_SSL_CLIENT_ENGINE_AUTO));
-		if (!eng) {
-			ERR_clear_error();
-			ENGINE_load_builtin_engines();
-			eng = ENGINE_by_id(eng_str(
-			    OPENSSL_SSL_CLIENT_ENGINE_AUTO));
-		}
-		if (!eng || !SSL_CTX_set_client_cert_engine(ret, eng))
-			ERR_clear_error();
-	}
-#endif
-#endif
 	/*
 	 * Default is to connect to non-RI servers. When RI is more widely
 	 * deployed might change this.
@@ -2241,10 +2227,6 @@ SSL_CTX_free(SSL_CTX *ctx)
 		sk_SRTP_PROTECTION_PROFILE_free(ctx->srtp_profiles);
 #endif
 
-#ifndef OPENSSL_NO_ENGINE
-	ENGINE_finish(ctx->client_cert_engine);
-#endif
-
 	free(ctx->tlsext_ecpointformatlist);
 	free(ctx->tlsext_supportedgroups);
 
@@ -2257,8 +2239,7 @@ LSSL_ALIAS(SSL_CTX_free);
 int
 SSL_CTX_up_ref(SSL_CTX *ctx)
 {
-	int refs = CRYPTO_add(&ctx->references, 1, CRYPTO_LOCK_SSL_CTX);
-	return ((refs > 1) ? 1 : 0);
+	return CRYPTO_add(&ctx->references, 1, CRYPTO_LOCK_SSL_CTX) > 1;
 }
 LSSL_ALIAS(SSL_CTX_up_ref);
 
@@ -2337,12 +2318,6 @@ ssl_set_cert_masks(SSL_CERT *c, const SSL_CIPHER *cipher)
 			mask_a |= SSL_aECDSA;
 	}
 
-	cpk = &(c->pkeys[SSL_PKEY_GOST01]);
-	if (cpk->x509 != NULL && cpk->privatekey != NULL) {
-		mask_k |= SSL_kGOST;
-		mask_a |= SSL_aGOST01;
-	}
-
 	cpk = &(c->pkeys[SSL_PKEY_RSA]);
 	if (cpk->x509 != NULL && cpk->privatekey != NULL) {
 		mask_a |= SSL_aRSA;
@@ -2403,8 +2378,6 @@ ssl_get_server_send_pkey(const SSL *s)
 		i = SSL_PKEY_ECC;
 	} else if (alg_a & SSL_aRSA) {
 		i = SSL_PKEY_RSA;
-	} else if (alg_a & SSL_aGOST01) {
-		i = SSL_PKEY_GOST01;
 	} else { /* if (alg_a & SSL_aNULL) */
 		SSLerror(s, ERR_R_INTERNAL_ERROR);
 		return (NULL);
@@ -2973,8 +2946,6 @@ SSL_dup(SSL *s)
 
 	SSL_set_info_callback(ret, SSL_get_info_callback(s));
 
-	ret->debug = s->debug;
-
 	/* copy app data, a little dangerous perhaps */
 	if (!CRYPTO_dup_ex_data(CRYPTO_EX_INDEX_SSL,
 	    &ret->ex_data, &s->ex_data))
@@ -3100,11 +3071,10 @@ LSSL_ALIAS(SSL_get_privatekey);
 const SSL_CIPHER *
 SSL_get_current_cipher(const SSL *s)
 {
-	if ((s->session != NULL) && (s->session->cipher != NULL))
-		return (s->session->cipher);
-	return (NULL);
+	return s->s3->hs.cipher;
 }
 LSSL_ALIAS(SSL_get_current_cipher);
+
 const void *
 SSL_get_current_compression(SSL *s)
 {
@@ -3431,6 +3401,16 @@ SSL_CTX_set_cert_store(SSL_CTX *ctx, X509_STORE *store)
 }
 LSSL_ALIAS(SSL_CTX_set_cert_store);
 
+void
+SSL_CTX_set1_cert_store(SSL_CTX *ctx, X509_STORE *store)
+{
+	if (store != NULL)
+		X509_STORE_up_ref(store);
+
+	SSL_CTX_set_cert_store(ctx, store);
+}
+LSSL_ALIAS(SSL_CTX_set1_cert_store);
+
 X509 *
 SSL_CTX_get0_certificate(const SSL_CTX *ctx)
 {
@@ -3524,13 +3504,6 @@ SSL_set_msg_callback(SSL *ssl, void (*cb)(int write_p, int version,
 	SSL_callback_ctrl(ssl, SSL_CTRL_SET_MSG_CALLBACK, (void (*)(void))cb);
 }
 LSSL_ALIAS(SSL_set_msg_callback);
-
-void
-SSL_set_debug(SSL *s, int debug)
-{
-	s->debug = debug;
-}
-LSSL_ALIAS(SSL_set_debug);
 
 int
 SSL_cache_hit(SSL *s)
@@ -3678,18 +3651,3 @@ SSL_set_quic_use_legacy_codepoint(SSL *ssl, int use_legacy)
 	/* Not supported. */
 }
 LSSL_ALIAS(SSL_set_quic_use_legacy_codepoint);
-
-static int
-ssl_cipher_id_cmp_BSEARCH_CMP_FN(const void *a_, const void *b_)
-{
-	SSL_CIPHER const *a = a_;
-	SSL_CIPHER const *b = b_;
-	return ssl_cipher_id_cmp(a, b);
-}
-
-SSL_CIPHER *
-OBJ_bsearch_ssl_cipher_id(SSL_CIPHER *key, SSL_CIPHER const *base, int num)
-{
-	return (SSL_CIPHER *)OBJ_bsearch_(key, base, num, sizeof(SSL_CIPHER),
-	    ssl_cipher_id_cmp_BSEARCH_CMP_FN);
-}

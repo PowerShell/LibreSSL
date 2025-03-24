@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_sess.c,v 1.122 2023/07/08 16:40:13 beck Exp $ */
+/* $OpenBSD: ssl_sess.c,v 1.128 2024/07/22 14:47:15 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -137,10 +137,6 @@
 
 #include <openssl/lhash.h>
 #include <openssl/opensslconf.h>
-
-#ifndef OPENSSL_NO_ENGINE
-#include <openssl/engine.h>
-#endif
 
 #include "ssl_local.h"
 
@@ -291,13 +287,7 @@ ssl_session_dup(SSL_SESSION *sess, int include_ticket)
 	copy->time = sess->time;
 	copy->references = 1;
 
-	copy->cipher = sess->cipher;
-	copy->cipher_id = sess->cipher_id;
-
-	if (sess->ciphers != NULL) {
-		if ((copy->ciphers = sk_SSL_CIPHER_dup(sess->ciphers)) == NULL)
-			goto err;
-	}
+	copy->cipher_value = sess->cipher_value;
 
 	if (sess->tlsext_hostname != NULL) {
 		copy->tlsext_hostname = strdup(sess->tlsext_hostname);
@@ -716,12 +706,6 @@ ssl_get_prev_session(SSL *s, CBS *session_id, CBS *ext_block, int *alert)
 		goto err;
 	}
 
-	if (sess->cipher == NULL) {
-		sess->cipher = ssl3_get_cipher_by_id(sess->cipher_id);
-		if (sess->cipher == NULL)
-			goto err;
-	}
-
 	if (sess->timeout < (time(NULL) - sess->time)) {
 		s->session_ctx->stats.sess_timeout++;
 		if (!ticket_decrypted) {
@@ -885,8 +869,6 @@ SSL_SESSION_free(SSL_SESSION *ss)
 
 	X509_free(ss->peer_cert);
 
-	sk_SSL_CIPHER_free(ss->ciphers);
-
 	free(ss->tlsext_hostname);
 	free(ss->tlsext_tick);
 	free(ss->tlsext_ecpointformatlist);
@@ -901,8 +883,7 @@ LSSL_ALIAS(SSL_SESSION_free);
 int
 SSL_SESSION_up_ref(SSL_SESSION *ss)
 {
-	int refs = CRYPTO_add(&ss->references, 1, CRYPTO_LOCK_SSL_SESSION);
-	return (refs > 1) ? 1 : 0;
+	return CRYPTO_add(&ss->references, 1, CRYPTO_LOCK_SSL_SESSION) > 1;
 }
 LSSL_ALIAS(SSL_SESSION_up_ref);
 
@@ -1003,7 +984,7 @@ LSSL_ALIAS(SSL_SESSION_get_protocol_version);
 const SSL_CIPHER *
 SSL_SESSION_get0_cipher(const SSL_SESSION *s)
 {
-	return s->cipher;
+	return ssl3_get_cipher_by_value(s->cipher_value);
 }
 LSSL_ALIAS(SSL_SESSION_get0_cipher);
 
@@ -1163,7 +1144,6 @@ timeout_LHASH_DOALL_ARG(void *arg1, void *arg2)
 void
 SSL_CTX_flush_sessions(SSL_CTX *s, long t)
 {
-	unsigned long i;
 	TIMEOUT_PARAM tp;
 
 	tp.ctx = s;
@@ -1171,12 +1151,10 @@ SSL_CTX_flush_sessions(SSL_CTX *s, long t)
 	if (tp.cache == NULL)
 		return;
 	tp.time = t;
+
 	CRYPTO_w_lock(CRYPTO_LOCK_SSL_CTX);
-	i = CHECKED_LHASH_OF(SSL_SESSION, tp.cache)->down_load;
-	CHECKED_LHASH_OF(SSL_SESSION, tp.cache)->down_load = 0;
 	lh_SSL_SESSION_doall_arg(tp.cache, timeout_LHASH_DOALL_ARG,
-	TIMEOUT_PARAM, &tp);
-	CHECKED_LHASH_OF(SSL_SESSION, tp.cache)->down_load = i;
+	    TIMEOUT_PARAM, &tp);
 	CRYPTO_w_unlock(CRYPTO_LOCK_SSL_CTX);
 }
 LSSL_ALIAS(SSL_CTX_flush_sessions);
@@ -1319,25 +1297,6 @@ int
 	return ctx->client_cert_cb;
 }
 LSSL_ALIAS(SSL_CTX_get_client_cert_cb);
-
-#ifndef OPENSSL_NO_ENGINE
-int
-SSL_CTX_set_client_cert_engine(SSL_CTX *ctx, ENGINE *e)
-{
-	if (!ENGINE_init(e)) {
-		SSLerrorx(ERR_R_ENGINE_LIB);
-		return 0;
-	}
-	if (!ENGINE_get_ssl_client_cert_function(e)) {
-		SSLerrorx(SSL_R_NO_CLIENT_CERT_METHOD);
-		ENGINE_finish(e);
-		return 0;
-	}
-	ctx->client_cert_engine = e;
-	return 1;
-}
-LSSL_ALIAS(SSL_CTX_set_client_cert_engine);
-#endif
 
 void
 SSL_CTX_set_cookie_generate_cb(SSL_CTX *ctx,

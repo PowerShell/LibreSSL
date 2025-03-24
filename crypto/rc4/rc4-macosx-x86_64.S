@@ -1,12 +1,20 @@
+#if defined(__CET__)
+#include <cet.h>
+#else
+#define _CET_ENDBR
+#endif
+
 #include "x86_arch.h"
 .text	
 
 .private_extern	_OPENSSL_ia32cap_P
 
-.globl	_RC4
+.globl	_rc4_internal
 
 .p2align	4
-_RC4:	orq	%rsi,%rsi
+_rc4_internal:
+_CET_ENDBR
+	orq	%rsi,%rsi
 	jne	L$entry
 	retq
 L$entry:
@@ -519,10 +527,11 @@ L$exit:
 L$epilogue:
 	retq
 
-.globl	_RC4_set_key
+.globl	_rc4_set_key_internal
 
 .p2align	4
-_RC4_set_key:
+_rc4_set_key_internal:
+_CET_ENDBR
 	leaq	8(%rdi),%rdi
 	leaq	(%rdx,%rsi,1),%rdx
 	negq	%rsi

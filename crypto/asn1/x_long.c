@@ -1,4 +1,4 @@
-/* $OpenBSD: x_long.c,v 1.19 2022/11/26 16:08:50 tb Exp $ */
+/* $OpenBSD: x_long.c,v 1.21 2024/07/08 16:24:22 beck Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2000.
  */
@@ -81,7 +81,7 @@ static int long_c2i(ASN1_VALUE **pval, const unsigned char *content, int len,
 static int long_print(BIO *out, ASN1_VALUE **pval, const ASN1_ITEM *it,
     int indent, const ASN1_PCTX *pctx);
 
-static ASN1_PRIMITIVE_FUNCS long_pf = {
+static const ASN1_PRIMITIVE_FUNCS long_pf = {
 	.app_data = NULL,
 	.flags = 0,
 	.prim_new = long_new,
@@ -101,6 +101,7 @@ const ASN1_ITEM LONG_it = {
 	.size = ASN1_LONG_UNDEF,
 	.sname = "LONG",
 };
+LCRYPTO_ALIAS(LONG_it);
 
 const ASN1_ITEM ZLONG_it = {
 	.itype = ASN1_ITYPE_PRIMITIVE,
@@ -111,6 +112,7 @@ const ASN1_ITEM ZLONG_it = {
 	.size = 0,
 	.sname = "ZLONG",
 };
+LCRYPTO_ALIAS(ZLONG_it);
 
 static void
 long_get(ASN1_VALUE **pval, long *out_val)

@@ -42,7 +42,6 @@ set(
 	sess_id.c
 	smime.c
 	speed.c
-	spkac.c
 	ts.c
 	verify.c
 	version.c
@@ -75,7 +74,7 @@ target_include_directories(openssl
 	PUBLIC
 		../../include
 		${CMAKE_BINARY_DIR}/include)
-target_link_libraries(openssl ${OPENSSL_LIBS})
+target_link_libraries(openssl ${OPENSSL_LIBS} compat_obj)
 
 if(ENABLE_LIBRESSL_INSTALL)
 	install(TARGETS openssl DESTINATION ${CMAKE_INSTALL_BINDIR})

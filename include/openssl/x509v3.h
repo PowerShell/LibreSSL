@@ -1,4 +1,4 @@
-/* $OpenBSD: x509v3.h,v 1.25 2023/06/25 18:15:21 tb Exp $ */
+/* $OpenBSD: x509v3.h,v 1.35 2024/08/31 10:23:13 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 1999.
  */
@@ -117,17 +117,9 @@ struct v3_ext_method {
 	X509V3_EXT_I2R i2r;
 	X509V3_EXT_R2I r2i;
 
-	void *usr_data;	/* Any extension specific data */
+	const void *usr_data;	/* Any extension specific data */
 };
 
-typedef struct X509V3_CONF_METHOD_st {
-	char *(*get_string)(void *db, const char *section, const char *value);
-	STACK_OF(CONF_VALUE) *(*get_section)(void *db, const char *section);
-	void (*free_string)(void *db, char *string);
-	void (*free_section)(void *db, STACK_OF(CONF_VALUE) *section);
-} X509V3_CONF_METHOD;
-
-/* Context specific info */
 struct v3_ext_ctx {
 	#define CTX_TEST 0x1
 	int flags;
@@ -135,9 +127,7 @@ struct v3_ext_ctx {
 	X509 *subject_cert;
 	X509_REQ *subject_req;
 	X509_CRL *crl;
-	X509V3_CONF_METHOD *db_meth;
 	void *db;
-	/* Maybe more here */
 };
 
 typedef struct v3_ext_method X509V3_EXT_METHOD;
@@ -422,15 +412,7 @@ struct ISSUING_DIST_POINT_st {
 #define X509_PURPOSE_DYNAMIC	0x1
 #define X509_PURPOSE_DYNAMIC_NAME	0x2
 
-typedef struct x509_purpose_st {
-	int purpose;
-	int trust;		/* Default trust ID */
-	int flags;
-	int (*check_purpose)(const struct x509_purpose_st *, const X509 *, int);
-	char *name;
-	char *sname;
-	void *usr_data;
-} X509_PURPOSE;
+typedef struct x509_purpose_st X509_PURPOSE;
 
 #define X509_PURPOSE_SSL_CLIENT		1
 #define X509_PURPOSE_SSL_SERVER		2
@@ -656,46 +638,18 @@ X509_EXTENSION *X509V3_EXT_conf_nid(LHASH_OF(CONF_VALUE) *conf, X509V3_CTX *ctx,
     int ext_nid, const char *value);
 X509_EXTENSION *X509V3_EXT_conf(LHASH_OF(CONF_VALUE) *conf, X509V3_CTX *ctx,
     const char *name, const char *value);
-int X509V3_EXT_add_conf(LHASH_OF(CONF_VALUE) *conf, X509V3_CTX *ctx,
-    const char *section, X509 *cert);
-int X509V3_EXT_REQ_add_conf(LHASH_OF(CONF_VALUE) *conf, X509V3_CTX *ctx,
-    const char *section, X509_REQ *req);
-int X509V3_EXT_CRL_add_conf(LHASH_OF(CONF_VALUE) *conf, X509V3_CTX *ctx,
-    const char *section, X509_CRL *crl);
 
-int X509V3_add_value_bool_nf(const char *name, int asn1_bool,
-			     STACK_OF(CONF_VALUE) **extlist);
-int X509V3_get_value_bool(const CONF_VALUE *value, int *asn1_bool);
-int X509V3_get_value_int(const CONF_VALUE *value, ASN1_INTEGER **aint);
 void X509V3_set_nconf(X509V3_CTX *ctx, CONF *conf);
-void X509V3_set_conf_lhash(X509V3_CTX *ctx, LHASH_OF(CONF_VALUE) *lhash);
 #endif
 
-char *X509V3_get_string(X509V3_CTX *ctx, const char *name,
-    const char *section);
-STACK_OF(CONF_VALUE) *X509V3_get_section(X509V3_CTX *ctx, const char *section);
-void X509V3_string_free(X509V3_CTX *ctx, char *str);
-void X509V3_section_free( X509V3_CTX *ctx, STACK_OF(CONF_VALUE) *section);
 void X509V3_set_ctx(X509V3_CTX *ctx, X509 *issuer, X509 *subject,
 				 X509_REQ *req, X509_CRL *crl, int flags);
 
-int X509V3_add_value(const char *name, const char *value,
-						STACK_OF(CONF_VALUE) **extlist);
-int X509V3_add_value_uchar(const char *name, const unsigned char *value,
-						STACK_OF(CONF_VALUE) **extlist);
-int X509V3_add_value_bool(const char *name, int asn1_bool,
-						STACK_OF(CONF_VALUE) **extlist);
-int X509V3_add_value_int(const char *name, const ASN1_INTEGER *aint,
-						STACK_OF(CONF_VALUE) **extlist);
 char *i2s_ASN1_INTEGER(X509V3_EXT_METHOD *meth, const ASN1_INTEGER *aint);
 ASN1_INTEGER *s2i_ASN1_INTEGER(X509V3_EXT_METHOD *meth, const char *value);
 char *i2s_ASN1_ENUMERATED(X509V3_EXT_METHOD *meth, const ASN1_ENUMERATED *aint);
 char *i2s_ASN1_ENUMERATED_TABLE(X509V3_EXT_METHOD *meth,
     const ASN1_ENUMERATED *aint);
-int X509V3_EXT_add(X509V3_EXT_METHOD *ext);
-int X509V3_EXT_add_list(X509V3_EXT_METHOD *extlist);
-int X509V3_EXT_add_alias(int nid_to, int nid_from);
-void X509V3_EXT_cleanup(void);
 
 const X509V3_EXT_METHOD *X509V3_EXT_get(X509_EXTENSION *ext);
 const X509V3_EXT_METHOD *X509V3_EXT_get_nid(int nid);
@@ -704,7 +658,6 @@ STACK_OF(CONF_VALUE) *X509V3_parse_list(const char *line);
 void *X509V3_EXT_d2i(X509_EXTENSION *ext);
 void *X509V3_get_d2i(const STACK_OF(X509_EXTENSION) *x, int nid, int *crit,
     int *idx);
-
 
 X509_EXTENSION *X509V3_EXT_i2d(int ext_nid, int crit, void *ext_struc);
 int X509V3_add1_i2d(STACK_OF(X509_EXTENSION) **x, int nid, void *value, int crit, unsigned long flags);
@@ -723,20 +676,14 @@ int X509V3_extensions_print(BIO *out, const char *title,
 int X509_check_ca(X509 *x);
 int X509_check_purpose(X509 *x, int id, int ca);
 int X509_supported_extension(X509_EXTENSION *ex);
-int X509_PURPOSE_set(int *p, int purpose);
 int X509_check_issued(X509 *issuer, X509 *subject);
 int X509_check_akid(X509 *issuer, AUTHORITY_KEYID *akid);
+
 int X509_PURPOSE_get_count(void);
-X509_PURPOSE * X509_PURPOSE_get0(int idx);
+const X509_PURPOSE *X509_PURPOSE_get0(int idx);
 int X509_PURPOSE_get_by_sname(const char *sname);
-int X509_PURPOSE_get_by_id(int id);
-int X509_PURPOSE_add(int id, int trust, int flags,
-			int (*ck)(const X509_PURPOSE *, const X509 *, int),
-			const char *name, const char *sname, void *arg);
-char *X509_PURPOSE_get0_name(const X509_PURPOSE *xp);
-char *X509_PURPOSE_get0_sname(const X509_PURPOSE *xp);
-int X509_PURPOSE_get_trust(const X509_PURPOSE *xp);
-void X509_PURPOSE_cleanup(void);
+const char *X509_PURPOSE_get0_name(const X509_PURPOSE *xp);
+const char *X509_PURPOSE_get0_sname(const X509_PURPOSE *xp);
 int X509_PURPOSE_get_id(const X509_PURPOSE *);
 uint32_t X509_get_extension_flags(X509 *x);
 uint32_t X509_get_key_usage(X509 *x);

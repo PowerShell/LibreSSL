@@ -1,4 +1,4 @@
-/* $OpenBSD: e_idea.c,v 1.20 2023/07/07 19:37:53 beck Exp $ */
+/* $OpenBSD: e_idea.c,v 1.22 2024/04/09 13:52:41 beck Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -189,7 +189,6 @@ static const EVP_CIPHER idea_cbc = {
 	.set_asn1_parameters = EVP_CIPHER_set_asn1_iv,
 	.get_asn1_parameters = EVP_CIPHER_get_asn1_iv,
 	.ctrl = NULL,
-	.app_data = NULL,
 };
 
 const EVP_CIPHER *
@@ -197,6 +196,7 @@ EVP_idea_cbc(void)
 {
 	return &idea_cbc;
 }
+LCRYPTO_ALIAS(EVP_idea_cbc);
 
 static const EVP_CIPHER idea_cfb64 = {
 	.nid = NID_idea_cfb64,
@@ -211,7 +211,6 @@ static const EVP_CIPHER idea_cfb64 = {
 	.set_asn1_parameters = EVP_CIPHER_set_asn1_iv,
 	.get_asn1_parameters = EVP_CIPHER_get_asn1_iv,
 	.ctrl = NULL,
-	.app_data = NULL,
 };
 
 const EVP_CIPHER *
@@ -219,6 +218,7 @@ EVP_idea_cfb64(void)
 {
 	return &idea_cfb64;
 }
+LCRYPTO_ALIAS(EVP_idea_cfb64);
 
 static const EVP_CIPHER idea_ofb = {
 	.nid = NID_idea_ofb64,
@@ -233,7 +233,6 @@ static const EVP_CIPHER idea_ofb = {
 	.set_asn1_parameters = EVP_CIPHER_set_asn1_iv,
 	.get_asn1_parameters = EVP_CIPHER_get_asn1_iv,
 	.ctrl = NULL,
-	.app_data = NULL,
 };
 
 const EVP_CIPHER *
@@ -241,6 +240,7 @@ EVP_idea_ofb(void)
 {
 	return &idea_ofb;
 }
+LCRYPTO_ALIAS(EVP_idea_ofb);
 
 static const EVP_CIPHER idea_ecb = {
 	.nid = NID_idea_ecb,
@@ -255,7 +255,6 @@ static const EVP_CIPHER idea_ecb = {
 	.set_asn1_parameters = EVP_CIPHER_set_asn1_iv,
 	.get_asn1_parameters = EVP_CIPHER_get_asn1_iv,
 	.ctrl = NULL,
-	.app_data = NULL,
 };
 
 const EVP_CIPHER *
@@ -263,4 +262,5 @@ EVP_idea_ecb(void)
 {
 	return &idea_ecb;
 }
+LCRYPTO_ALIAS(EVP_idea_ecb);
 #endif

@@ -123,9 +123,9 @@ am__openssl_SOURCES_DIST = apps.c asn1pars.c ca.c ciphers.c crl.c \
 	ocsp.c openssl.c passwd.c pkcs12.c pkcs7.c pkcs8.c pkey.c \
 	pkeyparam.c pkeyutl.c prime.c rand.c req.c rsa.c rsautl.c \
 	s_cb.c s_client.c s_server.c s_socket.c s_time.c sess_id.c \
-	smime.c speed.c spkac.c ts.c verify.c version.c x509.c \
-	certhash.c certhash_win.c apps_win.c apps_posix.c \
-	compat/poll_win.c compat/clock_gettime_osx.c
+	smime.c speed.c ts.c verify.c version.c x509.c certhash.c \
+	certhash_win.c apps_win.c apps_posix.c compat/poll_win.c \
+	compat/clock_gettime_osx.c
 @BUILD_CERTHASH_TRUE@am__objects_1 = certhash.$(OBJEXT)
 @BUILD_CERTHASH_FALSE@am__objects_2 = certhash_win.$(OBJEXT)
 @HOST_WIN_TRUE@am__objects_3 = apps_win.$(OBJEXT)
@@ -146,11 +146,10 @@ am_openssl_OBJECTS = apps.$(OBJEXT) asn1pars.$(OBJEXT) ca.$(OBJEXT) \
 	prime.$(OBJEXT) rand.$(OBJEXT) req.$(OBJEXT) rsa.$(OBJEXT) \
 	rsautl.$(OBJEXT) s_cb.$(OBJEXT) s_client.$(OBJEXT) \
 	s_server.$(OBJEXT) s_socket.$(OBJEXT) s_time.$(OBJEXT) \
-	sess_id.$(OBJEXT) smime.$(OBJEXT) speed.$(OBJEXT) \
-	spkac.$(OBJEXT) ts.$(OBJEXT) verify.$(OBJEXT) \
-	version.$(OBJEXT) x509.$(OBJEXT) $(am__objects_1) \
-	$(am__objects_2) $(am__objects_3) $(am__objects_4) \
-	$(am__objects_5) $(am__objects_6)
+	sess_id.$(OBJEXT) smime.$(OBJEXT) speed.$(OBJEXT) ts.$(OBJEXT) \
+	verify.$(OBJEXT) version.$(OBJEXT) x509.$(OBJEXT) \
+	$(am__objects_1) $(am__objects_2) $(am__objects_3) \
+	$(am__objects_4) $(am__objects_5) $(am__objects_6)
 openssl_OBJECTS = $(am_openssl_OBJECTS)
 am__DEPENDENCIES_1 =
 openssl_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1)
@@ -193,9 +192,9 @@ am__depfiles_remade = ./$(DEPDIR)/apps.Po ./$(DEPDIR)/apps_posix.Po \
 	./$(DEPDIR)/s_client.Po ./$(DEPDIR)/s_server.Po \
 	./$(DEPDIR)/s_socket.Po ./$(DEPDIR)/s_time.Po \
 	./$(DEPDIR)/sess_id.Po ./$(DEPDIR)/smime.Po \
-	./$(DEPDIR)/speed.Po ./$(DEPDIR)/spkac.Po ./$(DEPDIR)/ts.Po \
-	./$(DEPDIR)/verify.Po ./$(DEPDIR)/version.Po \
-	./$(DEPDIR)/x509.Po compat/$(DEPDIR)/clock_gettime_osx.Po \
+	./$(DEPDIR)/speed.Po ./$(DEPDIR)/ts.Po ./$(DEPDIR)/verify.Po \
+	./$(DEPDIR)/version.Po ./$(DEPDIR)/x509.Po \
+	compat/$(DEPDIR)/clock_gettime_osx.Po \
 	compat/$(DEPDIR)/poll_win.Po
 am__mv = mv -f
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
@@ -414,7 +413,7 @@ openssl_SOURCES = apps.c asn1pars.c ca.c ciphers.c crl.c crl2p7.c \
 	openssl.c passwd.c pkcs12.c pkcs7.c pkcs8.c pkey.c pkeyparam.c \
 	pkeyutl.c prime.c rand.c req.c rsa.c rsautl.c s_cb.c \
 	s_client.c s_server.c s_socket.c s_time.c sess_id.c smime.c \
-	speed.c spkac.c ts.c verify.c version.c x509.c $(am__append_1) \
+	speed.c ts.c verify.c version.c x509.c $(am__append_1) \
 	$(am__append_2) $(am__append_3) $(am__append_4) \
 	$(am__append_5) $(am__append_6)
 noinst_HEADERS = apps.h progs.h s_apps.h testdsa.h testrsa.h \
@@ -580,7 +579,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sess_id.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/smime.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/speed.Po@am__quote@ # am--include-marker
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/spkac.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ts.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/verify.Po@am__quote@ # am--include-marker
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/version.Po@am__quote@ # am--include-marker
@@ -842,7 +840,6 @@ distclean: distclean-am
 	-rm -f ./$(DEPDIR)/sess_id.Po
 	-rm -f ./$(DEPDIR)/smime.Po
 	-rm -f ./$(DEPDIR)/speed.Po
-	-rm -f ./$(DEPDIR)/spkac.Po
 	-rm -f ./$(DEPDIR)/ts.Po
 	-rm -f ./$(DEPDIR)/verify.Po
 	-rm -f ./$(DEPDIR)/version.Po
@@ -940,7 +937,6 @@ maintainer-clean: maintainer-clean-am
 	-rm -f ./$(DEPDIR)/sess_id.Po
 	-rm -f ./$(DEPDIR)/smime.Po
 	-rm -f ./$(DEPDIR)/speed.Po
-	-rm -f ./$(DEPDIR)/spkac.Po
 	-rm -f ./$(DEPDIR)/ts.Po
 	-rm -f ./$(DEPDIR)/verify.Po
 	-rm -f ./$(DEPDIR)/version.Po

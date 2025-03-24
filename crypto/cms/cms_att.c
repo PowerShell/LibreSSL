@@ -1,4 +1,4 @@
-/* $OpenBSD: cms_att.c,v 1.11 2023/07/08 08:26:26 beck Exp $ */
+/* $OpenBSD: cms_att.c,v 1.13 2024/08/27 01:19:27 tb Exp $ */
 /*
  * Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project.
@@ -52,19 +52,19 @@
  * ====================================================================
  */
 
-#include <openssl/asn1t.h>
-#include <openssl/pem.h>
-#include <openssl/x509v3.h>
-#include <openssl/err.h>
+#include <openssl/asn1.h>
 #include <openssl/cms.h>
+#include <openssl/x509.h>
+
 #include "cms_local.h"
+#include "x509_local.h"
 
 /* CMS SignedData Attribute utilities */
 
 int
 CMS_signed_get_attr_count(const CMS_SignerInfo *si)
 {
-	return X509at_get_attr_count(si->signedAttrs);
+	return sk_X509_ATTRIBUTE_num(si->signedAttrs);
 }
 LCRYPTO_ALIAS(CMS_signed_get_attr_count);
 
@@ -86,14 +86,14 @@ LCRYPTO_ALIAS(CMS_signed_get_attr_by_OBJ);
 X509_ATTRIBUTE *
 CMS_signed_get_attr(const CMS_SignerInfo *si, int loc)
 {
-	return X509at_get_attr(si->signedAttrs, loc);
+	return sk_X509_ATTRIBUTE_value(si->signedAttrs, loc);
 }
 LCRYPTO_ALIAS(CMS_signed_get_attr);
 
 X509_ATTRIBUTE *
 CMS_signed_delete_attr(CMS_SignerInfo *si, int loc)
 {
-	return X509at_delete_attr(si->signedAttrs, loc);
+	return sk_X509_ATTRIBUTE_delete(si->signedAttrs, loc);
 }
 LCRYPTO_ALIAS(CMS_signed_delete_attr);
 
@@ -147,7 +147,7 @@ LCRYPTO_ALIAS(CMS_signed_get0_data_by_OBJ);
 int
 CMS_unsigned_get_attr_count(const CMS_SignerInfo *si)
 {
-	return X509at_get_attr_count(si->unsignedAttrs);
+	return sk_X509_ATTRIBUTE_num(si->unsignedAttrs);
 }
 LCRYPTO_ALIAS(CMS_unsigned_get_attr_count);
 
@@ -169,14 +169,14 @@ LCRYPTO_ALIAS(CMS_unsigned_get_attr_by_OBJ);
 X509_ATTRIBUTE *
 CMS_unsigned_get_attr(const CMS_SignerInfo *si, int loc)
 {
-	return X509at_get_attr(si->unsignedAttrs, loc);
+	return sk_X509_ATTRIBUTE_value(si->unsignedAttrs, loc);
 }
 LCRYPTO_ALIAS(CMS_unsigned_get_attr);
 
 X509_ATTRIBUTE *
 CMS_unsigned_delete_attr(CMS_SignerInfo *si, int loc)
 {
-	return X509at_delete_attr(si->unsignedAttrs, loc);
+	return sk_X509_ATTRIBUTE_delete(si->unsignedAttrs, loc);
 }
 LCRYPTO_ALIAS(CMS_unsigned_delete_attr);
 

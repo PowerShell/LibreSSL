@@ -371,7 +371,7 @@ SUBDIRS = include crypto ssl tls apps man $(am__append_1)
 ACLOCAL_AMFLAGS = -I m4
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = libtls.pc $(am__append_2)
-EXTRA_DIST = README.md README.windows VERSION config scripts \
+EXTRA_DIST = README.md README.mingw.md VERSION config scripts \
 	CMakeLists.txt cmake_export_symbol.cmake \
 	cmake_uninstall.cmake.in FindLibreSSL.cmake \
 	LibreSSLConfig.cmake.in cert.pem openssl.cnf x509v3.cnf

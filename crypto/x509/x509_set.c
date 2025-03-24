@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_set.c,v 1.26 2023/06/23 08:00:28 tb Exp $ */
+/* $OpenBSD: x509_set.c,v 1.29 2024/03/26 23:21:36 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -83,13 +83,19 @@ int
 X509_set_version(X509 *x, long version)
 {
 	if (x == NULL)
-		return (0);
+		return 0;
+	/*
+	 * RFC 5280, 4.1: versions 1 - 3 are specified as follows.
+	 * Version  ::=  INTEGER  {  v1(0), v2(1), v3(2) }
+	 */
+	if (version < 0 || version > 2)
+		return 0;
 	if (x->cert_info->version == NULL) {
 		if ((x->cert_info->version = ASN1_INTEGER_new()) == NULL)
-			return (0);
+			return 0;
 	}
 	x->cert_info->enc.modified = 1;
-	return (ASN1_INTEGER_set(x->cert_info->version, version));
+	return ASN1_INTEGER_set(x->cert_info->version, version);
 }
 LCRYPTO_ALIAS(X509_set_version);
 
@@ -251,12 +257,12 @@ X509_get_X509_PUBKEY(const X509 *x)
 LCRYPTO_ALIAS(X509_get_X509_PUBKEY);
 
 void
-X509_get0_uids(const X509 *x, const ASN1_BIT_STRING **piuid,
-    const ASN1_BIT_STRING **psuid)
+X509_get0_uids(const X509 *x, const ASN1_BIT_STRING **issuerUID,
+    const ASN1_BIT_STRING **subjectUID)
 {
-	if (piuid != NULL)
-		*piuid = x->cert_info->issuerUID;
-	if (psuid != NULL)
-		*psuid = x->cert_info->subjectUID;
+	if (issuerUID != NULL)
+		*issuerUID = x->cert_info->issuerUID;
+	if (subjectUID != NULL)
+		*subjectUID = x->cert_info->subjectUID;
 }
 LCRYPTO_ALIAS(X509_get0_uids);

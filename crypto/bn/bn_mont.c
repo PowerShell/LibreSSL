@@ -1,4 +1,4 @@
-/* $OpenBSD: bn_mont.c,v 1.61 2023/07/08 12:21:58 beck Exp $ */
+/* $OpenBSD: bn_mont.c,v 1.63 2024/03/26 04:23:04 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -299,219 +299,6 @@ BN_MONT_CTX_set_locked(BN_MONT_CTX **pmctx, int lock, const BIGNUM *mod,
 }
 LCRYPTO_ALIAS(BN_MONT_CTX_set_locked);
 
-static int bn_montgomery_reduce(BIGNUM *ret, BIGNUM *r, BN_MONT_CTX *mctx);
-
-static int
-bn_mod_mul_montgomery_simple(BIGNUM *r, const BIGNUM *a, const BIGNUM *b,
-    BN_MONT_CTX *mctx, BN_CTX *ctx)
-{
-	BIGNUM *tmp;
-	int ret = 0;
-
-	BN_CTX_start(ctx);
-
-	if ((tmp = BN_CTX_get(ctx)) == NULL)
-		goto err;
-
-	if (a == b) {
-		if (!BN_sqr(tmp, a, ctx))
-			goto err;
-	} else {
-		if (!BN_mul(tmp, a, b, ctx))
-			goto err;
-	}
-
-	/* Reduce from aRR to aR. */
-	if (!bn_montgomery_reduce(r, tmp, mctx))
-		goto err;
-
-	ret = 1;
- err:
-	BN_CTX_end(ctx);
-
-	return ret;
-}
-
-static void
-bn_montgomery_multiply_word(const BN_ULONG *ap, BN_ULONG b, const BN_ULONG *np,
-    BN_ULONG *tp, BN_ULONG w, BN_ULONG *carry_a, BN_ULONG *carry_n, int n_len)
-{
-	BN_ULONG x3, x2, x1, x0;
-
-	*carry_a = *carry_n = 0;
-
-	while (n_len & ~3) {
-		bn_qwmulw_addqw_addw(ap[3], ap[2], ap[1], ap[0], b,
-		    tp[3], tp[2], tp[1], tp[0], *carry_a, carry_a,
-		    &x3, &x2, &x1, &x0);
-		bn_qwmulw_addqw_addw(np[3], np[2], np[1], np[0], w,
-		    x3, x2, x1, x0, *carry_n, carry_n,
-		    &tp[3], &tp[2], &tp[1], &tp[0]);
-		ap += 4;
-		np += 4;
-		tp += 4;
-		n_len -= 4;
-	}
-	while (n_len > 0) {
-		bn_mulw_addw_addw(ap[0], b, tp[0], *carry_a, carry_a, &x0);
-		bn_mulw_addw_addw(np[0], w, x0, *carry_n, carry_n, &tp[0]);
-		ap++;
-		np++;
-		tp++;
-		n_len--;
-	}
-}
-
-/*
- * bn_montgomery_multiply_words() computes r = aR * bR * R^-1 = abR for the
- * given word arrays. The caller must ensure that rp, ap, bp and np are all
- * n_len words in length, while tp must be n_len * 2 + 2 words in length.
- */
-void
-bn_montgomery_multiply_words(BN_ULONG *rp, const BN_ULONG *ap, const BN_ULONG *bp,
-    const BN_ULONG *np, BN_ULONG *tp, BN_ULONG n0, int n_len)
-{
-	BN_ULONG a0, b, carry_a, carry_n, carry, mask, w;
-	int i;
-
-	carry = 0;
-
-	for (i = 0; i < n_len; i++)
-		tp[i] = 0;
-
-	a0 = ap[0];
-
-	for (i = 0; i < n_len; i++) {
-		b = bp[i];
-
-		/* Compute new t[0] * n0, as we need it for this iteration. */
-		w = (a0 * b + tp[0]) * n0;
-
-		bn_montgomery_multiply_word(ap, b, np, tp, w, &carry_a,
-		    &carry_n, n_len);
-		bn_addw_addw(carry_a, carry_n, carry, &carry, &tp[n_len]);
-
-		tp++;
-	}
-	tp[n_len] = carry;
-
-	/*
-	 * The output is now in the range of [0, 2N). Attempt to reduce once by
-	 * subtracting the modulus. If the reduction was necessary then the
-	 * result is already in r, otherwise copy the value prior to reduction
-	 * from tp.
-	 */
-	mask = bn_ct_ne_zero(tp[n_len]) - bn_sub_words(rp, tp, np, n_len);
-
-	for (i = 0; i < n_len; i++) {
-		*rp = (*rp & ~mask) | (*tp & mask);
-		rp++;
-		tp++;
-	}
-}
-
-/*
- * bn_montgomery_multiply() computes r = aR * bR * R^-1 = abR for the given
- * BIGNUMs. The caller must ensure that the modulus is two or more words in
- * length and that a and b have the same number of words as the modulus.
- */
-int
-bn_montgomery_multiply(BIGNUM *r, const BIGNUM *a, const BIGNUM *b,
-    BN_MONT_CTX *mctx, BN_CTX *ctx)
-{
-	BIGNUM *t;
-	int ret = 0;
-
-	BN_CTX_start(ctx);
-
-	if (mctx->N.top <= 1 || a->top != mctx->N.top || b->top != mctx->N.top)
-		goto err;
-	if (!bn_wexpand(r, mctx->N.top))
-		goto err;
-
-	if ((t = BN_CTX_get(ctx)) == NULL)
-		goto err;
-	if (!bn_wexpand(t, mctx->N.top * 2 + 2))
-		goto err;
-
-	bn_montgomery_multiply_words(r->d, a->d, b->d, mctx->N.d, t->d,
-	    mctx->n0[0], mctx->N.top);
-
-	r->top = mctx->N.top;
-	bn_correct_top(r);
-
-	BN_set_negative(r, a->neg ^ b->neg);
-
-	ret = 1;
- err:
-	BN_CTX_end(ctx);
-
-	return ret;
-}
-
-#ifndef OPENSSL_BN_ASM_MONT
-int
-bn_mod_mul_montgomery(BIGNUM *r, const BIGNUM *a, const BIGNUM *b,
-    BN_MONT_CTX *mctx, BN_CTX *ctx)
-{
-	if (mctx->N.top <= 1 || a->top != mctx->N.top || b->top != mctx->N.top)
-		return bn_mod_mul_montgomery_simple(r, a, b, mctx, ctx);
-
-	return bn_montgomery_multiply(r, a, b, mctx, ctx);
-}
-#else
-
-int
-bn_mod_mul_montgomery(BIGNUM *r, const BIGNUM *a, const BIGNUM *b,
-    BN_MONT_CTX *mctx, BN_CTX *ctx)
-{
-	if (mctx->N.top <= 1 || a->top != mctx->N.top || b->top != mctx->N.top)
-		return bn_mod_mul_montgomery_simple(r, a, b, mctx, ctx);
-
-	/*
-	 * Legacy bn_mul_mont() performs stack based allocation, without
-	 * size limitation. Allowing a large size results in the stack
-	 * being blown.
-	 */
-	if (mctx->N.top > (8 * 1024 / sizeof(BN_ULONG)))
-		return bn_montgomery_multiply(r, a, b, mctx, ctx);
-
-	if (!bn_wexpand(r, mctx->N.top))
-		return 0;
-
-	/*
-	 * Legacy bn_mul_mont() can indicate that we should "fallback" to
-	 * another implementation.
-	 */
-	if (!bn_mul_mont(r->d, a->d, b->d, mctx->N.d, mctx->n0, mctx->N.top))
-		return bn_montgomery_multiply(r, a, b, mctx, ctx);
-
-	r->top = mctx->N.top;
-	bn_correct_top(r);
-
-	BN_set_negative(r, a->neg ^ b->neg);
-
-	return (1);
-}
-#endif
-
-int
-BN_mod_mul_montgomery(BIGNUM *r, const BIGNUM *a, const BIGNUM *b,
-    BN_MONT_CTX *mctx, BN_CTX *ctx)
-{
-	/* Compute r = aR * bR * R^-1 mod N = abR mod N */
-	return bn_mod_mul_montgomery(r, a, b, mctx, ctx);
-}
-LCRYPTO_ALIAS(BN_mod_mul_montgomery);
-
-int
-BN_to_montgomery(BIGNUM *r, const BIGNUM *a, BN_MONT_CTX *mctx, BN_CTX *ctx)
-{
-	/* Compute r = a * R * R * R^-1 mod N = aR mod N */
-	return bn_mod_mul_montgomery(r, a, &mctx->RR, mctx, ctx);
-}
-LCRYPTO_ALIAS(BN_to_montgomery);
-
 /*
  * bn_montgomery_reduce() performs Montgomery reduction, reducing the input
  * from its Montgomery form aR to a, returning the result in r. Note that the
@@ -582,6 +369,217 @@ bn_montgomery_reduce(BIGNUM *r, BIGNUM *a, BN_MONT_CTX *mctx)
 
 	return 1;
 }
+
+static int
+bn_mod_mul_montgomery_simple(BIGNUM *r, const BIGNUM *a, const BIGNUM *b,
+    BN_MONT_CTX *mctx, BN_CTX *ctx)
+{
+	BIGNUM *tmp;
+	int ret = 0;
+
+	BN_CTX_start(ctx);
+
+	if ((tmp = BN_CTX_get(ctx)) == NULL)
+		goto err;
+
+	if (a == b) {
+		if (!BN_sqr(tmp, a, ctx))
+			goto err;
+	} else {
+		if (!BN_mul(tmp, a, b, ctx))
+			goto err;
+	}
+
+	/* Reduce from aRR to aR. */
+	if (!bn_montgomery_reduce(r, tmp, mctx))
+		goto err;
+
+	ret = 1;
+ err:
+	BN_CTX_end(ctx);
+
+	return ret;
+}
+
+static void
+bn_montgomery_multiply_word(const BN_ULONG *ap, BN_ULONG b, const BN_ULONG *np,
+    BN_ULONG *tp, BN_ULONG w, BN_ULONG *carry_a, BN_ULONG *carry_n, int n_len)
+{
+	BN_ULONG x3, x2, x1, x0;
+
+	*carry_a = *carry_n = 0;
+
+	while (n_len & ~3) {
+		bn_qwmulw_addqw_addw(ap[3], ap[2], ap[1], ap[0], b,
+		    tp[3], tp[2], tp[1], tp[0], *carry_a, carry_a,
+		    &x3, &x2, &x1, &x0);
+		bn_qwmulw_addqw_addw(np[3], np[2], np[1], np[0], w,
+		    x3, x2, x1, x0, *carry_n, carry_n,
+		    &tp[3], &tp[2], &tp[1], &tp[0]);
+		ap += 4;
+		np += 4;
+		tp += 4;
+		n_len -= 4;
+	}
+	while (n_len > 0) {
+		bn_mulw_addw_addw(ap[0], b, tp[0], *carry_a, carry_a, &x0);
+		bn_mulw_addw_addw(np[0], w, x0, *carry_n, carry_n, &tp[0]);
+		ap++;
+		np++;
+		tp++;
+		n_len--;
+	}
+}
+
+/*
+ * bn_montgomery_multiply_words() computes r = aR * bR * R^-1 = abR for the
+ * given word arrays. The caller must ensure that rp, ap, bp and np are all
+ * n_len words in length, while tp must be n_len * 2 + 2 words in length.
+ */
+static void
+bn_montgomery_multiply_words(BN_ULONG *rp, const BN_ULONG *ap, const BN_ULONG *bp,
+    const BN_ULONG *np, BN_ULONG *tp, BN_ULONG n0, int n_len)
+{
+	BN_ULONG a0, b, carry_a, carry_n, carry, mask, w;
+	int i;
+
+	carry = 0;
+
+	for (i = 0; i < n_len; i++)
+		tp[i] = 0;
+
+	a0 = ap[0];
+
+	for (i = 0; i < n_len; i++) {
+		b = bp[i];
+
+		/* Compute new t[0] * n0, as we need it for this iteration. */
+		w = (a0 * b + tp[0]) * n0;
+
+		bn_montgomery_multiply_word(ap, b, np, tp, w, &carry_a,
+		    &carry_n, n_len);
+		bn_addw_addw(carry_a, carry_n, carry, &carry, &tp[n_len]);
+
+		tp++;
+	}
+	tp[n_len] = carry;
+
+	/*
+	 * The output is now in the range of [0, 2N). Attempt to reduce once by
+	 * subtracting the modulus. If the reduction was necessary then the
+	 * result is already in r, otherwise copy the value prior to reduction
+	 * from tp.
+	 */
+	mask = bn_ct_ne_zero(tp[n_len]) - bn_sub_words(rp, tp, np, n_len);
+
+	for (i = 0; i < n_len; i++) {
+		*rp = (*rp & ~mask) | (*tp & mask);
+		rp++;
+		tp++;
+	}
+}
+
+/*
+ * bn_montgomery_multiply() computes r = aR * bR * R^-1 = abR for the given
+ * BIGNUMs. The caller must ensure that the modulus is two or more words in
+ * length and that a and b have the same number of words as the modulus.
+ */
+static int
+bn_montgomery_multiply(BIGNUM *r, const BIGNUM *a, const BIGNUM *b,
+    BN_MONT_CTX *mctx, BN_CTX *ctx)
+{
+	BIGNUM *t;
+	int ret = 0;
+
+	BN_CTX_start(ctx);
+
+	if (mctx->N.top <= 1 || a->top != mctx->N.top || b->top != mctx->N.top)
+		goto err;
+	if (!bn_wexpand(r, mctx->N.top))
+		goto err;
+
+	if ((t = BN_CTX_get(ctx)) == NULL)
+		goto err;
+	if (!bn_wexpand(t, mctx->N.top * 2 + 2))
+		goto err;
+
+	bn_montgomery_multiply_words(r->d, a->d, b->d, mctx->N.d, t->d,
+	    mctx->n0[0], mctx->N.top);
+
+	r->top = mctx->N.top;
+	bn_correct_top(r);
+
+	BN_set_negative(r, a->neg ^ b->neg);
+
+	ret = 1;
+ err:
+	BN_CTX_end(ctx);
+
+	return ret;
+}
+
+#ifndef OPENSSL_BN_ASM_MONT
+static int
+bn_mod_mul_montgomery(BIGNUM *r, const BIGNUM *a, const BIGNUM *b,
+    BN_MONT_CTX *mctx, BN_CTX *ctx)
+{
+	if (mctx->N.top <= 1 || a->top != mctx->N.top || b->top != mctx->N.top)
+		return bn_mod_mul_montgomery_simple(r, a, b, mctx, ctx);
+
+	return bn_montgomery_multiply(r, a, b, mctx, ctx);
+}
+#else
+
+static int
+bn_mod_mul_montgomery(BIGNUM *r, const BIGNUM *a, const BIGNUM *b,
+    BN_MONT_CTX *mctx, BN_CTX *ctx)
+{
+	if (mctx->N.top <= 1 || a->top != mctx->N.top || b->top != mctx->N.top)
+		return bn_mod_mul_montgomery_simple(r, a, b, mctx, ctx);
+
+	/*
+	 * Legacy bn_mul_mont() performs stack based allocation, without
+	 * size limitation. Allowing a large size results in the stack
+	 * being blown.
+	 */
+	if (mctx->N.top > (8 * 1024 / sizeof(BN_ULONG)))
+		return bn_montgomery_multiply(r, a, b, mctx, ctx);
+
+	if (!bn_wexpand(r, mctx->N.top))
+		return 0;
+
+	/*
+	 * Legacy bn_mul_mont() can indicate that we should "fallback" to
+	 * another implementation.
+	 */
+	if (!bn_mul_mont(r->d, a->d, b->d, mctx->N.d, mctx->n0, mctx->N.top))
+		return bn_montgomery_multiply(r, a, b, mctx, ctx);
+
+	r->top = mctx->N.top;
+	bn_correct_top(r);
+
+	BN_set_negative(r, a->neg ^ b->neg);
+
+	return (1);
+}
+#endif
+
+int
+BN_mod_mul_montgomery(BIGNUM *r, const BIGNUM *a, const BIGNUM *b,
+    BN_MONT_CTX *mctx, BN_CTX *ctx)
+{
+	/* Compute r = aR * bR * R^-1 mod N = abR mod N */
+	return bn_mod_mul_montgomery(r, a, b, mctx, ctx);
+}
+LCRYPTO_ALIAS(BN_mod_mul_montgomery);
+
+int
+BN_to_montgomery(BIGNUM *r, const BIGNUM *a, BN_MONT_CTX *mctx, BN_CTX *ctx)
+{
+	/* Compute r = a * R * R * R^-1 mod N = aR mod N */
+	return bn_mod_mul_montgomery(r, a, &mctx->RR, mctx, ctx);
+}
+LCRYPTO_ALIAS(BN_to_montgomery);
 
 int
 BN_from_montgomery(BIGNUM *r, const BIGNUM *a, BN_MONT_CTX *mctx, BN_CTX *ctx)

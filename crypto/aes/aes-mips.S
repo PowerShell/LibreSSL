@@ -249,9 +249,9 @@ _mips_AES_encrypt:
 .end	_mips_AES_encrypt
 
 .align	5
-.globl	AES_encrypt
-.ent	AES_encrypt
-AES_encrypt:
+.globl	aes_encrypt_internal
+.ent	aes_encrypt_internal
+aes_encrypt_internal:
 	.frame	$29,64,$31
 	.mask	3237937152,-4
 	.set	noreorder
@@ -303,7 +303,7 @@ AES_encrypt:
 	lw	$16,64-10*4($29)
 	jr	$31
 	add $29,64
-.end	AES_encrypt
+.end	aes_encrypt_internal
 .align	5
 .ent	_mips_AES_decrypt
 _mips_AES_decrypt:
@@ -556,9 +556,9 @@ _mips_AES_decrypt:
 .end	_mips_AES_decrypt
 
 .align	5
-.globl	AES_decrypt
-.ent	AES_decrypt
-AES_decrypt:
+.globl	aes_decrypt_internal
+.ent	aes_decrypt_internal
+aes_decrypt_internal:
 	.frame	$29,64,$31
 	.mask	3237937152,-4
 	.set	noreorder
@@ -610,7 +610,7 @@ AES_decrypt:
 	lw	$16,64-10*4($29)
 	jr	$31
 	add $29,64
-.end	AES_decrypt
+.end	aes_decrypt_internal
 .align	5
 .ent	_mips_AES_set_encrypt_key
 _mips_AES_set_encrypt_key:
@@ -864,9 +864,9 @@ _mips_AES_set_encrypt_key:
 	nop
 .end	_mips_AES_set_encrypt_key
 
-.globl	AES_set_encrypt_key
-.ent	AES_set_encrypt_key
-AES_set_encrypt_key:
+.globl	aes_set_encrypt_key_internal
+.ent	aes_set_encrypt_key_internal
+aes_set_encrypt_key_internal:
 	.frame	$29,32,$31
 	.mask	3221225472,-4
 	.set	noreorder
@@ -885,11 +885,11 @@ AES_set_encrypt_key:
 	lw	$30,32-2*4($29)
 	jr	$31
 	add $29,32
-.end	AES_set_encrypt_key
+.end	aes_set_encrypt_key_internal
 .align	5
-.globl	AES_set_decrypt_key
-.ent	AES_set_decrypt_key
-AES_set_decrypt_key:
+.globl	aes_set_decrypt_key_internal
+.ent	aes_set_decrypt_key_internal
+aes_set_decrypt_key_internal:
 	.frame	$29,32,$31
 	.mask	3221225472,-4
 	.set	noreorder
@@ -996,7 +996,7 @@ AES_set_decrypt_key:
 	lw	$30,32-2*4($29)
 	jr	$31
 	add $29,32
-.end	AES_set_decrypt_key
+.end	aes_set_decrypt_key_internal
 .rdata
 .align	6
 AES_Te:

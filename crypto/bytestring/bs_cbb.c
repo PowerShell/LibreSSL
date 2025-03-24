@@ -1,4 +1,4 @@
-/*	$OpenBSD: bs_cbb.c,v 1.4 2022/07/07 17:16:05 tb Exp $	*/
+/*	$OpenBSD: bs_cbb.c,v 1.6 2024/06/22 15:32:51 jsing Exp $	*/
 /*
  * Copyright (c) 2014, Google Inc.
  *
@@ -15,6 +15,7 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -325,6 +326,12 @@ int
 CBB_add_u24_length_prefixed(CBB *cbb, CBB *out_contents)
 {
 	return cbb_add_length_prefixed(cbb, out_contents, 3);
+}
+
+int
+CBB_add_u32_length_prefixed(CBB *cbb, CBB *out_contents)
+{
+	return cbb_add_length_prefixed(cbb, out_contents, 4);
 }
 
 int

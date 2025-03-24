@@ -1,4 +1,4 @@
-/* $OpenBSD: e_cast.c,v 1.16 2023/07/07 19:37:53 beck Exp $ */
+/* $OpenBSD: e_cast.c,v 1.18 2024/04/09 13:52:41 beck Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -170,7 +170,6 @@ static const EVP_CIPHER cast5_cbc = {
 	.set_asn1_parameters = EVP_CIPHER_set_asn1_iv,
 	.get_asn1_parameters = EVP_CIPHER_get_asn1_iv,
 	.ctrl = NULL,
-	.app_data = NULL,
 };
 
 const EVP_CIPHER *
@@ -178,6 +177,7 @@ EVP_cast5_cbc(void)
 {
 	return &cast5_cbc;
 }
+LCRYPTO_ALIAS(EVP_cast5_cbc);
 
 static const EVP_CIPHER cast5_cfb64 = {
 	.nid = NID_cast5_cfb64,
@@ -192,7 +192,6 @@ static const EVP_CIPHER cast5_cfb64 = {
 	.set_asn1_parameters = EVP_CIPHER_set_asn1_iv,
 	.get_asn1_parameters = EVP_CIPHER_get_asn1_iv,
 	.ctrl = NULL,
-	.app_data = NULL,
 };
 
 const EVP_CIPHER *
@@ -200,6 +199,7 @@ EVP_cast5_cfb64(void)
 {
 	return &cast5_cfb64;
 }
+LCRYPTO_ALIAS(EVP_cast5_cfb64);
 
 static const EVP_CIPHER cast5_ofb = {
 	.nid = NID_cast5_ofb64,
@@ -214,7 +214,6 @@ static const EVP_CIPHER cast5_ofb = {
 	.set_asn1_parameters = EVP_CIPHER_set_asn1_iv,
 	.get_asn1_parameters = EVP_CIPHER_get_asn1_iv,
 	.ctrl = NULL,
-	.app_data = NULL,
 };
 
 const EVP_CIPHER *
@@ -222,6 +221,7 @@ EVP_cast5_ofb(void)
 {
 	return &cast5_ofb;
 }
+LCRYPTO_ALIAS(EVP_cast5_ofb);
 
 static const EVP_CIPHER cast5_ecb = {
 	.nid = NID_cast5_ecb,
@@ -236,7 +236,6 @@ static const EVP_CIPHER cast5_ecb = {
 	.set_asn1_parameters = EVP_CIPHER_set_asn1_iv,
 	.get_asn1_parameters = EVP_CIPHER_get_asn1_iv,
 	.ctrl = NULL,
-	.app_data = NULL,
 };
 
 const EVP_CIPHER *
@@ -244,4 +243,5 @@ EVP_cast5_ecb(void)
 {
 	return &cast5_ecb;
 }
+LCRYPTO_ALIAS(EVP_cast5_ecb);
 #endif

@@ -22,7 +22,7 @@ case $host_os in
 		# Don't use arc4random on systems before 10.12 because of
 		# weak seed on failure to open /dev/random, based on latest
 		# public source:
-		# http://www.opensource.apple.com/source/Libc/Libc-997.90.3/gen/FreeBSD/arc4random.c
+		# https://www.opensource.apple.com/source/Libc/Libc-997.90.3/gen/FreeBSD/arc4random.c
 		#
 		# We use the presence of getentropy() to detect 10.12. The
 		# following check take into account that:
@@ -109,7 +109,7 @@ char buf[1]; getentropy(buf, 1);
 		)
 		CPPFLAGS="$CPPFLAGS -D_OPENBSD_SOURCE"
 		;;
-	*openbsd* | *bitrig*)
+	*openbsd*)
 		HOST_OS=openbsd
 		HOST_ABI=elf
 		AC_DEFINE([HAVE_ATTRIBUTE__BOUNDED__], [1], [OpenBSD gcc has bounded])
@@ -131,7 +131,9 @@ char buf[1]; getentropy(buf, 1);
 		CPPFLAGS="$CPPFLAGS -D__EXTENSIONS__ -D_XOPEN_SOURCE=600 -DBSD_COMP"
 		AC_SUBST([PLATFORM_LDADD], ['-ldl -lmd -lnsl -lsocket'])
 		;;
-	*) ;;
+	*)
+		HOST_OS=unsupported
+		;;
 esac
 
 # Check if time_t is sized correctly
@@ -145,7 +147,7 @@ if test "$ac_cv_sizeof_time_t" = "4"; then
     if test "$host_os" = "mingw32" ; then
         echo " **"
         echo " ** You can solve this by adjusting the build flags in your"
-        echo " ** mingw-w64 toolchain. Refer to README.windows for details."
+        echo " ** mingw-w64 toolchain. Refer to README.mingw.md for details."
     fi
 fi
 

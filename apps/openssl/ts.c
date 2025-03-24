@@ -1,4 +1,4 @@
-/* $OpenBSD: ts.c,v 1.26 2023/03/06 14:32:06 tb Exp $ */
+/* $OpenBSD: ts.c,v 1.29 2024/08/26 18:40:50 tb Exp $ */
 /* Written by Zoltan Glozik (zglozik@stones.com) for the OpenSSL
  * project 2002.
  */
@@ -599,7 +599,7 @@ create_query(BIO *data_bio, char *digest, const EVP_MD *md, const char *policy,
 	TS_MSG_IMPRINT *msg_imprint = NULL;
 	X509_ALGOR *algo = NULL;
 	unsigned char *data = NULL;
-	ASN1_OBJECT *policy_obj = NULL;
+	ASN1_OBJECT *md_obj = NULL, *policy_obj = NULL;
 	ASN1_INTEGER *nonce_asn1 = NULL;
 
 	/* Setting default message digest. */
@@ -621,11 +621,14 @@ create_query(BIO *data_bio, char *digest, const EVP_MD *md, const char *policy,
 	/* Adding algorithm. */
 	if ((algo = X509_ALGOR_new()) == NULL)
 		goto err;
-	if ((algo->algorithm = OBJ_nid2obj(EVP_MD_type(md))) == NULL)
+	if ((md_obj = OBJ_nid2obj(EVP_MD_type(md))) == NULL)
 		goto err;
-	if ((algo->parameter = ASN1_TYPE_new()) == NULL)
+	/*
+	 * This does not use X509_ALGOR_set_md() for historical reasons.
+	 * See the comment in PKCS7_SIGNER_INFO_set() for details.
+	 */
+	if (!X509_ALGOR_set0(algo, md_obj, V_ASN1_NULL, NULL))
 		goto err;
-	algo->parameter->type = V_ASN1_NULL;
 	if (!TS_MSG_IMPRINT_set_algo(msg_imprint, algo))
 		goto err;
 
@@ -673,10 +676,12 @@ create_query(BIO *data_bio, char *digest, const EVP_MD *md, const char *policy,
 
 static int
 create_digest(BIO *input, char *digest, const EVP_MD *md,
-    unsigned char **md_value)
+    unsigned char **out_md_value)
 {
-	int md_value_len;
 	EVP_MD_CTX *md_ctx = NULL;
+	unsigned char *md_value = NULL;
+	int md_value_len;
+	int ret = 0;
 
 	md_value_len = EVP_MD_size(md);
 	if (md_value_len < 0)
@@ -687,8 +692,8 @@ create_digest(BIO *input, char *digest, const EVP_MD *md,
 		unsigned char buffer[4096];
 		int length;
 
-		*md_value = malloc(md_value_len);
-		if (*md_value == NULL)
+		md_value = malloc(md_value_len);
+		if (md_value == NULL)
 			goto err;
 
 		if ((md_ctx = EVP_MD_CTX_new()) == NULL)
@@ -702,31 +707,30 @@ create_digest(BIO *input, char *digest, const EVP_MD *md,
 				goto err;
 		}
 
-		if (!EVP_DigestFinal(md_ctx, *md_value, NULL))
+		if (!EVP_DigestFinal(md_ctx, md_value, NULL))
 			goto err;
-
-		EVP_MD_CTX_free(md_ctx);
-		md_ctx = NULL;
-
 	} else {
 		/* Digest bytes are specified with digest. */
 		long digest_len;
 
-		*md_value = string_to_hex(digest, &digest_len);
-		if (*md_value == NULL || md_value_len != digest_len) {
-			free(*md_value);
-			*md_value = NULL;
+		md_value = string_to_hex(digest, &digest_len);
+		if (md_value == NULL || md_value_len != digest_len) {
 			BIO_printf(bio_err, "bad digest, %d bytes "
 			    "must be specified\n", md_value_len);
 			goto err;
 		}
 	}
 
-	return md_value_len;
+	*out_md_value = md_value;
+	md_value = NULL;
+
+	ret = md_value_len;
 
  err:
+	free(md_value);
 	EVP_MD_CTX_free(md_ctx);
-	return 0;
+
+	return ret;
 }
 
 static ASN1_INTEGER *
@@ -946,7 +950,7 @@ create_response(CONF *conf, const char *section, char *queryfile, char *passin,
 	if (!TS_CONF_set_clock_precision_digits(conf, section, resp_ctx))
 		goto end;
 
-	/* Setting the ordering flaf if requested. */
+	/* Setting the ordering flag if requested. */
 	if (!TS_CONF_set_ordering(conf, section, resp_ctx))
 		goto end;
 

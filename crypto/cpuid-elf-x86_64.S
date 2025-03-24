@@ -1,20 +1,16 @@
+#if defined(__CET__)
+#include <cet.h>
+#else
+#define _CET_ENDBR
+#endif
+
 #include "x86_arch.h"
-
-.hidden	OPENSSL_cpuid_setup
-.section	.init
-	endbr64
-	call	OPENSSL_cpuid_setup
-
-
-.hidden	OPENSSL_ia32cap_P
-
 .text	
-
 .globl	OPENSSL_ia32_cpuid
 .type	OPENSSL_ia32_cpuid,@function
 .align	16
 OPENSSL_ia32_cpuid:
-	endbr64
+_CET_ENDBR
 	movq	%rbx,%r8
 
 	xorl	%eax,%eax
