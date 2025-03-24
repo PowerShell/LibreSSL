@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_local.h,v 1.13 2024/02/03 15:58:34 beck Exp $ */
+/* $OpenBSD: ssl_local.h,v 1.23 2024/07/23 14:40:54 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -167,8 +167,10 @@
 
 __BEGIN_HIDDEN_DECLS
 
+#ifndef CTASSERT
 #define CTASSERT(x)	extern char  _ctassert[(x) ? 1 : -1 ]   \
 			    __attribute__((__unused__))
+#endif
 
 #ifndef LIBRESSL_HAS_DTLS1_2
 #define LIBRESSL_HAS_DTLS1_2
@@ -244,37 +246,11 @@ __BEGIN_HIDDEN_DECLS
 /* Bits for algorithm2 (handshake digests and other extra flags) */
 
 #define SSL_HANDSHAKE_MAC_MASK		0xff0
-#define SSL_HANDSHAKE_MAC_MD5		0x010
-#define SSL_HANDSHAKE_MAC_SHA		0x020
 #define SSL_HANDSHAKE_MAC_SHA256	0x080
 #define SSL_HANDSHAKE_MAC_SHA384	0x100
-#define SSL_HANDSHAKE_MAC_DEFAULT (SSL_HANDSHAKE_MAC_MD5 | SSL_HANDSHAKE_MAC_SHA)
 
 #define SSL3_CK_ID		0x03000000
 #define SSL3_CK_VALUE_MASK	0x0000ffff
-
-#define TLS1_PRF_DGST_MASK	(0xff << TLS1_PRF_DGST_SHIFT)
-
-#define TLS1_PRF_DGST_SHIFT 10
-#define TLS1_PRF_MD5 (SSL_HANDSHAKE_MAC_MD5 << TLS1_PRF_DGST_SHIFT)
-#define TLS1_PRF_SHA1 (SSL_HANDSHAKE_MAC_SHA << TLS1_PRF_DGST_SHIFT)
-#define TLS1_PRF_SHA256 (SSL_HANDSHAKE_MAC_SHA256 << TLS1_PRF_DGST_SHIFT)
-#define TLS1_PRF_SHA384 (SSL_HANDSHAKE_MAC_SHA384 << TLS1_PRF_DGST_SHIFT)
-#define TLS1_PRF (TLS1_PRF_MD5 | TLS1_PRF_SHA1)
-
-/*
- * SSL_CIPHER_ALGORITHM2_VARIABLE_NONCE_IN_RECORD is an algorithm2 flag that
- * indicates that the variable part of the nonce is included as a prefix of
- * the record (AES-GCM, for example, does this with an 8-byte variable nonce.)
- */
-#define SSL_CIPHER_ALGORITHM2_VARIABLE_NONCE_IN_RECORD (1 << 22)
-
-/*
- * SSL_CIPHER_AEAD_FIXED_NONCE_LEN returns the number of bytes of fixed nonce
- * for an SSL_CIPHER with an algorithm_mac of SSL_AEAD.
- */
-#define SSL_CIPHER_AEAD_FIXED_NONCE_LEN(ssl_cipher) \
-	(((ssl_cipher->algorithm2 >> 24) & 0xf) * 2)
 
 /*
  * Cipher strength information.
@@ -294,10 +270,6 @@ __BEGIN_HIDDEN_DECLS
 /* See if we use signature algorithms extension. */
 #define SSL_USE_SIGALGS(s) \
 	(s->method->enc_flags & SSL_ENC_FLAG_SIGALGS)
-
-/* See if we use SHA256 default PRF. */
-#define SSL_USE_SHA256_PRF(s) \
-	(s->method->enc_flags & SSL_ENC_FLAG_SHA256_PRF)
 
 /* Allow TLS 1.2 ciphersuites: applies to DTLS 1.2 as well as TLS 1.2. */
 #define SSL_USE_TLS1_2_CIPHERS(s) \
@@ -367,9 +339,9 @@ struct ssl_comp_st {
 };
 
 struct ssl_cipher_st {
-	int valid;
+	uint16_t value;			/* Cipher suite value. */
+
 	const char *name;		/* text name */
-	unsigned long id;		/* id, 4 bytes, first is version */
 
 	unsigned long algorithm_mkey;	/* key exchange algorithm */
 	unsigned long algorithm_auth;	/* server authentication */
@@ -406,8 +378,6 @@ struct ssl_method_st {
 	int (*ssl_read_bytes)(SSL *s, int type, unsigned char *buf, int len,
 	    int peek);
 	int (*ssl_write_bytes)(SSL *s, int type, const void *buf_, int len);
-
-	const SSL_CIPHER *(*get_cipher)(unsigned int ncipher);
 
 	unsigned int enc_flags;		/* SSL_ENC_FLAG_* */
 };
@@ -466,12 +436,7 @@ struct ssl_session_st {
 	time_t time;
 	int references;
 
-	const SSL_CIPHER *cipher;
-	unsigned long cipher_id;	/* when ASN.1 loaded, this
-					 * needs to be used to load
-					 * the 'cipher' structure */
-
-	STACK_OF(SSL_CIPHER) *ciphers; /* shared ciphers? */
+	uint16_t cipher_value;
 
 	char *tlsext_hostname;
 
@@ -596,8 +561,14 @@ typedef struct ssl_handshake_st {
 	/* Cipher being negotiated in this handshake. */
 	const SSL_CIPHER *cipher;
 
+	/* Ciphers sent by the client. */
+	STACK_OF(SSL_CIPHER) *client_ciphers;
+
 	/* Extensions seen in this handshake. */
 	uint32_t extensions_seen;
+
+	/* Extensions processed in this handshake. */
+	uint32_t extensions_processed;
 
 	/* Signature algorithms selected for use (static pointers). */
 	const struct ssl_sigalg *our_sigalg;
@@ -1206,9 +1177,6 @@ typedef struct ssl3_state_st {
 /* Uses signature algorithms extension. */
 #define SSL_ENC_FLAG_SIGALGS            (1 << 1)
 
-/* Uses SHA256 default PRF. */
-#define SSL_ENC_FLAG_SHA256_PRF         (1 << 2)
-
 /* Allow TLS 1.2 ciphersuites: applies to DTLS 1.2 as well as TLS 1.2. */
 #define SSL_ENC_FLAG_TLS1_2_CIPHERS     (1 << 4)
 
@@ -1218,7 +1186,6 @@ typedef struct ssl3_state_st {
 #define TLSV1_ENC_FLAGS		0
 #define TLSV1_1_ENC_FLAGS	0
 #define TLSV1_2_ENC_FLAGS	(SSL_ENC_FLAG_SIGALGS		| \
-				 SSL_ENC_FLAG_SHA256_PRF	| \
 				 SSL_ENC_FLAG_TLS1_2_CIPHERS)
 #define TLSV1_3_ENC_FLAGS	(SSL_ENC_FLAG_SIGALGS		| \
 				 SSL_ENC_FLAG_TLS1_3_CIPHERS)
@@ -1295,9 +1262,9 @@ int ssl_merge_cipherlists(STACK_OF(SSL_CIPHER) *cipherlist,
     STACK_OF(SSL_CIPHER) *cipherlist_tls13,
     STACK_OF(SSL_CIPHER) **out_cipherlist);
 void ssl_update_cache(SSL *s, int mode);
-int ssl_cipher_get_evp(const SSL_SESSION *s, const EVP_CIPHER **enc,
+int ssl_cipher_get_evp(SSL *s, const EVP_CIPHER **enc,
     const EVP_MD **md, int *mac_pkey_type, int *mac_secret_size);
-int ssl_cipher_get_evp_aead(const SSL_SESSION *s, const EVP_AEAD **aead);
+int ssl_cipher_get_evp_aead(SSL *s, const EVP_AEAD **aead);
 int ssl_get_handshake_evp_md(SSL *s, const EVP_MD **md);
 
 int ssl_verify_cert_chain(SSL *s, STACK_OF(X509) *sk);
@@ -1316,16 +1283,13 @@ int ssl_verify_alarm_type(long type);
 
 int SSL_SESSION_ticket(SSL_SESSION *ss, unsigned char **out, size_t *out_len);
 
-const SSL_CIPHER *ssl3_get_cipher_by_char(const unsigned char *p);
 int ssl3_do_write(SSL *s, int type);
 int ssl3_send_alert(SSL *s, int level, int desc);
 int ssl3_get_req_cert_types(SSL *s, CBB *cbb);
 int ssl3_get_message(SSL *s, int st1, int stn, int mt, long max);
 int ssl3_num_ciphers(void);
-const SSL_CIPHER *ssl3_get_cipher(unsigned int u);
-const SSL_CIPHER *ssl3_get_cipher_by_id(unsigned long id);
+const SSL_CIPHER *ssl3_get_cipher_by_index(int idx);
 const SSL_CIPHER *ssl3_get_cipher_by_value(uint16_t value);
-uint16_t ssl3_cipher_get_value(const SSL_CIPHER *c);
 int ssl3_renegotiate(SSL *ssl);
 
 int ssl3_renegotiate_check(SSL *ssl);

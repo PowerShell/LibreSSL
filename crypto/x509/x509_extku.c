@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_extku.c,v 1.3 2023/02/16 08:38:17 tb Exp $ */
+/* $OpenBSD: x509_extku.c,v 1.6 2024/08/31 10:03:03 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 1999.
  */
@@ -63,12 +63,14 @@
 #include <openssl/err.h>
 #include <openssl/x509v3.h>
 
+#include "x509_local.h"
+
 static void *v2i_EXTENDED_KEY_USAGE(const X509V3_EXT_METHOD *method,
     X509V3_CTX *ctx, STACK_OF(CONF_VALUE) *nval);
 static STACK_OF(CONF_VALUE) *i2v_EXTENDED_KEY_USAGE(
     const X509V3_EXT_METHOD *method, void *eku, STACK_OF(CONF_VALUE) *extlist);
 
-const X509V3_EXT_METHOD v3_ext_ku = {
+static const X509V3_EXT_METHOD x509v3_ext_ext_key_usage = {
 	.ext_nid = NID_ext_key_usage,
 	.ext_flags = 0,
 	.it = &EXTENDED_KEY_USAGE_it,
@@ -85,8 +87,14 @@ const X509V3_EXT_METHOD v3_ext_ku = {
 	.usr_data = NULL,
 };
 
+const X509V3_EXT_METHOD *
+x509v3_ext_method_ext_key_usage(void)
+{
+	return &x509v3_ext_ext_key_usage;
+}
+
 /* NB OCSP acceptable responses also is a SEQUENCE OF OBJECT */
-const X509V3_EXT_METHOD v3_ocsp_accresp = {
+static const X509V3_EXT_METHOD x509v3_ext_id_pkix_OCSP_acceptableResponses = {
 	.ext_nid = NID_id_pkix_OCSP_acceptableResponses,
 	.ext_flags = 0,
 	.it = &EXTENDED_KEY_USAGE_it,
@@ -102,6 +110,12 @@ const X509V3_EXT_METHOD v3_ocsp_accresp = {
 	.r2i = NULL,
 	.usr_data = NULL,
 };
+
+const X509V3_EXT_METHOD *
+x509v3_ext_method_id_pkix_OCSP_acceptableResponses(void)
+{
+	return &x509v3_ext_id_pkix_OCSP_acceptableResponses;
+}
 
 static const ASN1_TEMPLATE EXTENDED_KEY_USAGE_item_tt = {
 	.flags = ASN1_TFLG_SEQUENCE_OF,
@@ -120,6 +134,7 @@ const ASN1_ITEM EXTENDED_KEY_USAGE_it = {
 	.size = 0,
 	.sname = "EXTENDED_KEY_USAGE",
 };
+LCRYPTO_ALIAS(EXTENDED_KEY_USAGE_it);
 
 
 EXTENDED_KEY_USAGE *

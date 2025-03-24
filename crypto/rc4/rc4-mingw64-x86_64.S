@@ -9,14 +9,14 @@
 
 
 
-.globl	RC4
-.def	RC4;	.scl 2;	.type 32;	.endef
+.globl	rc4_internal
+.def	rc4_internal;	.scl 2;	.type 32;	.endef
 .p2align	4
-RC4:
+rc4_internal:
 	movq	%rdi,8(%rsp)
 	movq	%rsi,16(%rsp)
 	movq	%rsp,%rax
-.LSEH_begin_RC4:
+.LSEH_begin_rc4_internal:
 	movq	%rcx,%rdi
 	movq	%rdx,%rsi
 	movq	%r8,%rdx
@@ -539,15 +539,15 @@ _CET_ENDBR
 	movq	8(%rsp),%rdi
 	movq	16(%rsp),%rsi
 	retq
-.LSEH_end_RC4:
-.globl	RC4_set_key
-.def	RC4_set_key;	.scl 2;	.type 32;	.endef
+.LSEH_end_rc4_internal:
+.globl	rc4_set_key_internal
+.def	rc4_set_key_internal;	.scl 2;	.type 32;	.endef
 .p2align	4
-RC4_set_key:
+rc4_set_key_internal:
 	movq	%rdi,8(%rsp)
 	movq	%rsi,16(%rsp)
 	movq	%rsp,%rax
-.LSEH_begin_RC4_set_key:
+.LSEH_begin_rc4_set_key_internal:
 	movq	%rcx,%rdi
 	movq	%rdx,%rsi
 	movq	%r8,%rdx
@@ -621,4 +621,4 @@ _CET_ENDBR
 	movq	8(%rsp),%rdi
 	movq	16(%rsp),%rsi
 	retq
-.LSEH_end_RC4_set_key:
+.LSEH_end_rc4_set_key_internal:

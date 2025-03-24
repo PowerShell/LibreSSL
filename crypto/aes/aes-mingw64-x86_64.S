@@ -337,17 +337,17 @@ _CET_ENDBR
 	xorl	12(%r15),%edx
 	retq
 
-.globl	AES_encrypt
-.def	AES_encrypt;	.scl 2;	.type 32;	.endef
+.globl	aes_encrypt_internal
+.def	aes_encrypt_internal;	.scl 2;	.type 32;	.endef
 .p2align	4
 .globl	asm_AES_encrypt
 
 asm_AES_encrypt:
-AES_encrypt:
+aes_encrypt_internal:
 	movq	%rdi,8(%rsp)
 	movq	%rsi,16(%rsp)
 	movq	%rsp,%rax
-.LSEH_begin_AES_encrypt:
+.LSEH_begin_aes_encrypt_internal:
 	movq	%rcx,%rdi
 	movq	%rdx,%rsi
 	movq	%r8,%rdx
@@ -414,7 +414,7 @@ _CET_ENDBR
 	movq	8(%rsp),%rdi
 	movq	16(%rsp),%rsi
 	retq
-.LSEH_end_AES_encrypt:
+.LSEH_end_aes_encrypt_internal:
 .def	_x86_64_AES_decrypt;	.scl 3;	.type 32;	.endef
 .p2align	4
 _x86_64_AES_decrypt:
@@ -798,17 +798,17 @@ _CET_ENDBR
 	xorl	12(%r15),%edx
 	retq
 
-.globl	AES_decrypt
-.def	AES_decrypt;	.scl 2;	.type 32;	.endef
+.globl	aes_decrypt_internal
+.def	aes_decrypt_internal;	.scl 2;	.type 32;	.endef
 .p2align	4
 .globl	asm_AES_decrypt
 
 asm_AES_decrypt:
-AES_decrypt:
+aes_decrypt_internal:
 	movq	%rdi,8(%rsp)
 	movq	%rsi,16(%rsp)
 	movq	%rsp,%rax
-.LSEH_begin_AES_decrypt:
+.LSEH_begin_aes_decrypt_internal:
 	movq	%rcx,%rdi
 	movq	%rdx,%rsi
 	movq	%r8,%rdx
@@ -877,15 +877,15 @@ _CET_ENDBR
 	movq	8(%rsp),%rdi
 	movq	16(%rsp),%rsi
 	retq
-.LSEH_end_AES_decrypt:
-.globl	AES_set_encrypt_key
-.def	AES_set_encrypt_key;	.scl 2;	.type 32;	.endef
+.LSEH_end_aes_decrypt_internal:
+.globl	aes_set_encrypt_key_internal
+.def	aes_set_encrypt_key_internal;	.scl 2;	.type 32;	.endef
 .p2align	4
-AES_set_encrypt_key:
+aes_set_encrypt_key_internal:
 	movq	%rdi,8(%rsp)
 	movq	%rsi,16(%rsp)
 	movq	%rsp,%rax
-.LSEH_begin_AES_set_encrypt_key:
+.LSEH_begin_aes_set_encrypt_key_internal:
 	movq	%rcx,%rdi
 	movq	%rdx,%rsi
 	movq	%r8,%rdx
@@ -913,7 +913,7 @@ _CET_ENDBR
 	movq	8(%rsp),%rdi
 	movq	16(%rsp),%rsi
 	retq
-.LSEH_end_AES_set_encrypt_key:
+.LSEH_end_aes_set_encrypt_key_internal:
 
 .def	_x86_64_AES_set_encrypt_key;	.scl 3;	.type 32;	.endef
 .p2align	4
@@ -1155,14 +1155,14 @@ _CET_ENDBR
 .Lexit:
 	retq
 
-.globl	AES_set_decrypt_key
-.def	AES_set_decrypt_key;	.scl 2;	.type 32;	.endef
+.globl	aes_set_decrypt_key_internal
+.def	aes_set_decrypt_key_internal;	.scl 2;	.type 32;	.endef
 .p2align	4
-AES_set_decrypt_key:
+aes_set_decrypt_key_internal:
 	movq	%rdi,8(%rsp)
 	movq	%rsi,16(%rsp)
 	movq	%rsp,%rax
-.LSEH_begin_AES_set_decrypt_key:
+.LSEH_begin_aes_set_decrypt_key_internal:
 	movq	%rcx,%rdi
 	movq	%rdx,%rsi
 	movq	%r8,%rdx
@@ -1352,20 +1352,20 @@ _CET_ENDBR
 	movq	8(%rsp),%rdi
 	movq	16(%rsp),%rsi
 	retq
-.LSEH_end_AES_set_decrypt_key:
-.globl	AES_cbc_encrypt
-.def	AES_cbc_encrypt;	.scl 2;	.type 32;	.endef
+.LSEH_end_aes_set_decrypt_key_internal:
+.globl	aes_cbc_encrypt_internal
+.def	aes_cbc_encrypt_internal;	.scl 2;	.type 32;	.endef
 .p2align	4
 
 
 .globl	asm_AES_cbc_encrypt
 
 asm_AES_cbc_encrypt:
-AES_cbc_encrypt:
+aes_cbc_encrypt_internal:
 	movq	%rdi,8(%rsp)
 	movq	%rsi,16(%rsp)
 	movq	%rsp,%rax
-.LSEH_begin_AES_cbc_encrypt:
+.LSEH_begin_aes_cbc_encrypt_internal:
 	movq	%rcx,%rdi
 	movq	%rdx,%rsi
 	movq	%r8,%rdx
@@ -1824,7 +1824,7 @@ _CET_ENDBR
 	movq	8(%rsp),%rdi
 	movq	16(%rsp),%rsi
 	retq
-.LSEH_end_AES_cbc_encrypt:
+.LSEH_end_aes_cbc_encrypt_internal:
 .section	.rodata
 .p2align	6
 .LAES_Te:
@@ -2838,44 +2838,44 @@ _CET_ENDBR
 
 .section	.pdata
 .p2align	2
-.rva	.LSEH_begin_AES_encrypt
-.rva	.LSEH_end_AES_encrypt
-.rva	.LSEH_info_AES_encrypt
+.rva	.LSEH_begin_aes_encrypt_internal
+.rva	.LSEH_end_aes_encrypt_internal
+.rva	.LSEH_info_aes_encrypt_internal
 
-.rva	.LSEH_begin_AES_decrypt
-.rva	.LSEH_end_AES_decrypt
-.rva	.LSEH_info_AES_decrypt
+.rva	.LSEH_begin_aes_decrypt_internal
+.rva	.LSEH_end_aes_decrypt_internal
+.rva	.LSEH_info_aes_decrypt_internal
 
-.rva	.LSEH_begin_AES_set_encrypt_key
-.rva	.LSEH_end_AES_set_encrypt_key
-.rva	.LSEH_info_AES_set_encrypt_key
+.rva	.LSEH_begin_aes_set_encrypt_key_internal
+.rva	.LSEH_end_aes_set_encrypt_key_internal
+.rva	.LSEH_info_aes_set_encrypt_key_internal
 
-.rva	.LSEH_begin_AES_set_decrypt_key
-.rva	.LSEH_end_AES_set_decrypt_key
-.rva	.LSEH_info_AES_set_decrypt_key
+.rva	.LSEH_begin_aes_set_decrypt_key_internal
+.rva	.LSEH_end_aes_set_decrypt_key_internal
+.rva	.LSEH_info_aes_set_decrypt_key_internal
 
-.rva	.LSEH_begin_AES_cbc_encrypt
-.rva	.LSEH_end_AES_cbc_encrypt
-.rva	.LSEH_info_AES_cbc_encrypt
+.rva	.LSEH_begin_aes_cbc_encrypt_internal
+.rva	.LSEH_end_aes_cbc_encrypt_internal
+.rva	.LSEH_info_aes_cbc_encrypt_internal
 
 .section	.xdata
 .p2align	3
-.LSEH_info_AES_encrypt:
+.LSEH_info_aes_encrypt_internal:
 .byte	9,0,0,0
 .rva	block_se_handler
 .rva	.Lenc_prologue,.Lenc_epilogue	
-.LSEH_info_AES_decrypt:
+.LSEH_info_aes_decrypt_internal:
 .byte	9,0,0,0
 .rva	block_se_handler
 .rva	.Ldec_prologue,.Ldec_epilogue	
-.LSEH_info_AES_set_encrypt_key:
+.LSEH_info_aes_set_encrypt_key_internal:
 .byte	9,0,0,0
 .rva	key_se_handler
 .rva	.Lenc_key_prologue,.Lenc_key_epilogue	
-.LSEH_info_AES_set_decrypt_key:
+.LSEH_info_aes_set_decrypt_key_internal:
 .byte	9,0,0,0
 .rva	key_se_handler
 .rva	.Ldec_key_prologue,.Ldec_key_epilogue	
-.LSEH_info_AES_cbc_encrypt:
+.LSEH_info_aes_cbc_encrypt_internal:
 .byte	9,0,0,0
 .rva	cbc_se_handler

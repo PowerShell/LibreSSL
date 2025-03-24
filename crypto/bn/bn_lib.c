@@ -1,4 +1,4 @@
-/* $OpenBSD: bn_lib.c,v 1.90 2023/07/28 10:35:14 tb Exp $ */
+/* $OpenBSD: bn_lib.c,v 1.93 2024/04/16 13:07:14 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -219,17 +219,27 @@ bn_expand_internal(BIGNUM *bn, int words)
 }
 
 int
-bn_expand(BIGNUM *bn, int bits)
+bn_expand_bits(BIGNUM *bn, size_t bits)
 {
 	int words;
-
-	if (bits < 0)
-		return 0;
 
 	if (bits > (INT_MAX - BN_BITS2 + 1))
 		return 0;
 
 	words = (bits + BN_BITS2 - 1) / BN_BITS2;
+
+	return bn_wexpand(bn, words);
+}
+
+int
+bn_expand_bytes(BIGNUM *bn, size_t bytes)
+{
+	int words;
+
+	if (bytes > (INT_MAX - BN_BYTES + 1))
+		return 0;
+
+	words = (bytes + BN_BYTES - 1) / BN_BYTES;
 
 	return bn_wexpand(bn, words);
 }
@@ -438,6 +448,9 @@ BN_clear_bit(BIGNUM *a, int n)
 
 	a->d[i] &= (~(((BN_ULONG)1) << j));
 	bn_correct_top(a);
+
+	BN_set_negative(a, a->neg);
+
 	return (1);
 }
 LCRYPTO_ALIAS(BN_clear_bit);
@@ -476,6 +489,9 @@ BN_mask_bits(BIGNUM *a, int n)
 		a->d[w] &= ~(BN_MASK2 << b);
 	}
 	bn_correct_top(a);
+
+	BN_set_negative(a, a->neg);
+
 	return (1);
 }
 LCRYPTO_ALIAS(BN_mask_bits);

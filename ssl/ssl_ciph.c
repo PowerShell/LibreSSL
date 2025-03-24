@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_ciph.c,v 1.140 2024/03/02 11:45:51 tb Exp $ */
+/* $OpenBSD: ssl_ciph.c,v 1.149 2024/08/31 12:46:55 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -373,21 +373,18 @@ static const SSL_CIPHER cipher_aliases[] = {
 	/* cipher suite aliases */
 #ifdef LIBRESSL_HAS_TLS1_3
 	{
-		.valid = 1,
+		.value = 0x1301,
 		.name = "TLS_AES_128_GCM_SHA256",
-		.id = TLS1_3_CK_AES_128_GCM_SHA256,
 		.algorithm_ssl = SSL_TLSV1_3,
 	},
 	{
-		.valid = 1,
+		.value = 0x1302,
 		.name = "TLS_AES_256_GCM_SHA384",
-		.id = TLS1_3_CK_AES_256_GCM_SHA384,
 		.algorithm_ssl = SSL_TLSV1_3,
 	},
 	{
-		.valid = 1,
+		.value = 0x1303,
 		.name = "TLS_CHACHA20_POLY1305_SHA256",
-		.id = TLS1_3_CK_CHACHA20_POLY1305_SHA256,
 		.algorithm_ssl = SSL_TLSV1_3,
 	},
 #endif
@@ -408,25 +405,27 @@ static const SSL_CIPHER cipher_aliases[] = {
 };
 
 int
-ssl_cipher_get_evp(const SSL_SESSION *ss, const EVP_CIPHER **enc,
-    const EVP_MD **md, int *mac_pkey_type, int *mac_secret_size)
+ssl_cipher_get_evp(SSL *s, const EVP_CIPHER **enc, const EVP_MD **md,
+    int *mac_pkey_type, int *mac_secret_size)
 {
+	const SSL_CIPHER *cipher;
+
 	*enc = NULL;
 	*md = NULL;
 	*mac_pkey_type = NID_undef;
 	*mac_secret_size = 0;
 
-	if (ss->cipher == NULL)
+	if ((cipher = s->s3->hs.cipher) == NULL)
 		return 0;
 
 	/*
 	 * This function does not handle EVP_AEAD.
 	 * See ssl_cipher_get_evp_aead instead.
 	 */
-	if (ss->cipher->algorithm_mac & SSL_AEAD)
+	if (cipher->algorithm_mac & SSL_AEAD)
 		return 0;
 
-	switch (ss->cipher->algorithm_enc) {
+	switch (cipher->algorithm_enc) {
 	case SSL_3DES:
 		*enc = EVP_des_ede3_cbc();
 		break;
@@ -450,7 +449,7 @@ ssl_cipher_get_evp(const SSL_SESSION *ss, const EVP_CIPHER **enc,
 		break;
 	}
 
-	switch (ss->cipher->algorithm_mac) {
+	switch (cipher->algorithm_mac) {
 	case SSL_MD5:
 		*md = EVP_md5();
 		break;
@@ -487,16 +486,18 @@ ssl_cipher_get_evp(const SSL_SESSION *ss, const EVP_CIPHER **enc,
  * for s->cipher. It returns 1 on success and 0 on error.
  */
 int
-ssl_cipher_get_evp_aead(const SSL_SESSION *ss, const EVP_AEAD **aead)
+ssl_cipher_get_evp_aead(SSL *s, const EVP_AEAD **aead)
 {
+	const SSL_CIPHER *cipher;
+
 	*aead = NULL;
 
-	if (ss->cipher == NULL)
+	if ((cipher = s->s3->hs.cipher) == NULL)
 		return 0;
-	if ((ss->cipher->algorithm_mac & SSL_AEAD) == 0)
+	if ((cipher->algorithm_mac & SSL_AEAD) == 0)
 		return 0;
 
-	switch (ss->cipher->algorithm_enc) {
+	switch (cipher->algorithm_enc) {
 	case SSL_AES128GCM:
 		*aead = EVP_aead_aes_128_gcm();
 		return 1;
@@ -515,24 +516,14 @@ ssl_cipher_get_evp_aead(const SSL_SESSION *ss, const EVP_AEAD **aead)
 int
 ssl_get_handshake_evp_md(SSL *s, const EVP_MD **md)
 {
-	unsigned long handshake_mac;
+	const SSL_CIPHER *cipher;
 
 	*md = NULL;
 
-	if (s->s3->hs.cipher == NULL)
+	if ((cipher = s->s3->hs.cipher) == NULL)
 		return 0;
 
-	handshake_mac = s->s3->hs.cipher->algorithm2 &
-	    SSL_HANDSHAKE_MAC_MASK;
-
-	/* For TLSv1.2 we upgrade the default MD5+SHA1 MAC to SHA256. */
-	if (SSL_USE_SHA256_PRF(s) && handshake_mac == SSL_HANDSHAKE_MAC_DEFAULT)
-		handshake_mac = SSL_HANDSHAKE_MAC_SHA256;
-
-	switch (handshake_mac) {
-	case SSL_HANDSHAKE_MAC_DEFAULT:
-		*md = EVP_md5_sha1();
-		return 1;
+	switch (cipher->algorithm2 & SSL_HANDSHAKE_MAC_MASK) {
 	case SSL_HANDSHAKE_MAC_SHA256:
 		*md = EVP_sha256();
 		return 1;
@@ -585,22 +576,6 @@ ll_append_head(CIPHER_ORDER **head, CIPHER_ORDER *curr,
 	*head = curr;
 }
 
-/* XXX beck: remove this in a followon to removing GOST */
-static void
-ssl_cipher_get_disabled(unsigned long *mkey, unsigned long *auth,
-    unsigned long *enc, unsigned long *mac, unsigned long *ssl)
-{
-	*mkey = 0;
-	*auth = 0;
-	*enc = 0;
-	*mac = 0;
-	*ssl = 0;
-
-#ifdef SSL_FORBID_ENULL
-	*enc |= SSL_eNULL;
-#endif
-}
-
 static void
 ssl_cipher_collect_ciphers(const SSL_METHOD *ssl_method, int num_of_ciphers,
     unsigned long disabled_mkey, unsigned long disabled_auth,
@@ -617,15 +592,20 @@ ssl_cipher_collect_ciphers(const SSL_METHOD *ssl_method, int num_of_ciphers,
 	 * a linked list with at most num entries.
 	 */
 
-	/* Get the initial list of ciphers */
+	/*
+	 * Get the initial list of ciphers, iterating backwards over the
+	 * cipher list - the list is ordered by cipher value and we currently
+	 * hope that ciphers with higher cipher values are preferable...
+	 */
 	co_list_num = 0;	/* actual count of ciphers */
-	for (i = 0; i < num_of_ciphers; i++) {
-		c = ssl_method->get_cipher(i);
+	for (i = num_of_ciphers - 1; i >= 0; i--) {
+		c = ssl3_get_cipher_by_index(i);
+
 		/*
 		 * Drop any invalid ciphers and any which use unavailable
 		 * algorithms.
 		 */
-		if ((c != NULL) && c->valid &&
+		if ((c != NULL) &&
 		    !(c->algorithm_mkey & disabled_mkey) &&
 		    !(c->algorithm_auth & disabled_auth) &&
 		    !(c->algorithm_enc & disabled_enc) &&
@@ -731,7 +711,7 @@ ssl_cipher_collect_aliases(const SSL_CIPHER **ca_list, int num_of_group_aliases,
 }
 
 static void
-ssl_cipher_apply_rule(unsigned long cipher_id, unsigned long alg_mkey,
+ssl_cipher_apply_rule(uint16_t cipher_value, unsigned long alg_mkey,
     unsigned long alg_auth, unsigned long alg_enc, unsigned long alg_mac,
     unsigned long alg_ssl, unsigned long algo_strength, int rule,
     int strength_bits, CIPHER_ORDER **head_p, CIPHER_ORDER **tail_p)
@@ -763,7 +743,7 @@ ssl_cipher_apply_rule(unsigned long cipher_id, unsigned long alg_mkey,
 
 		cp = curr->cipher;
 
-		if (cipher_id && cp->id != cipher_id)
+		if (cipher_value != 0 && cp->value != cipher_value)
 			continue;
 
 		/*
@@ -888,7 +868,7 @@ ssl_cipher_process_rulestr(const char *rule_str, CIPHER_ORDER **head_p,
 	unsigned long alg_mkey, alg_auth, alg_enc, alg_mac, alg_ssl;
 	unsigned long algo_strength;
 	int j, multi, found, rule, retval, ok, buflen;
-	unsigned long cipher_id = 0;
+	uint16_t cipher_value = 0;
 	const char *l, *buf;
 	char ch;
 
@@ -980,7 +960,7 @@ ssl_cipher_process_rulestr(const char *rule_str, CIPHER_ORDER **head_p,
 			 * '\0' terminated.)
 			 */
 			j = found = 0;
-			cipher_id = 0;
+			cipher_value = 0;
 			while (ca_list[j]) {
 				if (!strncmp(buf, ca_list[j]->name, buflen) &&
 				    (ca_list[j]->name[buflen] == '\0')) {
@@ -1053,13 +1033,13 @@ ssl_cipher_process_rulestr(const char *rule_str, CIPHER_ORDER **head_p,
 					    SSL_STRONG_MASK;
 			}
 
-			if (ca_list[j]->valid) {
+			if (ca_list[j]->value != 0) {
 				/*
 				 * explicit ciphersuite found; its protocol
 				 * version does not become part of the search
 				 * pattern!
 				 */
-				cipher_id = ca_list[j]->id;
+				cipher_value = ca_list[j]->value;
 				if (ca_list[j]->algorithm_ssl == SSL_TLSV1_3)
 					*tls13_seen = 1;
 			} else {
@@ -1115,7 +1095,7 @@ ssl_cipher_process_rulestr(const char *rule_str, CIPHER_ORDER **head_p,
 		} else if (found) {
 			if (alg_ssl == SSL_TLSV1_3)
 				*tls13_seen = 1;
-			ssl_cipher_apply_rule(cipher_id, alg_mkey, alg_auth,
+			ssl_cipher_apply_rule(cipher_value, alg_mkey, alg_auth,
 			    alg_enc, alg_mac, alg_ssl, algo_strength, rule,
 			    -1, head_p, tail_p);
 		} else {
@@ -1132,11 +1112,7 @@ ssl_cipher_process_rulestr(const char *rule_str, CIPHER_ORDER **head_p,
 static inline int
 ssl_aes_is_accelerated(void)
 {
-#if defined(__i386__) || defined(__x86_64__)
-	return ((OPENSSL_cpu_caps() & (1ULL << 57)) != 0);
-#else
-	return (0);
-#endif
+	return (OPENSSL_cpu_caps() & CRYPTO_CPU_CAPS_ACCELERATED_AES) != 0;
 }
 
 STACK_OF(SSL_CIPHER) *
@@ -1162,11 +1138,19 @@ ssl_create_cipher_list(const SSL_METHOD *ssl_method,
 	if (rule_str == NULL || cipher_list == NULL)
 		goto err;
 
-	/*
-	 * To reduce the work to do we only want to process the compiled
-	 * in algorithms, so we first get the mask of disabled ciphers.
-	 */
-	ssl_cipher_get_disabled(&disabled_mkey, &disabled_auth, &disabled_enc, &disabled_mac, &disabled_ssl);
+	disabled_mkey = 0;
+	disabled_auth = 0;
+	disabled_enc = 0;
+	disabled_mac = 0;
+	disabled_ssl = 0;
+
+#ifdef SSL_FORBID_ENULL
+	disabled_enc |= SSL_eNULL;
+#endif
+
+	/* DTLS cannot be used with stream ciphers. */
+	if (ssl_method->dtls)
+		disabled_enc |= SSL_RC4;
 
 	/*
 	 * Now we have to collect the available ciphers from the compiled
@@ -1344,7 +1328,7 @@ ssl_create_cipher_list(const SSL_METHOD *ssl_method,
 char *
 SSL_CIPHER_description(const SSL_CIPHER *cipher, char *buf, int len)
 {
-	unsigned long alg_mkey, alg_auth, alg_enc, alg_mac, alg_ssl, alg2;
+	unsigned long alg_mkey, alg_auth, alg_enc, alg_mac, alg_ssl;
 	const char *ver, *kx, *au, *enc, *mac;
 	char *ret;
 	int l;
@@ -1354,8 +1338,6 @@ SSL_CIPHER_description(const SSL_CIPHER *cipher, char *buf, int len)
 	alg_enc = cipher->algorithm_enc;
 	alg_mac = cipher->algorithm_mac;
 	alg_ssl = cipher->algorithm_ssl;
-
-	alg2 = cipher->algorithm2;
 
 	if (alg_ssl & SSL_SSLV3)
 		ver = "SSLv3";
@@ -1409,7 +1391,7 @@ SSL_CIPHER_description(const SSL_CIPHER *cipher, char *buf, int len)
 		enc = "3DES(168)";
 		break;
 	case SSL_RC4:
-		enc = alg2 & SSL2_CF_8_BYTE_ENC ? "RC4(64)" : "RC4(128)";
+		enc = "RC4(128)";
 		break;
 	case SSL_eNULL:
 		enc = "None";
@@ -1478,24 +1460,23 @@ SSL_CIPHER_description(const SSL_CIPHER *cipher, char *buf, int len)
 LSSL_ALIAS(SSL_CIPHER_description);
 
 const char *
-SSL_CIPHER_get_version(const SSL_CIPHER *c)
+SSL_CIPHER_get_version(const SSL_CIPHER *cipher)
 {
-	if (c == NULL)
-		return("(NONE)");
-	if ((c->id >> 24) == 3)
-		return("TLSv1/SSLv3");
-	else
-		return("unknown");
+	if (cipher == NULL)
+		return "(NONE)";
+
+	return "TLSv1/SSLv3";
 }
 LSSL_ALIAS(SSL_CIPHER_get_version);
 
 /* return the actual cipher being used */
 const char *
-SSL_CIPHER_get_name(const SSL_CIPHER *c)
+SSL_CIPHER_get_name(const SSL_CIPHER *cipher)
 {
-	if (c != NULL)
-		return (c->name);
-	return("(NONE)");
+	if (cipher == NULL)
+		return "(NONE)";
+
+	return cipher->name;
 }
 LSSL_ALIAS(SSL_CIPHER_get_name);
 
@@ -1515,16 +1496,16 @@ SSL_CIPHER_get_bits(const SSL_CIPHER *c, int *alg_bits)
 LSSL_ALIAS(SSL_CIPHER_get_bits);
 
 unsigned long
-SSL_CIPHER_get_id(const SSL_CIPHER *c)
+SSL_CIPHER_get_id(const SSL_CIPHER *cipher)
 {
-	return c->id;
+	return SSL3_CK_ID | cipher->value;
 }
 LSSL_ALIAS(SSL_CIPHER_get_id);
 
 uint16_t
-SSL_CIPHER_get_value(const SSL_CIPHER *c)
+SSL_CIPHER_get_value(const SSL_CIPHER *cipher)
 {
-	return ssl3_cipher_get_value(c);
+	return cipher->value;
 }
 LSSL_ALIAS(SSL_CIPHER_get_value);
 
@@ -1627,6 +1608,20 @@ SSL_CIPHER_get_auth_nid(const SSL_CIPHER *c)
 }
 LSSL_ALIAS(SSL_CIPHER_get_auth_nid);
 
+const EVP_MD *
+SSL_CIPHER_get_handshake_digest(const SSL_CIPHER *c)
+{
+	switch (c->algorithm2 & SSL_HANDSHAKE_MAC_MASK) {
+	case SSL_HANDSHAKE_MAC_SHA256:
+		return EVP_sha256();
+	case SSL_HANDSHAKE_MAC_SHA384:
+		return EVP_sha384();
+	default:
+		return NULL;
+	}
+}
+LSSL_ALIAS(SSL_CIPHER_get_handshake_digest);
+
 int
 SSL_CIPHER_is_aead(const SSL_CIPHER *c)
 {
@@ -1640,13 +1635,6 @@ SSL_COMP_get_compression_methods(void)
 	return NULL;
 }
 LSSL_ALIAS(SSL_COMP_get_compression_methods);
-
-int
-SSL_COMP_add_compression_method(int id, void *cm)
-{
-	return 1;
-}
-LSSL_ALIAS(SSL_COMP_add_compression_method);
 
 const char *
 SSL_COMP_get_name(const void *comp)

@@ -1,4 +1,4 @@
-/* $OpenBSD: evp_pbe.c,v 1.46 2024/03/02 10:20:27 tb Exp $ */
+/* $OpenBSD: evp_pbe.c,v 1.50 2024/04/09 13:52:41 beck Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 1999.
  */
@@ -234,7 +234,7 @@ int
 PKCS5_PBE_keyivgen(EVP_CIPHER_CTX *cctx, const char *pass, int passlen,
     ASN1_TYPE *param, const EVP_CIPHER *cipher, const EVP_MD *md, int en_de)
 {
-	EVP_MD_CTX ctx;
+	EVP_MD_CTX *md_ctx;
 	unsigned char md_tmp[EVP_MAX_MD_SIZE];
 	unsigned char key[EVP_MAX_KEY_LENGTH], iv[EVP_MAX_IV_LENGTH];
 	int i;
@@ -277,22 +277,23 @@ PKCS5_PBE_keyivgen(EVP_CIPHER_CTX *cctx, const char *pass, int passlen,
 	else if (passlen == -1)
 		passlen = strlen(pass);
 
-	EVP_MD_CTX_legacy_clear(&ctx);
+	if ((md_ctx = EVP_MD_CTX_new()) == NULL)
+		goto err;
 
-	if (!EVP_DigestInit_ex(&ctx, md, NULL))
+	if (!EVP_DigestInit_ex(md_ctx, md, NULL))
 		goto err;
-	if (!EVP_DigestUpdate(&ctx, pass, passlen))
+	if (!EVP_DigestUpdate(md_ctx, pass, passlen))
 		goto err;
-	if (!EVP_DigestUpdate(&ctx, salt, saltlen))
+	if (!EVP_DigestUpdate(md_ctx, salt, saltlen))
 		goto err;
-	if (!EVP_DigestFinal_ex(&ctx, md_tmp, NULL))
+	if (!EVP_DigestFinal_ex(md_ctx, md_tmp, NULL))
 		goto err;
 	for (i = 1; i < iter; i++) {
-		if (!EVP_DigestInit_ex(&ctx, md, NULL))
+		if (!EVP_DigestInit_ex(md_ctx, md, NULL))
 			goto err;
-		if (!EVP_DigestUpdate(&ctx, md_tmp, mdsize))
+		if (!EVP_DigestUpdate(md_ctx, md_tmp, mdsize))
 			goto err;
-		if (!EVP_DigestFinal_ex (&ctx, md_tmp, NULL))
+		if (!EVP_DigestFinal_ex(md_ctx, md_tmp, NULL))
 			goto err;
 	}
 	if ((size_t)EVP_CIPHER_key_length(cipher) > sizeof(md_tmp)) {
@@ -315,7 +316,7 @@ PKCS5_PBE_keyivgen(EVP_CIPHER_CTX *cctx, const char *pass, int passlen,
 	ret = 1;
 
  err:
-	EVP_MD_CTX_cleanup(&ctx);
+	EVP_MD_CTX_free(md_ctx);
 	PBEPARAM_free(pbe);
 
 	return ret;
@@ -397,6 +398,7 @@ PKCS5_PBKDF2_HMAC(const char *pass, int passlen, const unsigned char *salt,
 	HMAC_CTX_cleanup(&hctx_tpl);
 	return 1;
 }
+LCRYPTO_ALIAS(PKCS5_PBKDF2_HMAC);
 
 int
 PKCS5_PBKDF2_HMAC_SHA1(const char *pass, int passlen, const unsigned char *salt,
@@ -405,6 +407,7 @@ PKCS5_PBKDF2_HMAC_SHA1(const char *pass, int passlen, const unsigned char *salt,
 	return PKCS5_PBKDF2_HMAC(pass, passlen, salt, saltlen, iter,
 	    EVP_sha1(), keylen, out);
 }
+LCRYPTO_ALIAS(PKCS5_PBKDF2_HMAC_SHA1);
 
 /*
  * Now the key derivation function itself. This is a bit evil because
@@ -494,14 +497,6 @@ md_nid_from_prf_nid(int nid)
 		return NID_sha3_384;
 	case NID_hmac_sha3_512:
 		return NID_sha3_512;
-#ifndef OPENSSL_NO_GOST
-	case NID_id_HMACGostR3411_94:
-		return NID_id_GostR3411_94;
-	case NID_id_tc26_hmac_gost_3411_12_256:
-		return NID_id_tc26_gost3411_2012_256;
-	case NID_id_tc26_hmac_gost_3411_12_512:
-		return NID_id_tc26_gost3411_2012_512;
-#endif
 	default:
 		return NID_undef;
 	}
@@ -650,4 +645,3 @@ PKCS12_PBE_keyivgen(EVP_CIPHER_CTX *ctx, const char *pass, int passlen,
 	explicit_bzero(iv, EVP_MAX_IV_LENGTH);
 	return ret;
 }
-LCRYPTO_ALIAS(PKCS12_PBE_keyivgen);

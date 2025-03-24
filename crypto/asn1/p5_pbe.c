@@ -1,4 +1,4 @@
-/* $OpenBSD: p5_pbe.c,v 1.26 2024/03/02 10:17:37 tb Exp $ */
+/* $OpenBSD: p5_pbe.c,v 1.28 2024/07/08 14:48:49 beck Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 1999.
  */
@@ -89,6 +89,7 @@ const ASN1_ITEM PBEPARAM_it = {
 	.size = sizeof(PBEPARAM),
 	.sname = "PBEPARAM",
 };
+LCRYPTO_ALIAS(PBEPARAM_it);
 
 
 PBEPARAM *
@@ -127,8 +128,7 @@ PKCS5_pbe_set0_algor(X509_ALGOR *algor, int alg, int iter,
 	ASN1_STRING *pbe_str = NULL;
 	unsigned char *sstr;
 
-	pbe = PBEPARAM_new();
-	if (!pbe) {
+	if ((pbe = PBEPARAM_new()) == NULL) {
 		ASN1error(ERR_R_MALLOC_FAILURE);
 		goto err;
 	}

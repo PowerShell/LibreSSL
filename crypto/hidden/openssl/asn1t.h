@@ -1,4 +1,4 @@
-/* $OpenBSD: asn1t.h,v 1.3 2023/07/28 10:00:10 tb Exp $ */
+/* $OpenBSD: asn1t.h,v 1.5 2024/07/08 17:01:54 beck Exp $ */
 /*
  * Copyright (c) 2023 Bob Beck <beck@openbsd.org>
  *
@@ -29,5 +29,12 @@ LCRYPTO_USED(ASN1_item_ex_new);
 LCRYPTO_USED(ASN1_item_ex_free);
 LCRYPTO_USED(ASN1_item_ex_d2i);
 LCRYPTO_USED(ASN1_item_ex_i2d);
+#if defined(LIBRESSL_NAMESPACE)
+extern LCRYPTO_USED(ASN1_SEQUENCE_it);
+extern LCRYPTO_USED(BIGNUM_it);
+extern LCRYPTO_USED(LONG_it);
+extern LCRYPTO_USED(ZLONG_it);
+extern LCRYPTO_UNUSED(CBIGNUM_it);
+#endif
 
 #endif /* _LIBCRYPTO_ASN1T_H */

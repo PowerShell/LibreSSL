@@ -5,18 +5,7 @@
 #endif
 
 #include "x86_arch.h"
-
-
-.section	.ctors
-_CET_ENDBR
-	.p2align	3
-	.quad	OPENSSL_cpuid_setup
-
-
-
-
 .text	
-
 .globl	OPENSSL_ia32_cpuid
 .def	OPENSSL_ia32_cpuid;	.scl 2;	.type 32;	.endef
 .p2align	4

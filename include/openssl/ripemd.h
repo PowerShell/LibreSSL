@@ -1,4 +1,4 @@
-/* $OpenBSD: ripemd.h,v 1.15 2023/07/08 06:52:56 jsing Exp $ */
+/* $OpenBSD: ripemd.h,v 1.19 2024/06/01 18:42:49 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -61,6 +61,10 @@
 #ifndef HEADER_RIPEMD_H
 #define HEADER_RIPEMD_H
 
+#if !defined(HAVE_ATTRIBUTE__BOUNDED__) && !defined(__OpenBSD__)
+#define __bounded__(x, y, z)
+#endif
+
 #include <openssl/opensslconf.h>
 
 #ifdef  __cplusplus
@@ -92,10 +96,13 @@ typedef struct RIPEMD160state_st {
 } RIPEMD160_CTX;
 
 int RIPEMD160_Init(RIPEMD160_CTX *c);
-int RIPEMD160_Update(RIPEMD160_CTX *c, const void *data, size_t len);
+int RIPEMD160_Update(RIPEMD160_CTX *c, const void *data, size_t len)
+    __attribute__ ((__bounded__(__buffer__, 2, 3)));
 int RIPEMD160_Final(unsigned char *md, RIPEMD160_CTX *c);
 unsigned char *RIPEMD160(const unsigned char *d, size_t n,
-    unsigned char *md);
+    unsigned char *md)
+    __attribute__ ((__bounded__(__buffer__, 1, 2)))
+    __attribute__ ((__nonnull__(3)));
 void RIPEMD160_Transform(RIPEMD160_CTX *c, const unsigned char *b);
 #ifdef  __cplusplus
 }

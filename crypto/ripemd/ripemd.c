@@ -1,4 +1,4 @@
-/* $OpenBSD: ripemd.c,v 1.7 2023/08/10 12:27:35 jsing Exp $ */
+/* $OpenBSD: ripemd.c,v 1.19 2024/06/01 07:36:16 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -57,50 +57,18 @@
  */
 
 #include <stdio.h>
-#include <openssl/opensslv.h>
-#include <openssl/crypto.h>
-
 #include <stdlib.h>
 #include <string.h>
+
 #include <openssl/opensslconf.h>
+
+#include <openssl/crypto.h>
 #include <openssl/ripemd.h>
 
-/*
- * DO EXAMINE COMMENTS IN crypto/md5/md5_locl.h & crypto/md5/md5_dgst.c
- * FOR EXPLANATIONS ON FOLLOWING "CODE."
- *					<appro@fy.chalmers.se>
- */
-#ifdef RMD160_ASM
-# if defined(__i386) || defined(__i386__) || defined(_M_IX86) || defined(__INTEL__)
-#  define ripemd160_block_data_order ripemd160_block_asm_data_order
-# endif
-#endif
+#include "crypto_internal.h"
 
-__BEGIN_HIDDEN_DECLS
-
-void ripemd160_block_data_order (RIPEMD160_CTX *c, const void *p, size_t num);
-
-__END_HIDDEN_DECLS
-
-#define DATA_ORDER_IS_LITTLE_ENDIAN
-
-#define HASH_LONG               RIPEMD160_LONG
-#define HASH_CTX                RIPEMD160_CTX
-#define HASH_CBLOCK             RIPEMD160_CBLOCK
-#define HASH_UPDATE             RIPEMD160_Update
-#define HASH_TRANSFORM          RIPEMD160_Transform
-#define HASH_FINAL              RIPEMD160_Final
-#define	HASH_MAKE_STRING(c,s)	do {	\
-	unsigned long ll;		\
-	ll=(c)->A; HOST_l2c(ll,(s));	\
-	ll=(c)->B; HOST_l2c(ll,(s));	\
-	ll=(c)->C; HOST_l2c(ll,(s));	\
-	ll=(c)->D; HOST_l2c(ll,(s));	\
-	ll=(c)->E; HOST_l2c(ll,(s));	\
-	} while (0)
-#define HASH_BLOCK_DATA_ORDER   ripemd160_block_data_order
-
-#include "md32_common.h"
+/* Ensure that SHA_LONG and uint32_t are equivalent sizes. */
+CTASSERT(sizeof(RIPEMD160_LONG) == sizeof(uint32_t));
 
 #if 0
 #define F1(x,y,z)	 ((x)^(y)^(z))
@@ -119,12 +87,6 @@ __END_HIDDEN_DECLS
 #define F5(x,y,z)	(((~(z)) | (y)) ^ (x))
 #endif
 
-#define RIPEMD160_A	0x67452301L
-#define RIPEMD160_B	0xEFCDAB89L
-#define RIPEMD160_C	0x98BADCFEL
-#define RIPEMD160_D	0x10325476L
-#define RIPEMD160_E	0xC3D2E1F0L
-
 #define KL0 0x00000000L
 #define KL1 0x5A827999L
 #define KL2 0x6ED9EBA1L
@@ -139,112 +101,100 @@ __END_HIDDEN_DECLS
 
 #define RIP1(a,b,c,d,e,w,s) { \
 	a+=F1(b,c,d)+w; \
-        a=ROTATE(a,s)+e; \
-        c=ROTATE(c,10); }
+        a=crypto_rol_u32(a,s)+e; \
+        c=crypto_rol_u32(c,10); }
 
 #define RIP2(a,b,c,d,e,w,s,K) { \
 	a+=F2(b,c,d)+w+K; \
-        a=ROTATE(a,s)+e; \
-        c=ROTATE(c,10); }
+        a=crypto_rol_u32(a,s)+e; \
+        c=crypto_rol_u32(c,10); }
 
 #define RIP3(a,b,c,d,e,w,s,K) { \
 	a+=F3(b,c,d)+w+K; \
-        a=ROTATE(a,s)+e; \
-        c=ROTATE(c,10); }
+        a=crypto_rol_u32(a,s)+e; \
+        c=crypto_rol_u32(c,10); }
 
 #define RIP4(a,b,c,d,e,w,s,K) { \
 	a+=F4(b,c,d)+w+K; \
-        a=ROTATE(a,s)+e; \
-        c=ROTATE(c,10); }
+        a=crypto_rol_u32(a,s)+e; \
+        c=crypto_rol_u32(c,10); }
 
 #define RIP5(a,b,c,d,e,w,s,K) { \
 	a+=F5(b,c,d)+w+K; \
-        a=ROTATE(a,s)+e; \
-        c=ROTATE(c,10); }
+        a=crypto_rol_u32(a,s)+e; \
+        c=crypto_rol_u32(c,10); }
 
-#  ifdef RMD160_ASM
-void ripemd160_block_x86(RIPEMD160_CTX *c, unsigned long *p, size_t num);
-#    define ripemd160_block ripemd160_block_x86
-#  else
-void ripemd160_block(RIPEMD160_CTX *c, unsigned long *p, size_t num);
-#  endif
-
-int
-RIPEMD160_Init(RIPEMD160_CTX *c)
+static void
+ripemd160_block_data_order(RIPEMD160_CTX *ctx, const void *_in, size_t num)
 {
-	memset (c, 0, sizeof(*c));
-	c->A = RIPEMD160_A;
-	c->B = RIPEMD160_B;
-	c->C = RIPEMD160_C;
-	c->D = RIPEMD160_D;
-	c->E = RIPEMD160_E;
-	return 1;
-}
-
-#ifndef ripemd160_block_data_order
-void
-ripemd160_block_data_order(RIPEMD160_CTX *ctx, const void *p, size_t num)
-{
-	const unsigned char *data = p;
+	const uint8_t *in = _in;
+	const RIPEMD160_LONG *in32;
 	unsigned int A, B, C, D, E;
-	unsigned int a, b, c, d, e, l;
+	unsigned int a, b, c, d, e;
 	unsigned int X0, X1, X2, X3, X4, X5, X6, X7,
 	    X8, X9, X10, X11, X12, X13, X14, X15;
 
 	for (; num--; ) {
-
 		A = ctx->A;
 		B = ctx->B;
 		C = ctx->C;
 		D = ctx->D;
 		E = ctx->E;
 
-		HOST_c2l(data, l);
-		X0 = l;
-		HOST_c2l(data, l);
-		X1 = l;
+		if ((uintptr_t)in % 4 == 0) {
+			/* Input is 32 bit aligned. */
+			in32 = (const RIPEMD160_LONG *)in;
+			X0 = le32toh(in32[0]);
+			X1 = le32toh(in32[1]);
+			X2 = le32toh(in32[2]);
+			X3 = le32toh(in32[3]);
+			X4 = le32toh(in32[4]);
+			X5 = le32toh(in32[5]);
+			X6 = le32toh(in32[6]);
+			X7 = le32toh(in32[7]);
+			X8 = le32toh(in32[8]);
+			X9 = le32toh(in32[9]);
+			X10 = le32toh(in32[10]);
+			X11 = le32toh(in32[11]);
+			X12 = le32toh(in32[12]);
+			X13 = le32toh(in32[13]);
+			X14 = le32toh(in32[14]);
+			X15 = le32toh(in32[15]);
+		} else {
+			/* Input is not 32 bit aligned. */
+			X0 = crypto_load_le32toh(&in[0 * 4]);
+			X1 = crypto_load_le32toh(&in[1 * 4]);
+			X2 = crypto_load_le32toh(&in[2 * 4]);
+			X3 = crypto_load_le32toh(&in[3 * 4]);
+			X4 = crypto_load_le32toh(&in[4 * 4]);
+			X5 = crypto_load_le32toh(&in[5 * 4]);
+			X6 = crypto_load_le32toh(&in[6 * 4]);
+			X7 = crypto_load_le32toh(&in[7 * 4]);
+			X8 = crypto_load_le32toh(&in[8 * 4]);
+			X9 = crypto_load_le32toh(&in[9 * 4]);
+			X10 = crypto_load_le32toh(&in[10 * 4]);
+			X11 = crypto_load_le32toh(&in[11 * 4]);
+			X12 = crypto_load_le32toh(&in[12 * 4]);
+			X13 = crypto_load_le32toh(&in[13 * 4]);
+			X14 = crypto_load_le32toh(&in[14 * 4]);
+			X15 = crypto_load_le32toh(&in[15 * 4]);
+		}
+		in += RIPEMD160_CBLOCK;
+
 		RIP1(A, B, C, D, E, X0, 11);
-		HOST_c2l(data, l);
-		X2 = l;
 		RIP1(E, A, B, C, D, X1, 14);
-		HOST_c2l(data, l);
-		X3 = l;
 		RIP1(D, E, A, B, C, X2, 15);
-		HOST_c2l(data, l);
-		X4 = l;
 		RIP1(C, D, E, A, B, X3, 12);
-		HOST_c2l(data, l);
-		X5 = l;
 		RIP1(B, C, D, E, A, X4, 5);
-		HOST_c2l(data, l);
-		X6 = l;
 		RIP1(A, B, C, D, E, X5, 8);
-		HOST_c2l(data, l);
-		X7 = l;
 		RIP1(E, A, B, C, D, X6, 7);
-		HOST_c2l(data, l);
-		X8 = l;
 		RIP1(D, E, A, B, C, X7, 9);
-		HOST_c2l(data, l);
-		X9 = l;
 		RIP1(C, D, E, A, B, X8, 11);
-		HOST_c2l(data, l);
-		X10 = l;
 		RIP1(B, C, D, E, A, X9, 13);
-		HOST_c2l(data, l);
-		X11 = l;
 		RIP1(A, B, C, D, E, X10, 14);
-		HOST_c2l(data, l);
-		X12 = l;
 		RIP1(E, A, B, C, D, X11, 15);
-		HOST_c2l(data, l);
-		X13 = l;
 		RIP1(D, E, A, B, C, X12, 6);
-		HOST_c2l(data, l);
-		X14 = l;
 		RIP1(C, D, E, A, B, X13, 7);
-		HOST_c2l(data, l);
-		X15 = l;
 		RIP1(B, C, D, E, A, X14, 9);
 		RIP1(A, B, C, D, E, X15, 8);
 
@@ -419,20 +369,124 @@ ripemd160_block_data_order(RIPEMD160_CTX *ctx, const void *p, size_t num)
 		ctx->D = ctx->E + a + B;
 		ctx->E = ctx->A + b + C;
 		ctx->A = D;
-
 	}
 }
-#endif
+
+int
+RIPEMD160_Init(RIPEMD160_CTX *c)
+{
+	memset(c, 0, sizeof(*c));
+
+	c->A = 0x67452301UL;
+	c->B = 0xEFCDAB89UL;
+	c->C = 0x98BADCFEUL;
+	c->D = 0x10325476UL;
+	c->E = 0xC3D2E1F0UL;
+
+	return 1;
+}
+LCRYPTO_ALIAS(RIPEMD160_Init);
+
+int
+RIPEMD160_Update(RIPEMD160_CTX *c, const void *data_, size_t len)
+{
+	const unsigned char *data = data_;
+	unsigned char *p;
+	RIPEMD160_LONG l;
+	size_t n;
+
+	if (len == 0)
+		return 1;
+
+	l = (c->Nl + (((RIPEMD160_LONG)len) << 3))&0xffffffffUL;
+	/* 95-05-24 eay Fixed a bug with the overflow handling, thanks to
+	 * Wei Dai <weidai@eskimo.com> for pointing it out. */
+	if (l < c->Nl) /* overflow */
+		c->Nh++;
+	c->Nh+=(RIPEMD160_LONG)(len>>29);	/* might cause compiler warning on 16-bit */
+	c->Nl = l;
+
+	n = c->num;
+	if (n != 0) {
+		p = (unsigned char *)c->data;
+
+		if (len >= RIPEMD160_CBLOCK || len + n >= RIPEMD160_CBLOCK) {
+			memcpy(p + n, data, RIPEMD160_CBLOCK - n);
+			ripemd160_block_data_order(c, p, 1);
+			n = RIPEMD160_CBLOCK - n;
+			data += n;
+			len -= n;
+			c->num = 0;
+			memset(p, 0, RIPEMD160_CBLOCK);	/* keep it zeroed */
+		} else {
+			memcpy(p + n, data, len);
+			c->num += (unsigned int)len;
+			return 1;
+		}
+	}
+
+	n = len/RIPEMD160_CBLOCK;
+	if (n > 0) {
+		ripemd160_block_data_order(c, data, n);
+		n    *= RIPEMD160_CBLOCK;
+		data += n;
+		len -= n;
+	}
+
+	if (len != 0) {
+		p = (unsigned char *)c->data;
+		c->num = (unsigned int)len;
+		memcpy(p, data, len);
+	}
+	return 1;
+}
+LCRYPTO_ALIAS(RIPEMD160_Update);
+
+void
+RIPEMD160_Transform(RIPEMD160_CTX *c, const unsigned char *data)
+{
+	ripemd160_block_data_order(c, data, 1);
+}
+LCRYPTO_ALIAS(RIPEMD160_Transform);
+
+int
+RIPEMD160_Final(unsigned char *md, RIPEMD160_CTX *c)
+{
+	unsigned char *p = (unsigned char *)c->data;
+	size_t n = c->num;
+
+	p[n] = 0x80; /* there is always room for one */
+	n++;
+
+	if (n > (RIPEMD160_CBLOCK - 8)) {
+		memset(p + n, 0, RIPEMD160_CBLOCK - n);
+		n = 0;
+		ripemd160_block_data_order(c, p, 1);
+	}
+
+	memset(p + n, 0, RIPEMD160_CBLOCK - 8 - n);
+	c->data[RIPEMD160_LBLOCK - 2] = htole32(c->Nl);
+	c->data[RIPEMD160_LBLOCK - 1] = htole32(c->Nh);
+
+	ripemd160_block_data_order(c, p, 1);
+	c->num = 0;
+	memset(p, 0, RIPEMD160_CBLOCK);
+
+	crypto_store_htole32(&md[0 * 4], c->A);
+	crypto_store_htole32(&md[1 * 4], c->B);
+	crypto_store_htole32(&md[2 * 4], c->C);
+	crypto_store_htole32(&md[3 * 4], c->D);
+	crypto_store_htole32(&md[4 * 4], c->E);
+
+	return 1;
+}
+LCRYPTO_ALIAS(RIPEMD160_Final);
 
 unsigned char *
-RIPEMD160(const unsigned char *d, size_t n,
-    unsigned char *md)
+RIPEMD160(const unsigned char *d, size_t n, unsigned char *md)
 {
 	RIPEMD160_CTX c;
-	static unsigned char m[RIPEMD160_DIGEST_LENGTH];
 
-	if (md == NULL)
-		md = m;
 	if (!RIPEMD160_Init(&c))
 		return NULL;
 	RIPEMD160_Update(&c, d, n);
@@ -440,3 +494,4 @@ RIPEMD160(const unsigned char *d, size_t n,
 	explicit_bzero(&c, sizeof(c));
 	return (md);
 }
+LCRYPTO_ALIAS(RIPEMD160);

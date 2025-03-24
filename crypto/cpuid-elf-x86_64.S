@@ -5,17 +5,7 @@
 #endif
 
 #include "x86_arch.h"
-
-.hidden	OPENSSL_cpuid_setup
-.section	.init
-_CET_ENDBR
-	call	OPENSSL_cpuid_setup
-
-
-.hidden	OPENSSL_ia32cap_P
-
 .text	
-
 .globl	OPENSSL_ia32_cpuid
 .type	OPENSSL_ia32_cpuid,@function
 .align	16

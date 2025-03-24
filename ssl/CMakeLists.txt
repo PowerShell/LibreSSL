@@ -65,6 +65,7 @@ target_include_directories(ssl_obj
 	PRIVATE
 		.
 		hidden
+		../crypto
 		../crypto/bio
 		../include/compat
 	PUBLIC
@@ -85,16 +86,16 @@ endif()
 
 export_symbol(ssl ${CMAKE_CURRENT_SOURCE_DIR}/ssl.sym)
 target_link_libraries(ssl crypto ${PLATFORM_LIBS})
-if (WIN32)
-	set(SSL_POSTFIX -${SSL_MAJOR_VERSION} PARENT_SCOPE)
-endif()
 set_target_properties(ssl PROPERTIES
-	OUTPUT_NAME ssl${SSL_POSTFIX}
-	ARCHIVE_OUTPUT_NAME ssl${SSL_POSTFIX}
+	OUTPUT_NAME ssl
+	ARCHIVE_OUTPUT_NAME ssl
 	EXPORT_NAME SSL
 	VERSION ${SSL_VERSION}
 	SOVERSION ${SSL_MAJOR_VERSION}
 )
+if(NOT CMAKE_VERSION VERSION_LESS 3.27.0)
+	set_target_properties(ssl PROPERTIES DLL_NAME_WITH_SOVERSION TRUE)
+endif()
 
 target_include_directories(
 	ssl
@@ -102,6 +103,28 @@ target_include_directories(
 	$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/include>
 	$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
+
+if(HOST_AARCH64)
+	target_include_directories(ssl_obj PRIVATE ../crypto/arch/aarch64/)
+elseif(HOST_ARM)
+	target_include_directories(ssl_obj PRIVATE ../crypto/arch/arm/)
+elseif(HOST_I386)
+	target_include_directories(ssl_obj PRIVATE ../crypto/arch/i386/)
+elseif(HOST_MIPS64)
+	target_include_directories(ssl_obj PRIVATE ../crypto/arch/mips64)
+elseif(HOST_MIPS)
+	# XXX - can this go away? the directory doesn't exist...
+elseif(HOST_POWERPC)
+	target_include_directories(ssl_obj PRIVATE ../crypto/arch/powerpc)
+elseif(HOST_POWERPC64)
+	target_include_directories(ssl_obj PRIVATE ../crypto/arch/powerpc64)
+elseif(HOST_RISCV64)
+	target_include_directories(ssl_obj PRIVATE ../crypto/arch/riscv64)
+elseif(HOST_SPARC64)
+	target_include_directories(ssl_obj PRIVATE ../crypto/arch/sparc64)
+elseif(HOST_X86_64)
+	target_include_directories(ssl_obj PRIVATE ../crypto/arch/amd64)
+endif()
 
 install(
 	TARGETS ssl

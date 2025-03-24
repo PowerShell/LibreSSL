@@ -1,4 +1,4 @@
-/*	$OpenBSD: bn_convert.c,v 1.3 2023/06/23 10:50:47 tb Exp $ */
+/*	$OpenBSD: bn_convert.c,v 1.6 2024/04/17 08:51:11 jsing Exp $ */
 /*
  * Copyright (c) 2023 Joel Sing <jsing@openbsd.org>
  *
@@ -25,8 +25,6 @@
  *
  * - BN_bn2binpad()
  * - BN_bn2lebinpad()
- * - BN_lebin2bn()
- * - BN_bn2mpi()/BN_mpi2bn()
  * - BN_print()/BN_print_fp()
  *
  * - Invalid inputs to {asc,dec,hex,mpi}2bn
@@ -238,6 +236,8 @@ struct bn_convert_test {
 	int neg;
 	const char *dec;
 	const char *hex;
+	const uint8_t mpi[64];
+	int mpi_len;
 };
 
 static const struct bn_convert_test bn_convert_tests[] = {
@@ -247,6 +247,8 @@ static const struct bn_convert_test bn_convert_tests[] = {
 		.neg = 0,
 		.dec = "0",
 		.hex = "0",
+		.mpi = { 0x00, 0x00, 0x00, 0x00, },
+		.mpi_len = 4,
 	},
 	{
 		.bin = { 0x1, },
@@ -254,6 +256,17 @@ static const struct bn_convert_test bn_convert_tests[] = {
 		.neg = 0,
 		.dec = "1",
 		.hex = "01",
+		.mpi = { 0x00, 0x00, 0x00, 0x01, 0x01, },
+		.mpi_len = 5,
+	},
+	{
+		.bin = { 0x1, },
+		.bin_len = 1,
+		.neg = 1,
+		.dec = "-1",
+		.hex = "-01",
+		.mpi = { 0x00, 0x00, 0x00, 0x01, 0x81, },
+		.mpi_len = 5,
 	},
 	{
 		.bin = { 0x7f, 0xff, 0xff, },
@@ -261,6 +274,8 @@ static const struct bn_convert_test bn_convert_tests[] = {
 		.neg = 0,
 		.dec = "8388607",
 		.hex = "7FFFFF",
+		.mpi = { 0x00, 0x00, 0x00, 0x03, 0x7f, 0xff, 0xff },
+		.mpi_len = 7,
 	},
 	{
 		.bin = { 0x7f, 0xff, 0xff, },
@@ -268,6 +283,8 @@ static const struct bn_convert_test bn_convert_tests[] = {
 		.neg = 1,
 		.dec = "-8388607",
 		.hex = "-7FFFFF",
+		.mpi = { 0x00, 0x00, 0x00, 0x03, 0xff, 0xff, 0xff },
+		.mpi_len = 7,
 	},
 	{
 		.bin = { 0xff, 0xff, 0xff, 0xff, },
@@ -275,6 +292,11 @@ static const struct bn_convert_test bn_convert_tests[] = {
 		.neg = 0,
 		.dec = "4294967295",
 		.hex = "FFFFFFFF",
+		.mpi = {
+			0x00, 0x00, 0x00, 0x05, 0x00, 0xff, 0xff, 0xff,
+			0xff,
+		 },
+		.mpi_len = 9,
 	},
 	{
 		.bin = { 0xff, 0xff, 0xff, 0xff, },
@@ -282,6 +304,11 @@ static const struct bn_convert_test bn_convert_tests[] = {
 		.neg = 1,
 		.dec = "-4294967295",
 		.hex = "-FFFFFFFF",
+		.mpi = {
+			0x00, 0x00, 0x00, 0x05, 0x80, 0xff, 0xff, 0xff,
+			0xff,
+		 },
+		.mpi_len = 9,
 	},
 	{
 		.bin = { 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, },
@@ -289,6 +316,11 @@ static const struct bn_convert_test bn_convert_tests[] = {
 		.neg = 0,
 		.dec = "18446744069414584320",
 		.hex = "FFFFFFFF00000000",
+		.mpi = {
+			0x00, 0x00, 0x00, 0x09, 0x00, 0xff, 0xff, 0xff,
+			0xff, 0x00, 0x00, 0x00, 0x00,
+		 },
+		.mpi_len = 13,
 	},
 	{
 		.bin = { 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, },
@@ -296,6 +328,11 @@ static const struct bn_convert_test bn_convert_tests[] = {
 		.neg = 1,
 		.dec = "-18446744069414584320",
 		.hex = "-FFFFFFFF00000000",
+		.mpi = {
+			0x00, 0x00, 0x00, 0x09, 0x80, 0xff, 0xff, 0xff,
+			0xff, 0x00, 0x00, 0x00, 0x00,
+		 },
+		.mpi_len = 13,
 	},
 	{
 		.bin = { 0x80, 0x01, 0x80, 0x01, 0x80, 0x01, 0x80, 0x01, },
@@ -303,6 +340,11 @@ static const struct bn_convert_test bn_convert_tests[] = {
 		.neg = 0,
 		.dec = "9223794255762391041",
 		.hex = "8001800180018001",
+		.mpi = {
+			0x00, 0x00, 0x00, 0x09, 0x00, 0x80, 0x01, 0x80,
+			0x01, 0x80, 0x01, 0x80, 0x01,
+		 },
+		.mpi_len = 13,
 	},
 	{
 		.bin = { 0x80, 0x01, 0x80, 0x01, 0x80, 0x01, 0x80, 0x01, },
@@ -310,20 +352,41 @@ static const struct bn_convert_test bn_convert_tests[] = {
 		.neg = 1,
 		.dec = "-9223794255762391041",
 		.hex = "-8001800180018001",
+		.mpi = {
+			0x00, 0x00, 0x00, 0x09, 0x80, 0x80, 0x01, 0x80,
+			0x01, 0x80, 0x01, 0x80, 0x01,
+		 },
+		.mpi_len = 13,
 	},
 	{
-		.bin = { 0x01, 0x80, 0x01, 0x80, 0x01, 0x80, 0x01, 0x80, 0x01, },
+		.bin = {
+			0x01, 0x80, 0x01, 0x80, 0x01, 0x80, 0x01, 0x80,
+			0x01,
+		},
 		.bin_len = 9,
 		.neg = 0,
 		.dec = "27670538329471942657",
 		.hex = "018001800180018001",
+		.mpi = {
+			0x00, 0x00, 0x00, 0x09, 0x01, 0x80, 0x01, 0x80,
+			0x01, 0x80, 0x01, 0x80, 0x01,
+		 },
+		.mpi_len = 13,
 	},
 	{
-		.bin = { 0x01, 0x80, 0x01, 0x80, 0x01, 0x80, 0x01, 0x80, 0x01, },
+		.bin = {
+			0x01, 0x80, 0x01, 0x80, 0x01, 0x80, 0x01, 0x80,
+			0x01,
+		},
 		.bin_len = 9,
 		.neg = 1,
 		.dec = "-27670538329471942657",
 		.hex = "-018001800180018001",
+		.mpi = {
+			0x00, 0x00, 0x00, 0x09, 0x81, 0x80, 0x01, 0x80,
+			0x01, 0x80, 0x01, 0x80, 0x01,
+		 },
+		.mpi_len = 13,
 	},
 	{
 		.bin = {
@@ -336,6 +399,14 @@ static const struct bn_convert_test bn_convert_tests[] = {
 		.neg = 0,
 		.dec = "57895161181645529494837117048595051142566530671229791132691030063130991362047",
 		.hex = "7FFF7FFF7FFF7FFF7FFF7FFF7FFF7FFF7FFF7FFF7FFF7FFF7FFF7FFF7FFF7FFF",
+		.mpi = {
+			0x00, 0x00, 0x00, 0x20, 0x7f, 0xff, 0x7f, 0xff,
+			0x7f, 0xff, 0x7f, 0xff, 0x7f, 0xff, 0x7f, 0xff,
+			0x7f, 0xff, 0x7f, 0xff, 0x7f, 0xff, 0x7f, 0xff,
+			0x7f, 0xff, 0x7f, 0xff, 0x7f, 0xff, 0x7f, 0xff,
+			0x7f, 0xff, 0x7f, 0xff,
+		 },
+		.mpi_len = 36,
 	},
 	{
 		.bin = {
@@ -348,6 +419,14 @@ static const struct bn_convert_test bn_convert_tests[] = {
 		.neg = 1,
 		.dec = "-57895161181645529494837117048595051142566530671229791132691030063130991362047",
 		.hex = "-7FFF7FFF7FFF7FFF7FFF7FFF7FFF7FFF7FFF7FFF7FFF7FFF7FFF7FFF7FFF7FFF",
+		.mpi = {
+			0x00, 0x00, 0x00, 0x20, 0xff, 0xff, 0x7f, 0xff,
+			0x7f, 0xff, 0x7f, 0xff, 0x7f, 0xff, 0x7f, 0xff,
+			0x7f, 0xff, 0x7f, 0xff, 0x7f, 0xff, 0x7f, 0xff,
+			0x7f, 0xff, 0x7f, 0xff, 0x7f, 0xff, 0x7f, 0xff,
+			0x7f, 0xff, 0x7f, 0xff,
+		 },
+		.mpi_len = 36,
 	},
 };
 
@@ -358,9 +437,12 @@ static int
 test_bn_convert(void)
 {
 	const struct bn_convert_test *bct;
+	uint8_t *mpi_out = NULL;
 	char *out_str = NULL;
+	uint8_t lebin[64];
 	BIGNUM *bn = NULL;
-	size_t i;
+	int mpi_len;
+	size_t i, j;
 	int failed = 1;
 
 	for (i = 0; i < N_BN_CONVERT_TESTS; i++) {
@@ -374,6 +456,20 @@ test_bn_convert(void)
 		BN_set_negative(bn, bct->neg);
 
 		if (check_bin_output(i, "BN_bin2bn()", bct->bin, bct->bin_len,
+		    bn) != 0)
+			goto failure;
+
+		for (j = 0; j < bct->bin_len; j++)
+			lebin[j] = bct->bin[bct->bin_len - j - 1];
+
+		BN_free(bn);
+		if ((bn = BN_lebin2bn(lebin, bct->bin_len, NULL)) == NULL) {
+			fprintf(stderr, "FAIL: BN_lebin2bn() failed\n");
+			goto failure;
+		}
+		BN_set_negative(bn, bct->neg);
+
+		if (check_bin_output(i, "BN_lebin2bn()", bct->bin, bct->bin_len,
 		    bn) != 0)
 			goto failure;
 
@@ -399,6 +495,30 @@ test_bn_convert(void)
 			goto failure;
 		}
 
+		free(mpi_out);
+		mpi_out = NULL;
+
+		if ((mpi_len = BN_bn2mpi(bn, NULL)) != bct->mpi_len) {
+			fprintf(stderr, "FAIL: Test %zu - BN_bn2mpi() returned "
+			    "%d, want %d", i, mpi_len, bct->mpi_len);
+			goto failure;
+		}
+		if ((mpi_out = calloc(1, bct->mpi_len)) == NULL)
+			goto failure;
+		if ((mpi_len = BN_bn2mpi(bn, mpi_out)) != bct->mpi_len) {
+			fprintf(stderr, "FAIL: Test %zu - BN_bn2mpi() returned "
+			    "%d, want %d", i, mpi_len, bct->mpi_len);
+			goto failure;
+		}
+		if (memcmp(mpi_out, bct->mpi, bct->mpi_len) != 0) {
+			fprintf(stderr, "FAIL: Test %zu - BN_bn2mpi() "
+			    "generated:\n", i);
+			hexdump(mpi_out, bct->mpi_len);
+			fprintf(stderr, "Want:\n");
+			hexdump(bct->mpi, bct->mpi_len);
+			goto failure;
+		}
+
 		if (BN_dec2bn(&bn, bct->dec) != (int)strlen(bct->dec)) {
 			fprintf(stderr, "FAIL: BN_dec2bn() failed\n");
 			goto failure;
@@ -409,7 +529,6 @@ test_bn_convert(void)
 			    bct->neg);
 			goto failure;
 		}
-
 		if (check_bin_output(i, "BN_dec2bn()", bct->bin, bct->bin_len,
 		    bn) != 0)
 			goto failure;
@@ -424,8 +543,21 @@ test_bn_convert(void)
 			    bct->neg);
 			goto failure;
 		}
-
 		if (check_bin_output(i, "BN_hex2bn()", bct->bin, bct->bin_len,
+		    bn) != 0)
+			goto failure;
+
+		if (BN_mpi2bn(bct->mpi, bct->mpi_len, bn) == NULL) {
+			fprintf(stderr, "FAIL: BN_mpi2bn() failed\n");
+			goto failure;
+		}
+		if (BN_is_negative(bn) != bct->neg) {
+			fprintf(stderr, "FAIL: Test %zu - BN_mpi2bn() resulted "
+			    "in negative %d, want %d", i, BN_is_negative(bn),
+			    bct->neg);
+			goto failure;
+		}
+		if (check_bin_output(i, "BN_mpi2bn()", bct->bin, bct->bin_len,
 		    bn) != 0)
 			goto failure;
 	}
@@ -433,6 +565,7 @@ test_bn_convert(void)
 	failed = 0;
 
  failure:
+	free(mpi_out);
 	free(out_str);
 	BN_free(bn);
 

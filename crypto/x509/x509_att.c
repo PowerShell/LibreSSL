@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_att.c,v 1.22 2023/02/16 08:38:17 tb Exp $ */
+/* $OpenBSD: x509_att.c,v 1.25 2024/08/31 10:46:40 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -69,13 +69,6 @@
 #include "x509_local.h"
 
 int
-X509at_get_attr_count(const STACK_OF(X509_ATTRIBUTE) *x)
-{
-	return sk_X509_ATTRIBUTE_num(x);
-}
-LCRYPTO_ALIAS(X509at_get_attr_count);
-
-int
 X509at_get_attr_by_NID(const STACK_OF(X509_ATTRIBUTE) *x, int nid, int lastpos)
 {
 	ASN1_OBJECT *obj;
@@ -85,7 +78,6 @@ X509at_get_attr_by_NID(const STACK_OF(X509_ATTRIBUTE) *x, int nid, int lastpos)
 		return (-2);
 	return (X509at_get_attr_by_OBJ(x, obj, lastpos));
 }
-LCRYPTO_ALIAS(X509at_get_attr_by_NID);
 
 int
 X509at_get_attr_by_OBJ(const STACK_OF(X509_ATTRIBUTE) *sk,
@@ -107,29 +99,6 @@ X509at_get_attr_by_OBJ(const STACK_OF(X509_ATTRIBUTE) *sk,
 	}
 	return (-1);
 }
-LCRYPTO_ALIAS(X509at_get_attr_by_OBJ);
-
-X509_ATTRIBUTE *
-X509at_get_attr(const STACK_OF(X509_ATTRIBUTE) *x, int loc)
-{
-	if (x == NULL || sk_X509_ATTRIBUTE_num(x) <= loc || loc < 0)
-		return NULL;
-	else
-		return sk_X509_ATTRIBUTE_value(x, loc);
-}
-LCRYPTO_ALIAS(X509at_get_attr);
-
-X509_ATTRIBUTE *
-X509at_delete_attr(STACK_OF(X509_ATTRIBUTE) *x, int loc)
-{
-	X509_ATTRIBUTE *ret;
-
-	if (x == NULL || sk_X509_ATTRIBUTE_num(x) <= loc || loc < 0)
-		return (NULL);
-	ret = sk_X509_ATTRIBUTE_delete(x, loc);
-	return (ret);
-}
-LCRYPTO_ALIAS(X509at_delete_attr);
 
 STACK_OF(X509_ATTRIBUTE) *
 X509at_add1_attr(STACK_OF(X509_ATTRIBUTE) **x, X509_ATTRIBUTE *attr)
@@ -165,7 +134,6 @@ err2:
 		sk_X509_ATTRIBUTE_free(sk);
 	return (NULL);
 }
-LCRYPTO_ALIAS(X509at_add1_attr);
 
 STACK_OF(X509_ATTRIBUTE) *
 X509at_add1_attr_by_OBJ(STACK_OF(X509_ATTRIBUTE) **x, const ASN1_OBJECT *obj,
@@ -181,7 +149,6 @@ X509at_add1_attr_by_OBJ(STACK_OF(X509_ATTRIBUTE) **x, const ASN1_OBJECT *obj,
 	X509_ATTRIBUTE_free(attr);
 	return ret;
 }
-LCRYPTO_ALIAS(X509at_add1_attr_by_OBJ);
 
 STACK_OF(X509_ATTRIBUTE) *
 X509at_add1_attr_by_NID(STACK_OF(X509_ATTRIBUTE) **x, int nid, int type,
@@ -197,7 +164,6 @@ X509at_add1_attr_by_NID(STACK_OF(X509_ATTRIBUTE) **x, int nid, int type,
 	X509_ATTRIBUTE_free(attr);
 	return ret;
 }
-LCRYPTO_ALIAS(X509at_add1_attr_by_NID);
 
 STACK_OF(X509_ATTRIBUTE) *
 X509at_add1_attr_by_txt(STACK_OF(X509_ATTRIBUTE) **x, const char *attrname,
@@ -213,7 +179,6 @@ X509at_add1_attr_by_txt(STACK_OF(X509_ATTRIBUTE) **x, const char *attrname,
 	X509_ATTRIBUTE_free(attr);
 	return ret;
 }
-LCRYPTO_ALIAS(X509at_add1_attr_by_txt);
 
 void *
 X509at_get0_data_by_OBJ(STACK_OF(X509_ATTRIBUTE) *x, const ASN1_OBJECT *obj,
@@ -227,12 +192,11 @@ X509at_get0_data_by_OBJ(STACK_OF(X509_ATTRIBUTE) *x, const ASN1_OBJECT *obj,
 		return NULL;
 	if ((lastpos <= -2) && (X509at_get_attr_by_OBJ(x, obj, i) != -1))
 		return NULL;
-	at = X509at_get_attr(x, i);
+	at = sk_X509_ATTRIBUTE_value(x, i);
 	if (lastpos <= -3 && (X509_ATTRIBUTE_count(at) != 1))
 		return NULL;
 	return X509_ATTRIBUTE_get0_data(at, 0, type, NULL);
 }
-LCRYPTO_ALIAS(X509at_get0_data_by_OBJ);
 
 X509_ATTRIBUTE *
 X509_ATTRIBUTE_create_by_NID(X509_ATTRIBUTE **attr, int nid, int atrtype,

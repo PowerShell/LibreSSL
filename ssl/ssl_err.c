@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_err.c,v 1.47 2024/02/03 15:58:33 beck Exp $ */
+/* $OpenBSD: ssl_err.c,v 1.52 2024/09/09 07:40:03 tb Exp $ */
 /* ====================================================================
  * Copyright (c) 1999-2011 The OpenSSL Project.  All rights reserved.
  *
@@ -67,7 +67,7 @@
 #define ERR_REASON(reason) ERR_PACK(ERR_LIB_SSL,0,reason)
 
 /* See SSL_state_func_code below */
-static ERR_STRING_DATA SSL_str_functs[]= {
+static const ERR_STRING_DATA SSL_str_functs[] = {
 	{ERR_FUNC(1),  "CONNECT_CW_FLUSH"},
 	{ERR_FUNC(2),  "CONNECT_CW_CLNT_HELLO"},
 	{ERR_FUNC(3),  "CONNECT_CW_CLNT_HELLO"},
@@ -136,24 +136,24 @@ static ERR_STRING_DATA SSL_str_functs[]= {
 	{ERR_FUNC(70),  "ACCEPT_SW_SESSION_TICKET"},
 	{ERR_FUNC(71),  "ACCEPT_SW_CERT_STATUS"},
 	{ERR_FUNC(72),  "ACCEPT_SW_CERT_STATUS"},
-	{ERR_FUNC(73), 	"ST_BEFORE"},
-	{ERR_FUNC(74), 	"ST_ACCEPT"},
-	{ERR_FUNC(75), 	"ST_CONNECT"},
-	{ERR_FUNC(76), 	"ST_OK"},
-	{ERR_FUNC(77), 	"ST_RENEGOTIATE"},
-	{ERR_FUNC(78), 	"ST_BEFORE_CONNECT"},
-	{ERR_FUNC(79), 	"ST_OK_CONNECT"},
-	{ERR_FUNC(80), 	"ST_BEFORE_ACCEPT"},
-	{ERR_FUNC(81), 	"ST_OK_ACCEPT"},
+	{ERR_FUNC(73),	"ST_BEFORE"},
+	{ERR_FUNC(74),	"ST_ACCEPT"},
+	{ERR_FUNC(75),	"ST_CONNECT"},
+	{ERR_FUNC(76),	"ST_OK"},
+	{ERR_FUNC(77),	"ST_RENEGOTIATE"},
+	{ERR_FUNC(78),	"ST_BEFORE_CONNECT"},
+	{ERR_FUNC(79),	"ST_OK_CONNECT"},
+	{ERR_FUNC(80),	"ST_BEFORE_ACCEPT"},
+	{ERR_FUNC(81),	"ST_OK_ACCEPT"},
 	{ERR_FUNC(83),  "DTLS1_ST_CR_HELLO_VERIFY_REQUEST"},
-	{ERR_FUNC(84), 	"DTLS1_ST_CR_HELLO_VERIFY_REQUEST"},
-	{ERR_FUNC(85), 	"DTLS1_ST_SW_HELLO_VERIFY_REQUEST"},
-	{ERR_FUNC(86), 	"DTLS1_ST_SW_HELLO_VERIFY_REQUEST"},
+	{ERR_FUNC(84),	"DTLS1_ST_CR_HELLO_VERIFY_REQUEST"},
+	{ERR_FUNC(85),	"DTLS1_ST_SW_HELLO_VERIFY_REQUEST"},
+	{ERR_FUNC(86),	"DTLS1_ST_SW_HELLO_VERIFY_REQUEST"},
 	{ERR_FUNC(0xfff),   "(UNKNOWN)SSL_internal"},
 	{0, NULL}
 };
 
-static ERR_STRING_DATA SSL_str_reasons[]= {
+static const ERR_STRING_DATA SSL_str_reasons[] = {
 	{ERR_REASON(SSL_R_APP_DATA_IN_HANDSHAKE) , "app data in handshake"},
 	{ERR_REASON(SSL_R_ATTEMPT_TO_REUSE_SESSION_IN_DIFFERENT_CONTEXT), "attempt to reuse session in different context"},
 	{ERR_REASON(SSL_R_BAD_ALERT_RECORD)      , "bad alert record"},
@@ -417,7 +417,6 @@ static ERR_STRING_DATA SSL_str_reasons[]= {
 	{ERR_REASON(SSL_R_TLS_INVALID_ECPOINTFORMAT_LIST), "tls invalid ecpointformat list"},
 	{ERR_REASON(SSL_R_TLS_PEER_DID_NOT_RESPOND_WITH_CERTIFICATE_LIST), "tls peer did not respond with certificate list"},
 	{ERR_REASON(SSL_R_TLS_RSA_ENCRYPTED_VALUE_LENGTH_IS_WRONG), "tls rsa encrypted value length is wrong"},
-	{ERR_REASON(SSL_R_TRIED_TO_USE_UNSUPPORTED_CIPHER), "tried to use unsupported cipher"},
 	{ERR_REASON(SSL_R_UNABLE_TO_DECODE_DH_CERTS), "unable to decode dh certs"},
 	{ERR_REASON(SSL_R_UNABLE_TO_DECODE_ECDH_CERTS), "unable to decode ecdh certs"},
 	{ERR_REASON(SSL_R_UNABLE_TO_EXTRACT_PUBLIC_KEY), "unable to extract public key"},
@@ -476,8 +475,9 @@ ERR_load_SSL_strings(void)
 {
 #ifndef OPENSSL_NO_ERR
 	if (ERR_func_error_string(SSL_str_functs[0].error) == NULL) {
-		ERR_load_strings(0, SSL_str_functs);
-		ERR_load_strings(0, SSL_str_reasons);
+		/* TMP UGLY CASTS */
+		ERR_load_strings(0, (ERR_STRING_DATA *)SSL_str_functs);
+		ERR_load_strings(0, (ERR_STRING_DATA *)SSL_str_reasons);
 	}
 #endif
 }

@@ -1,4 +1,4 @@
-.\" $OpenBSD: PEM_read_bio_PrivateKey.3,v 1.21 2023/04/25 18:57:57 tb Exp $
+.\" $OpenBSD: PEM_read_bio_PrivateKey.3,v 1.23 2024/09/02 08:04:32 tb Exp $
 .\" full merge up to:
 .\" OpenSSL man3/PEM_read_bio_PrivateKey.pod 18bad535 Apr 9 15:13:55 2019 +0100
 .\" OpenSSL man3/PEM_read_CMS.pod 83cf7abf May 29 13:07:08 2018 +0100
@@ -51,7 +51,7 @@
 .\" ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 .\" OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.Dd $Mdocdate: April 25 2023 $
+.Dd $Mdocdate: September 2 2024 $
 .Dt PEM_READ_BIO_PRIVATEKEY 3
 .Os
 .Sh NAME
@@ -896,9 +896,6 @@ The
 functions process a trusted X509 certificate using an
 .Vt X509
 structure.
-The
-.Xr X509_check_trust 3
-manual explains how the auxiliary trust information is used.
 .Pp
 The
 .Sy X509_REQ
@@ -1034,7 +1031,7 @@ are used as the passphrase and
 .Fa cb
 is ignored.
 .Ss PEM encryption format
-This old
+These old
 .Sy PrivateKey
 routines use a non-standard technique for encryption.
 .Pp

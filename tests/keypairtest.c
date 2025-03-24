@@ -1,4 +1,4 @@
-/* $OpenBSD: keypairtest.c,v 1.6 2022/02/08 18:05:57 tb Exp $ */
+/* $OpenBSD: keypairtest.c,v 1.7 2024/03/20 10:38:05 jsing Exp $ */
 /*
  * Copyright (c) 2018 Joel Sing <jsing@openbsd.org>
  *

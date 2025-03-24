@@ -1,4 +1,4 @@
-/*	$OpenBSD: x509_addr.c,v 1.91 2023/10/29 13:22:37 tb Exp $ */
+/*	$OpenBSD: x509_addr.c,v 1.93 2024/07/13 15:08:58 tb Exp $ */
 /*
  * Contributed to the OpenSSL Project by the American Registry for
  * Internet Numbers ("ARIN").
@@ -109,6 +109,7 @@ const ASN1_ITEM IPAddressRange_it = {
 	.size = sizeof(IPAddressRange),
 	.sname = "IPAddressRange",
 };
+LCRYPTO_ALIAS(IPAddressRange_it);
 
 static const ASN1_TEMPLATE IPAddressOrRange_ch_tt[] = {
 	{
@@ -136,6 +137,7 @@ const ASN1_ITEM IPAddressOrRange_it = {
 	.size = sizeof(IPAddressOrRange),
 	.sname = "IPAddressOrRange",
 };
+LCRYPTO_ALIAS(IPAddressOrRange_it);
 
 static const ASN1_TEMPLATE IPAddressChoice_ch_tt[] = {
 	{
@@ -163,6 +165,7 @@ const ASN1_ITEM IPAddressChoice_it = {
 	.size = sizeof(IPAddressChoice),
 	.sname = "IPAddressChoice",
 };
+LCRYPTO_ALIAS(IPAddressChoice_it);
 
 static const ASN1_TEMPLATE IPAddressFamily_seq_tt[] = {
 	{
@@ -190,6 +193,7 @@ const ASN1_ITEM IPAddressFamily_it = {
 	.size = sizeof(IPAddressFamily),
 	.sname = "IPAddressFamily",
 };
+LCRYPTO_ALIAS(IPAddressFamily_it);
 
 static const ASN1_TEMPLATE IPAddrBlocks_item_tt = {
 	.flags = ASN1_TFLG_SEQUENCE_OF,
@@ -1710,7 +1714,7 @@ v2i_IPAddrBlocks(const struct v3_ext_method *method, struct v3_ext_ctx *ctx,
 /*
  * OpenSSL dispatch
  */
-const X509V3_EXT_METHOD v3_addr = {
+static const X509V3_EXT_METHOD x509v3_ext_sbgp_ipAddrBlock = {
 	.ext_nid = NID_sbgp_ipAddrBlock,
 	.ext_flags = 0,
 	.it = &IPAddrBlocks_it,
@@ -1726,6 +1730,12 @@ const X509V3_EXT_METHOD v3_addr = {
 	.r2i = NULL,
 	.usr_data = NULL,
 };
+
+const X509V3_EXT_METHOD *
+x509v3_ext_method_sbgp_ipAddrBlock(void)
+{
+	return &x509v3_ext_sbgp_ipAddrBlock;
+}
 
 /*
  * Figure out whether extension uses inheritance.

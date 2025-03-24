@@ -62,9 +62,9 @@
  * [including the GNU Public Licence.]
  */
 
-#define NUM_NID 1055
-#define NUM_SN 1048
-#define NUM_LN 1048
+#define NUM_NID 1056
+#define NUM_SN 1049
+#define NUM_LN 1049
 #define NUM_OBJ 977
 
 static const unsigned char lvalues[6968]={
@@ -2761,6 +2761,7 @@ static const ASN1_OBJECT nid_objs[NUM_NID]={
 	&(lvalues[6948]),0},
 {"id-ct-rpkiSignedPrefixList","id-ct-rpkiSignedPrefixList",
 	NID_id_ct_rpkiSignedPrefixList,11,&(lvalues[6956]),0},
+{"TLS1-PRF","tls1-prf",NID_tls1_prf,0,NULL,0},
 };
 
 static const unsigned int sn_objs[NUM_SN]={
@@ -2980,6 +2981,7 @@ static const unsigned int sn_objs[NUM_SN]={
 100,	/* "SN" */
 16,	/* "ST" */
 143,	/* "SXNetID" */
+1055,	/* "TLS1-PRF" */
 458,	/* "UID" */
  0,	/* "UNDEF" */
 950,	/* "X25519" */
@@ -4833,6 +4835,7 @@ static const unsigned int ln_objs[NUM_LN]={
 459,	/* "textEncodedORAddress" */
 293,	/* "textNotice" */
 106,	/* "title" */
+1055,	/* "tls1-prf" */
 682,	/* "tpBasis" */
 436,	/* "ucl" */
  0,	/* "undefined" */

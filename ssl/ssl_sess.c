@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_sess.c,v 1.124 2024/01/24 14:05:10 jsing Exp $ */
+/* $OpenBSD: ssl_sess.c,v 1.128 2024/07/22 14:47:15 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -287,13 +287,7 @@ ssl_session_dup(SSL_SESSION *sess, int include_ticket)
 	copy->time = sess->time;
 	copy->references = 1;
 
-	copy->cipher = sess->cipher;
-	copy->cipher_id = sess->cipher_id;
-
-	if (sess->ciphers != NULL) {
-		if ((copy->ciphers = sk_SSL_CIPHER_dup(sess->ciphers)) == NULL)
-			goto err;
-	}
+	copy->cipher_value = sess->cipher_value;
 
 	if (sess->tlsext_hostname != NULL) {
 		copy->tlsext_hostname = strdup(sess->tlsext_hostname);
@@ -712,12 +706,6 @@ ssl_get_prev_session(SSL *s, CBS *session_id, CBS *ext_block, int *alert)
 		goto err;
 	}
 
-	if (sess->cipher == NULL) {
-		sess->cipher = ssl3_get_cipher_by_id(sess->cipher_id);
-		if (sess->cipher == NULL)
-			goto err;
-	}
-
 	if (sess->timeout < (time(NULL) - sess->time)) {
 		s->session_ctx->stats.sess_timeout++;
 		if (!ticket_decrypted) {
@@ -881,8 +869,6 @@ SSL_SESSION_free(SSL_SESSION *ss)
 
 	X509_free(ss->peer_cert);
 
-	sk_SSL_CIPHER_free(ss->ciphers);
-
 	free(ss->tlsext_hostname);
 	free(ss->tlsext_tick);
 	free(ss->tlsext_ecpointformatlist);
@@ -897,8 +883,7 @@ LSSL_ALIAS(SSL_SESSION_free);
 int
 SSL_SESSION_up_ref(SSL_SESSION *ss)
 {
-	int refs = CRYPTO_add(&ss->references, 1, CRYPTO_LOCK_SSL_SESSION);
-	return (refs > 1) ? 1 : 0;
+	return CRYPTO_add(&ss->references, 1, CRYPTO_LOCK_SSL_SESSION) > 1;
 }
 LSSL_ALIAS(SSL_SESSION_up_ref);
 
@@ -999,7 +984,7 @@ LSSL_ALIAS(SSL_SESSION_get_protocol_version);
 const SSL_CIPHER *
 SSL_SESSION_get0_cipher(const SSL_SESSION *s)
 {
-	return s->cipher;
+	return ssl3_get_cipher_by_value(s->cipher_value);
 }
 LSSL_ALIAS(SSL_SESSION_get0_cipher);
 

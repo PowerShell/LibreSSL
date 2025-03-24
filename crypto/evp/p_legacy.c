@@ -1,4 +1,4 @@
-/*	$OpenBSD: p_legacy.c,v 1.3 2024/02/18 15:44:10 tb Exp $ */
+/*	$OpenBSD: p_legacy.c,v 1.6 2024/04/09 13:52:41 beck Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -77,6 +77,7 @@ EVP_PKEY_decrypt_old(unsigned char *to, const unsigned char *from, int from_len,
 	return RSA_private_decrypt(from_len, from, to, pkey->pkey.rsa,
 	    RSA_PKCS1_PADDING);
 }
+LCRYPTO_ALIAS(EVP_PKEY_decrypt_old);
 
 int
 EVP_PKEY_encrypt_old(unsigned char *to, const unsigned char *from, int from_len,
@@ -90,6 +91,7 @@ EVP_PKEY_encrypt_old(unsigned char *to, const unsigned char *from, int from_len,
 	return RSA_public_encrypt(from_len, from, to, pkey->pkey.rsa,
 	    RSA_PKCS1_PADDING);
 }
+LCRYPTO_ALIAS(EVP_PKEY_encrypt_old);
 
 int
 EVP_OpenInit(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *type,
@@ -99,7 +101,8 @@ EVP_OpenInit(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *type,
 	int i, size = 0, ret = 0;
 
 	if (type) {
-		EVP_CIPHER_CTX_legacy_clear(ctx);
+		if (!EVP_CIPHER_CTX_reset(ctx))
+			return 0;
 		if (!EVP_DecryptInit_ex(ctx, type, NULL, NULL, NULL))
 			return 0;
 	}
@@ -134,6 +137,7 @@ err:
 	freezero(key, size);
 	return (ret);
 }
+LCRYPTO_ALIAS(EVP_OpenInit);
 
 int
 EVP_OpenFinal(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl)
@@ -145,6 +149,7 @@ EVP_OpenFinal(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl)
 		i = EVP_DecryptInit_ex(ctx, NULL, NULL, NULL, NULL);
 	return (i);
 }
+LCRYPTO_ALIAS(EVP_OpenFinal);
 
 int
 EVP_SealInit(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *type, unsigned char **ek,
@@ -154,7 +159,8 @@ EVP_SealInit(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *type, unsigned char **ek,
 	int i, iv_len;
 
 	if (type) {
-		EVP_CIPHER_CTX_legacy_clear(ctx);
+		if (!EVP_CIPHER_CTX_reset(ctx))
+			return 0;
 		if (!EVP_EncryptInit_ex(ctx, type, NULL, NULL, NULL))
 			return 0;
 	}
@@ -179,6 +185,7 @@ EVP_SealInit(EVP_CIPHER_CTX *ctx, const EVP_CIPHER *type, unsigned char **ek,
 	}
 	return (npubk);
 }
+LCRYPTO_ALIAS(EVP_SealInit);
 
 int
 EVP_SealFinal(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl)
@@ -190,3 +197,4 @@ EVP_SealFinal(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl)
 		i = EVP_EncryptInit_ex(ctx, NULL, NULL, NULL, NULL);
 	return i;
 }
+LCRYPTO_ALIAS(EVP_SealFinal);

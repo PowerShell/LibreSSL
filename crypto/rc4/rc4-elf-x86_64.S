@@ -9,10 +9,10 @@
 
 .hidden	OPENSSL_ia32cap_P
 
-.globl	RC4
-.type	RC4,@function
+.globl	rc4_internal
+.type	rc4_internal,@function
 .align	16
-RC4:
+rc4_internal:
 _CET_ENDBR
 	orq	%rsi,%rsi
 	jne	.Lentry
@@ -526,11 +526,11 @@ _CET_ENDBR
 	addq	$24,%rsp
 .Lepilogue:
 	retq
-.size	RC4,.-RC4
-.globl	RC4_set_key
-.type	RC4_set_key,@function
+.size	rc4_internal,.-rc4_internal
+.globl	rc4_set_key_internal
+.type	rc4_set_key_internal,@function
 .align	16
-RC4_set_key:
+rc4_set_key_internal:
 _CET_ENDBR
 	leaq	8(%rdi),%rdi
 	leaq	(%rdx,%rsi,1),%rdx
@@ -598,7 +598,7 @@ _CET_ENDBR
 	movl	%eax,-8(%rdi)
 	movl	%eax,-4(%rdi)
 	retq
-.size	RC4_set_key,.-RC4_set_key
+.size	rc4_set_key_internal,.-rc4_set_key_internal
 #if defined(HAVE_GNU_STACK)
 .section .note.GNU-stack,"",%progbits
 #endif

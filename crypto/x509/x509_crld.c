@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_crld.c,v 1.5 2023/02/16 08:38:17 tb Exp $ */
+/* $OpenBSD: x509_crld.c,v 1.7 2024/07/13 15:08:58 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 1999.
  */
@@ -72,7 +72,7 @@ static void *v2i_crld(const X509V3_EXT_METHOD *method,
 static int i2r_crldp(const X509V3_EXT_METHOD *method, void *pcrldp, BIO *out,
     int indent);
 
-const X509V3_EXT_METHOD v3_crld = {
+static const X509V3_EXT_METHOD x509v3_ext_crl_distribution_points = {
 	.ext_nid = NID_crl_distribution_points,
 	.ext_flags = 0,
 	.it = &CRL_DIST_POINTS_it,
@@ -89,7 +89,13 @@ const X509V3_EXT_METHOD v3_crld = {
 	.usr_data = NULL,
 };
 
-const X509V3_EXT_METHOD v3_freshest_crl = {
+const X509V3_EXT_METHOD *
+x509v3_ext_method_crl_distribution_points(void)
+{
+	return &x509v3_ext_crl_distribution_points;
+}
+
+static const X509V3_EXT_METHOD x509v3_ext_freshest_crl = {
 	.ext_nid = NID_freshest_crl,
 	.ext_flags = 0,
 	.it = &CRL_DIST_POINTS_it,
@@ -105,6 +111,12 @@ const X509V3_EXT_METHOD v3_freshest_crl = {
 	.r2i = NULL,
 	.usr_data = NULL,
 };
+
+const X509V3_EXT_METHOD *
+x509v3_ext_method_freshest_crl(void)
+{
+	return &x509v3_ext_freshest_crl;
+}
 
 static STACK_OF(GENERAL_NAME) *
 gnames_from_sectname(X509V3_CTX *ctx, char *sect)
@@ -417,6 +429,7 @@ const ASN1_ITEM DIST_POINT_NAME_it = {
 	.size = sizeof(DIST_POINT_NAME),
 	.sname = "DIST_POINT_NAME",
 };
+LCRYPTO_ALIAS(DIST_POINT_NAME_it);
 
 
 
@@ -482,6 +495,7 @@ const ASN1_ITEM DIST_POINT_it = {
 	.size = sizeof(DIST_POINT),
 	.sname = "DIST_POINT",
 };
+LCRYPTO_ALIAS(DIST_POINT_it);
 
 
 DIST_POINT *
@@ -530,6 +544,7 @@ const ASN1_ITEM CRL_DIST_POINTS_it = {
 	.size = 0,
 	.sname = "CRL_DIST_POINTS",
 };
+LCRYPTO_ALIAS(CRL_DIST_POINTS_it);
 
 
 CRL_DIST_POINTS *
@@ -615,6 +630,7 @@ const ASN1_ITEM ISSUING_DIST_POINT_it = {
 	.size = sizeof(ISSUING_DIST_POINT),
 	.sname = "ISSUING_DIST_POINT",
 };
+LCRYPTO_ALIAS(ISSUING_DIST_POINT_it);
 
 
 ISSUING_DIST_POINT *
@@ -651,16 +667,28 @@ static int i2r_idp(const X509V3_EXT_METHOD *method, void *pidp, BIO *out,
 static void *v2i_idp(const X509V3_EXT_METHOD *method, X509V3_CTX *ctx,
     STACK_OF(CONF_VALUE) *nval);
 
-const X509V3_EXT_METHOD v3_idp = {
-	NID_issuing_distribution_point, X509V3_EXT_MULTILINE,
-	&ISSUING_DIST_POINT_it,
-	0, 0, 0, 0,
-	0, 0,
-	0,
-	v2i_idp,
-	i2r_idp, 0,
-	NULL
+static const X509V3_EXT_METHOD x509v3_ext_issuing_distribution_point = {
+	.ext_nid = NID_issuing_distribution_point,
+	.ext_flags = X509V3_EXT_MULTILINE,
+	.it = &ISSUING_DIST_POINT_it,
+	.ext_new = NULL,
+	.ext_free = NULL,
+	.d2i = NULL,
+	.i2d = NULL,
+	.i2s = NULL,
+	.s2i = NULL,
+	.i2v = NULL,
+	.v2i = v2i_idp,
+	.i2r = i2r_idp,
+	.r2i = NULL,
+	.usr_data = NULL,
 };
+
+const X509V3_EXT_METHOD *
+x509v3_ext_method_issuing_distribution_point(void)
+{
+	return &x509v3_ext_issuing_distribution_point;
+}
 
 static void *
 v2i_idp(const X509V3_EXT_METHOD *method, X509V3_CTX *ctx,

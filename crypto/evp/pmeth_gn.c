@@ -1,4 +1,4 @@
-/* $OpenBSD: pmeth_gn.c,v 1.15 2024/01/01 18:33:04 tb Exp $ */
+/* $OpenBSD: pmeth_gn.c,v 1.21 2024/08/31 09:14:21 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2006.
  */
@@ -71,27 +71,23 @@
 int
 EVP_PKEY_paramgen_init(EVP_PKEY_CTX *ctx)
 {
-	int ret;
-
-	if (!ctx || !ctx->pmeth || !ctx->pmeth->paramgen) {
+	if (ctx == NULL || ctx->pmeth == NULL || ctx->pmeth->paramgen == NULL) {
 		EVPerror(EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE);
 		return -2;
 	}
+
 	ctx->operation = EVP_PKEY_OP_PARAMGEN;
-	if (!ctx->pmeth->paramgen_init)
-		return 1;
-	ret = ctx->pmeth->paramgen_init(ctx);
-	if (ret <= 0)
-		ctx->operation = EVP_PKEY_OP_UNDEFINED;
-	return ret;
+
+	return 1;
 }
+LCRYPTO_ALIAS(EVP_PKEY_paramgen_init);
 
 int
 EVP_PKEY_paramgen(EVP_PKEY_CTX *ctx, EVP_PKEY **ppkey)
 {
 	int ret;
 
-	if (!ctx || !ctx->pmeth || !ctx->pmeth->paramgen) {
+	if (ctx == NULL || ctx->pmeth == NULL || ctx->pmeth->paramgen == NULL) {
 		EVPerror(EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE);
 		return -2;
 	}
@@ -101,44 +97,43 @@ EVP_PKEY_paramgen(EVP_PKEY_CTX *ctx, EVP_PKEY **ppkey)
 		return -1;
 	}
 
-	if (!ppkey)
+	if (ppkey == NULL)
 		return -1;
 
-	if (!*ppkey)
+	if (*ppkey == NULL)
 		*ppkey = EVP_PKEY_new();
+	if (*ppkey == NULL)
+		return -1;
 
-	ret = ctx->pmeth->paramgen(ctx, *ppkey);
-	if (ret <= 0) {
+	if ((ret = ctx->pmeth->paramgen(ctx, *ppkey)) <= 0) {
 		EVP_PKEY_free(*ppkey);
 		*ppkey = NULL;
 	}
+
 	return ret;
 }
+LCRYPTO_ALIAS(EVP_PKEY_paramgen);
 
 int
 EVP_PKEY_keygen_init(EVP_PKEY_CTX *ctx)
 {
-	int ret;
-
-	if (!ctx || !ctx->pmeth || !ctx->pmeth->keygen) {
+	if (ctx == NULL || ctx->pmeth == NULL || ctx->pmeth->keygen == NULL)  {
 		EVPerror(EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE);
 		return -2;
 	}
+
 	ctx->operation = EVP_PKEY_OP_KEYGEN;
-	if (!ctx->pmeth->keygen_init)
-		return 1;
-	ret = ctx->pmeth->keygen_init(ctx);
-	if (ret <= 0)
-		ctx->operation = EVP_PKEY_OP_UNDEFINED;
-	return ret;
+
+	return 1;
 }
+LCRYPTO_ALIAS(EVP_PKEY_keygen_init);
 
 int
 EVP_PKEY_keygen(EVP_PKEY_CTX *ctx, EVP_PKEY **ppkey)
 {
 	int ret;
 
-	if (!ctx || !ctx->pmeth || !ctx->pmeth->keygen) {
+	if (ctx == NULL || ctx->pmeth == NULL || ctx->pmeth->keygen == NULL) {
 		EVPerror(EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE);
 		return -2;
 	}
@@ -147,31 +142,36 @@ EVP_PKEY_keygen(EVP_PKEY_CTX *ctx, EVP_PKEY **ppkey)
 		return -1;
 	}
 
-	if (!ppkey)
+	if (ppkey == NULL)
 		return -1;
 
-	if (!*ppkey)
+	if (*ppkey == NULL)
 		*ppkey = EVP_PKEY_new();
+	if (*ppkey == NULL)
+		return -1;
 
-	ret = ctx->pmeth->keygen(ctx, *ppkey);
-	if (ret <= 0) {
+	if ((ret = ctx->pmeth->keygen(ctx, *ppkey)) <= 0) {
 		EVP_PKEY_free(*ppkey);
 		*ppkey = NULL;
 	}
+
 	return ret;
 }
+LCRYPTO_ALIAS(EVP_PKEY_keygen);
 
 void
 EVP_PKEY_CTX_set_cb(EVP_PKEY_CTX *ctx, EVP_PKEY_gen_cb *cb)
 {
 	ctx->pkey_gencb = cb;
 }
+LCRYPTO_ALIAS(EVP_PKEY_CTX_set_cb);
 
 EVP_PKEY_gen_cb *
 EVP_PKEY_CTX_get_cb(EVP_PKEY_CTX *ctx)
 {
 	return ctx->pkey_gencb;
 }
+LCRYPTO_ALIAS(EVP_PKEY_CTX_get_cb);
 
 /* "translation callback" to call EVP_PKEY_CTX callbacks using BN_GENCB
  * style callbacks.
@@ -201,6 +201,7 @@ EVP_PKEY_CTX_get_keygen_info(EVP_PKEY_CTX *ctx, int idx)
 		return 0;
 	return ctx->keygen_info[idx];
 }
+LCRYPTO_ALIAS(EVP_PKEY_CTX_get_keygen_info);
 
 EVP_PKEY *
 EVP_PKEY_new_mac_key(int type, ENGINE *e, const unsigned char *key, int keylen)
@@ -223,66 +224,4 @@ merr:
 	EVP_PKEY_CTX_free(mac_ctx);
 	return mac_key;
 }
-
-int
-EVP_PKEY_check(EVP_PKEY_CTX *ctx)
-{
-	EVP_PKEY *pkey;
-
-	if ((pkey = ctx->pkey) == NULL) {
-		EVPerror(EVP_R_NO_KEY_SET);
-		return 0;
-	}
-
-	if (ctx->pmeth->check != NULL)
-		return ctx->pmeth->check(pkey);
-
-	if (pkey->ameth == NULL || pkey->ameth->pkey_check == NULL) {
-		EVPerror(EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE);
-		return -2;
-	}
-
-	return pkey->ameth->pkey_check(pkey);
-}
-
-int
-EVP_PKEY_public_check(EVP_PKEY_CTX *ctx)
-{
-	EVP_PKEY *pkey;
-
-	if ((pkey = ctx->pkey) == NULL) {
-		EVPerror(EVP_R_NO_KEY_SET);
-		return 0;
-	}
-
-	if (ctx->pmeth->public_check != NULL)
-		return ctx->pmeth->public_check(pkey);
-
-	if (pkey->ameth == NULL || pkey->ameth->pkey_public_check == NULL) {
-		EVPerror(EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE);
-		return -2;
-	}
-
-	return pkey->ameth->pkey_public_check(pkey);
-}
-
-int
-EVP_PKEY_param_check(EVP_PKEY_CTX *ctx)
-{
-	EVP_PKEY *pkey;
-
-	if ((pkey = ctx->pkey) == NULL) {
-		EVPerror(EVP_R_NO_KEY_SET);
-		return 0;
-	}
-
-	if (ctx->pmeth->param_check != NULL)
-		return ctx->pmeth->param_check(pkey);
-
-	if (pkey->ameth == NULL || pkey->ameth->pkey_param_check == NULL) {
-		EVPerror(EVP_R_OPERATION_NOT_SUPPORTED_FOR_THIS_KEYTYPE);
-		return -2;
-	}
-
-	return pkey->ameth->pkey_param_check(pkey);
-}
+LCRYPTO_ALIAS(EVP_PKEY_new_mac_key);

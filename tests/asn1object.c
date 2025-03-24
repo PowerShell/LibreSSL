@@ -1,4 +1,4 @@
-/* $OpenBSD: asn1object.c,v 1.10 2022/11/26 16:08:56 tb Exp $ */
+/* $OpenBSD: asn1object.c,v 1.14 2024/05/29 17:23:05 tb Exp $ */
 /*
  * Copyright (c) 2017, 2021, 2022 Joel Sing <jsing@openbsd.org>
  *
@@ -17,6 +17,7 @@
 
 #include <openssl/asn1.h>
 #include <openssl/err.h>
+#include <openssl/objects.h>
 
 #include <err.h>
 #include <stdio.h>
@@ -25,9 +26,14 @@
 #include "asn1_local.h"
 
 static void
-hexdump(const unsigned char *buf, size_t len)
+hexdump(const unsigned char *buf, int len)
 {
-	size_t i;
+	int i;
+
+	if (len <= 0) {
+		fprintf(stderr, "<negative length %d>\n", len);
+		return;
+	}
 
 	for (i = 1; i <= len; i++)
 		fprintf(stderr, " 0x%02hhx,%s", buf[i - 1], i % 8 ? "" : "\n");
@@ -223,6 +229,7 @@ do_asn1_object_test(struct asn1_object_test *aot)
 	ASN1_OBJECT *aobj = NULL;
 	uint8_t buf[1024];
 	const uint8_t *p;
+	uint8_t *der = NULL;
 	uint8_t *q;
 	int err, ret;
 	int failed = 1;
@@ -268,6 +275,15 @@ do_asn1_object_test(struct asn1_object_test *aot)
 	    aot->der_len))
 		goto failed;
 
+	der = NULL;
+	ret = i2d_ASN1_OBJECT(aobj, &der);
+	if (!asn1_compare_bytes("ASN1_OBJECT DER", der, ret, aot->der,
+	    aot->der_len))
+		goto failed;
+
+	free(der);
+	der = NULL;
+
 	ASN1_OBJECT_free(aobj);
 	aobj = NULL;
 
@@ -300,6 +316,7 @@ do_asn1_object_test(struct asn1_object_test *aot)
 
  failed:
 	ASN1_OBJECT_free(aobj);
+	free(der);
 
 	return failed;
 }
@@ -332,7 +349,7 @@ asn1_object_bad_content_test(void)
 	int failed = 1;
 
 	p = asn1_object_bad_content1;
-	len = sizeof(asn1_object_bad_content1); 
+	len = sizeof(asn1_object_bad_content1);
 	if ((aobj = c2i_ASN1_OBJECT(NULL, &p, len)) != NULL) {
 		fprintf(stderr, "FAIL: c2i_ASN1_OBJECT() succeeded with bad "
 		    "content 1\n");
@@ -340,7 +357,7 @@ asn1_object_bad_content_test(void)
 	}
 
 	p = asn1_object_bad_content2;
-	len = sizeof(asn1_object_bad_content2); 
+	len = sizeof(asn1_object_bad_content2);
 	if ((aobj = c2i_ASN1_OBJECT(NULL, &p, len)) != NULL) {
 		fprintf(stderr, "FAIL: c2i_ASN1_OBJECT() succeeded with bad "
 		    "content 2\n");
@@ -455,11 +472,10 @@ asn1_object_large_oid_test(void)
 	ASN1_OBJECT *aobj = NULL;
 	uint8_t buf[1024];
 	const uint8_t *p;
+	uint8_t *der = NULL;
 	uint8_t *q;
 	int ret;
 	int failed = 1;
-
-	failed = 0;
 
 	p = asn1_large_oid_der;
 	aobj = d2i_ASN1_OBJECT(NULL, &p, sizeof(asn1_large_oid_der));
@@ -474,6 +490,52 @@ asn1_object_large_oid_test(void)
 	if (!asn1_compare_bytes("ASN1_OBJECT DER", buf, ret, asn1_large_oid_der,
 	    sizeof(asn1_large_oid_der)))
 		goto failed;
+
+	der = NULL;
+	ret = i2d_ASN1_OBJECT(aobj, &der);
+	if (!asn1_compare_bytes("ASN1_OBJECT DER", der, ret, asn1_large_oid_der,
+	    sizeof(asn1_large_oid_der)))
+		goto failed;
+
+	failed = 0;
+
+ failed:
+	ASN1_OBJECT_free(aobj);
+	free(der);
+
+	return failed;
+}
+
+static int
+asn1_object_i2d_errors(void)
+{
+	ASN1_OBJECT *aobj = NULL;
+	int ret;
+	int failed = 1;
+
+	if ((ret = i2d_ASN1_OBJECT(NULL, NULL)) > 0) {
+		fprintf(stderr, "FAIL: i2d_ASN1_OBJECT(NULL, NULL) returned %d, "
+		    "want <= 0\n", ret);
+		goto failed;
+	}
+
+	if ((aobj = OBJ_nid2obj(NID_undef)) == NULL) {
+		fprintf(stderr, "FAIL: OBJ_nid2obj() failed\n");
+		goto failed;
+	}
+
+	if (OBJ_get0_data(aobj) != NULL) {
+		fprintf(stderr, "FAIL: undefined obj didn't have NULL data\n");
+		goto failed;
+	}
+
+	if ((ret = i2d_ASN1_OBJECT(aobj, NULL)) > 0) {
+		fprintf(stderr, "FAIL: i2d_ASN1_OBJECT() succeeded on undefined "
+		    "object\n");
+		goto failed;
+	}
+
+	failed = 0;
 
  failed:
 	ASN1_OBJECT_free(aobj);
@@ -490,6 +552,7 @@ main(int argc, char **argv)
 	failed |= asn1_object_bad_content_test();
 	failed |= asn1_object_txt_test();
 	failed |= asn1_object_large_oid_test();
+	failed |= asn1_object_i2d_errors();
 
 	return (failed);
 }

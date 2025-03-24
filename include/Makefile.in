@@ -351,15 +351,15 @@ SUBDIRS = openssl
 noinst_HEADERS = pqueue.h compat/dirent.h compat/dirent_msvc.h \
 	compat/endian.h compat/err.h compat/fcntl.h compat/getopt.h \
 	compat/limits.h compat/netdb.h compat/poll.h compat/pthread.h \
-	compat/readpassphrase.h compat/resolv.h compat/stdio.h \
-	compat/stdlib.h compat/string.h compat/syslog.h compat/time.h \
-	compat/unistd.h compat/win32netcompat.h compat/arpa/inet.h \
-	compat/arpa/nameser.h compat/netinet/in.h compat/netinet/ip.h \
-	compat/netinet/tcp.h compat/sys/_null.h compat/sys/ioctl.h \
-	compat/sys/mman.h compat/sys/param.h compat/sys/queue.h \
-	compat/sys/select.h compat/sys/socket.h compat/sys/stat.h \
-	compat/sys/tree.h compat/sys/time.h compat/sys/types.h \
-	compat/sys/uio.h arch/aarch64/opensslconf.h \
+	compat/readpassphrase.h compat/resolv.h compat/stdint.h \
+	compat/stdio.h compat/stdlib.h compat/string.h compat/syslog.h \
+	compat/time.h compat/unistd.h compat/win32netcompat.h \
+	compat/arpa/inet.h compat/arpa/nameser.h compat/netinet/in.h \
+	compat/netinet/ip.h compat/netinet/tcp.h compat/sys/_null.h \
+	compat/sys/ioctl.h compat/sys/mman.h compat/sys/param.h \
+	compat/sys/queue.h compat/sys/select.h compat/sys/socket.h \
+	compat/sys/stat.h compat/sys/tree.h compat/sys/time.h \
+	compat/sys/types.h compat/sys/uio.h arch/aarch64/opensslconf.h \
 	arch/alpha/opensslconf.h arch/amd64/opensslconf.h \
 	arch/arm/opensslconf.h arch/hppa/opensslconf.h \
 	arch/i386/opensslconf.h arch/m88k/opensslconf.h \

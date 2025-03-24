@@ -58,16 +58,16 @@ endif()
 
 export_symbol(tls ${CMAKE_CURRENT_BINARY_DIR}/tls.sym)
 target_link_libraries(tls ${OPENSSL_LIBS})
-if (WIN32)
-	set(TLS_POSTFIX -${TLS_MAJOR_VERSION} PARENT_SCOPE)
-endif()
 set_target_properties(tls PROPERTIES
-	OUTPUT_NAME tls${TLS_POSTFIX}
-	ARCHIVE_OUTPUT_NAME tls${TLS_POSTFIX}
+	OUTPUT_NAME tls
+	ARCHIVE_OUTPUT_NAME tls
 	EXPORT_NAME TLS
 	VERSION ${TLS_VERSION}
 	SOVERSION ${TLS_MAJOR_VERSION}
 )
+if(NOT CMAKE_VERSION VERSION_LESS 3.27.0)
+	set_target_properties(tls PROPERTIES DLL_NAME_WITH_SOVERSION TRUE)
+endif()
 
 target_include_directories(
 	tls

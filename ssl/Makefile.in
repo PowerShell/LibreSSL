@@ -91,6 +91,19 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 @ENABLE_LIBTLS_ONLY_TRUE@am__append_1 = libssl.la
+
+# arch
+@HOST_AARCH64_TRUE@am__append_2 = -I$(top_srcdir)/crypto/arch/aarch64/
+@HOST_ARM_TRUE@am__append_3 = -I$(top_srcdir)/crypto/arch/arm/
+@HOST_I386_TRUE@am__append_4 = -I$(top_srcdir)/crypto/arch/i386/
+
+# XXX - do we still need this?
+@HOST_MIPS64_TRUE@am__append_5 = -I$(top_srcdir)/crypto/arch/mips64/
+@HOST_POWERPC_TRUE@am__append_6 = -I$(top_srcdir)/crypto/arch/powerpc/
+@HOST_POWERPC64_TRUE@am__append_7 = -I$(top_srcdir)/crypto/arch/powerpc64/
+@HOST_RISCV64_TRUE@am__append_8 = -I$(top_srcdir)/crypto/arch/riscv64/
+@HOST_SPARC64_TRUE@am__append_9 = -I$(top_srcdir)/crypto/arch/sparc64/
+@HOST_X86_64_TRUE@am__append_10 = -I$(top_srcdir)/crypto/arch/amd64/
 subdir = ssl
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/ax_add_fortify_source.m4 \
@@ -424,14 +437,17 @@ AM_CFLAGS =
 AM_CPPFLAGS = -I$(top_srcdir)/include -I$(abs_top_builddir)/include \
 	-I$(top_srcdir)/include/compat -DLIBRESSL_INTERNAL \
 	-D__BEGIN_HIDDEN_DECLS= -D__END_HIDDEN_DECLS= \
-	-I$(top_srcdir)/crypto/bio
+	-I$(top_srcdir)/crypto -I$(top_srcdir)/crypto/bio
 noinst_LTLIBRARIES = libbs.la $(am__append_1)
 @ENABLE_LIBTLS_ONLY_FALSE@lib_LTLIBRARIES = libssl.la
 noinst_DATA = remove_bs_objects
 EXTRA_DIST = VERSION CMakeLists.txt ssl.sym empty.c
 CLEANFILES = libssl_la_objects.mk
 EXTRA_libssl_la_DEPENDENCIES = libssl_la_objects.mk
-libssl_la_CPPFLAGS = -I$(top_srcdir)/ssl/hidden ${AM_CPPFLAGS}
+libssl_la_CPPFLAGS = -I$(top_srcdir)/ssl/hidden ${AM_CPPFLAGS} \
+	$(am__append_2) $(am__append_3) $(am__append_4) \
+	$(am__append_5) $(am__append_6) $(am__append_7) \
+	$(am__append_8) $(am__append_9) $(am__append_10)
 libssl_la_LDFLAGS = -version-info @LIBSSL_VERSION@ -no-undefined -export-symbols $(top_srcdir)/ssl/ssl.sym
 libssl_la_LIBADD = $(abs_top_builddir)/crypto/libcrypto.la \
 	$(PLATFORM_LDADD) $(libcompat_la_objects) \
@@ -442,7 +458,15 @@ noinst_HEADERS = bytestring.h hidden/ssl_namespace.h \
 	hidden/openssl/ssl.h srtp.h dtls_local.h ssl_local.h \
 	ssl_sigalgs.h ssl_tlsext.h tls_content.h tls_internal.h \
 	tls12_internal.h tls13_internal.h tls13_handshake.h \
-	tls13_record.h
+	tls13_record.h $(top_srcdir)/crypto/arch/aarch64/crypto_arch.h \
+	$(top_srcdir)/crypto/arch/arm/crypto_arch.h \
+	$(top_srcdir)/crypto/arch/i386/crypto_arch.h \
+	$(top_srcdir)/crypto/arch/mips64/crypto_arch.h \
+	$(top_srcdir)/crypto/arch/powerpc/crypto_arch.h \
+	$(top_srcdir)/crypto/arch/powerpc64/crypto_arch.h \
+	$(top_srcdir)/crypto/arch/riscv64/crypto_arch.h \
+	$(top_srcdir)/crypto/arch/sparc64/crypto_arch.h \
+	$(top_srcdir)/crypto/arch/amd64/crypto_arch.h
 libssl_la_SOURCES = bio_ssl.c d1_both.c d1_lib.c d1_pkt.c d1_srtp.c \
 	pqueue.c s3_cbc.c s3_lib.c ssl_asn1.c ssl_both.c ssl_cert.c \
 	ssl_ciph.c ssl_ciphers.c ssl_clnt.c ssl_err.c ssl_init.c \

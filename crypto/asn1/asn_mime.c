@@ -1,4 +1,4 @@
-/* $OpenBSD: asn_mime.c,v 1.32 2023/07/05 21:23:36 beck Exp $ */
+/* $OpenBSD: asn_mime.c,v 1.34 2024/03/29 04:35:42 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project.
  */
@@ -110,7 +110,6 @@ static MIME_PARAM *mime_param_find(MIME_HEADER *hdr, char *name);
 static void mime_hdr_free(MIME_HEADER *hdr);
 
 #define MAX_SMLEN 1024
-#define mime_debug(x) /* x */
 
 /* Output an ASN1 structure in BER format streaming if necessary */
 
@@ -118,29 +117,30 @@ int
 i2d_ASN1_bio_stream(BIO *out, ASN1_VALUE *val, BIO *in, int flags,
     const ASN1_ITEM *it)
 {
-	/* If streaming create stream BIO and copy all content through it */
-	if (flags & SMIME_STREAM) {
-		BIO *bio, *tbio;
-		bio = BIO_new_NDEF(out, val, it);
-		if (!bio) {
-			ASN1error(ERR_R_MALLOC_FAILURE);
-			return 0;
-		}
-		SMIME_crlf_copy(in, bio, flags);
-		(void)BIO_flush(bio);
-		/* Free up successive BIOs until we hit the old output BIO */
-		do {
-			tbio = BIO_pop(bio);
-			BIO_free(bio);
-			bio = tbio;
-		} while (bio != out);
+	BIO *bio, *tbio;
+	int ret;
+
+	/* Without streaming, write out the ASN.1 structure's content. */
+	if ((flags & SMIME_STREAM) == 0)
+		return ASN1_item_i2d_bio(it, out, val);
+
+	/* If streaming, create a stream BIO and copy all content through it. */
+	if ((bio = BIO_new_NDEF(out, val, it)) == NULL) {
+		ASN1error(ERR_R_MALLOC_FAILURE);
+		return 0;
 	}
-	/* else just write out ASN1 structure which will have all content
-	 * stored internally
-	 */
-	else
-		ASN1_item_i2d_bio(it, out, val);
-	return 1;
+
+	ret = SMIME_crlf_copy(in, bio, flags);
+	(void)BIO_flush(bio);
+
+	/* Free up successive BIOs until we hit the old output BIO. */
+	do {
+		tbio = BIO_pop(bio);
+		BIO_free(bio);
+		bio = tbio;
+	} while (bio != out);
+
+	return ret;
 }
 
 /* Base 64 read and write of ASN1 structure */
@@ -706,7 +706,6 @@ mime_parse_hdr(BIO *bio)
 
 			case MIME_TYPE:
 				if (c == ';') {
-					mime_debug("Found End Value\n");
 					*p = 0;
 					mhdr = mime_hdr_new(ntmp,
 					    strip_ends(q));
@@ -748,7 +747,6 @@ mime_parse_hdr(BIO *bio)
 					ntmp = NULL;
 					q = p + 1;
 				} else if (c == '"') {
-					mime_debug("Found Quote\n");
 					state = MIME_QUOTE;
 				} else if (c == '(') {
 					save_state = state;
@@ -758,7 +756,6 @@ mime_parse_hdr(BIO *bio)
 
 			case MIME_QUOTE:
 				if (c == '"') {
-					mime_debug("Found Match Quote\n");
 					state = MIME_VALUE;
 				}
 				break;

@@ -1,4 +1,4 @@
-/* $OpenBSD: err.h,v 1.5 2024/03/02 10:30:48 tb Exp $ */
+/* $OpenBSD: err.h,v 1.7 2024/08/31 10:09:15 tb Exp $ */
 /*
  * Copyright (c) 2023 Bob Beck <beck@openbsd.org>
  *
