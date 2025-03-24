@@ -1,4 +1,4 @@
-/* $OpenBSD: dsa_asn1.c,v 1.31 2023/07/08 14:28:15 beck Exp $ */
+/* $OpenBSD: dsa_asn1.c,v 1.33 2024/07/08 17:11:05 beck Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2000.
  */
@@ -109,7 +109,7 @@ static const ASN1_TEMPLATE DSA_SIG_seq_tt[] = {
 	},
 };
 
-const ASN1_ITEM DSA_SIG_it = {
+static const ASN1_ITEM DSA_SIG_it = {
 	.itype = ASN1_ITYPE_SEQUENCE,
 	.utype = V_ASN1_SEQUENCE,
 	.templates = DSA_SIG_seq_tt,
@@ -239,6 +239,7 @@ const ASN1_ITEM DSAPrivateKey_it = {
 	.size = sizeof(DSA),
 	.sname = "DSA",
 };
+LCRYPTO_ALIAS(DSAPrivateKey_it);
 
 
 DSA *
@@ -297,6 +298,7 @@ const ASN1_ITEM DSAparams_it = {
 	.size = sizeof(DSA),
 	.sname = "DSA",
 };
+LCRYPTO_ALIAS(DSAparams_it);
 
 
 DSA *
@@ -390,6 +392,7 @@ const ASN1_ITEM DSAPublicKey_it = {
 	.size = sizeof(DSA),
 	.sname = "DSA",
 };
+LCRYPTO_ALIAS(DSAPublicKey_it);
 
 DSA *
 d2i_DSAPublicKey(DSA **a, const unsigned char **in, long len)

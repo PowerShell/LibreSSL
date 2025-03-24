@@ -73,18 +73,7 @@ OPTION	DOTNAME
 
 
 ; 9 "crypto/cpuid-masm-x86_64.S.tmp" 2
-EXTERN	OPENSSL_cpuid_setup:NEAR
-
-.CRT$XCU	SEGMENT READONLY ALIGN(8)
-
-		DQ	OPENSSL_cpuid_setup
-
-EXTERN	OPENSSL_ia32cap_P:NEAR
-
-
-.CRT$XCU	ENDS
 .text$	SEGMENT ALIGN(64) 'CODE'
-
 PUBLIC	OPENSSL_ia32_cpuid
 
 ALIGN	16

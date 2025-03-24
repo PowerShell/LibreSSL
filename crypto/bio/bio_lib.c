@@ -1,4 +1,4 @@
-/* $OpenBSD: bio_lib.c,v 1.52 2024/03/02 09:22:41 tb Exp $ */
+/* $OpenBSD: bio_lib.c,v 1.54 2024/07/09 06:14:59 beck Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -198,8 +198,7 @@ LCRYPTO_ALIAS(BIO_vfree);
 int
 BIO_up_ref(BIO *bio)
 {
-	int refs = CRYPTO_add(&bio->references, 1, CRYPTO_LOCK_BIO);
-	return (refs > 1) ? 1 : 0;
+	return CRYPTO_add(&bio->references, 1, CRYPTO_LOCK_BIO) > 1;
 }
 LCRYPTO_ALIAS(BIO_up_ref);
 
@@ -852,6 +851,7 @@ BIO_get_ex_new_index(long argl, void *argp, CRYPTO_EX_new *new_func,
 	return CRYPTO_get_ex_new_index(CRYPTO_EX_INDEX_BIO, argl, argp,
 	    new_func, dup_func, free_func);
 }
+LCRYPTO_ALIAS(BIO_get_ex_new_index);
 
 int
 BIO_set_ex_data(BIO *bio, int idx, void *data)

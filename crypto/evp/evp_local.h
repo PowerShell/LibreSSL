@@ -1,4 +1,4 @@
-/* $OpenBSD: evp_local.h,v 1.19 2024/03/02 10:20:27 tb Exp $ */
+/* $OpenBSD: evp_local.h,v 1.25 2024/08/29 16:58:19 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2000.
  */
@@ -112,6 +112,9 @@ struct evp_pkey_asn1_method_st {
 	int (*pkey_bits)(const EVP_PKEY *pk);
 	int (*pkey_security_bits)(const EVP_PKEY *pk);
 
+	int (*signature_info)(const X509_ALGOR *sig_alg, int *out_md_nid,
+	    int *out_pkey_nid, int *out_security_bits, uint32_t *out_flags);
+
 	int (*param_decode)(EVP_PKEY *pkey, const unsigned char **pder,
 	    int derlen);
 	int (*param_encode)(const EVP_PKEY *pkey, unsigned char **pder);
@@ -136,10 +139,6 @@ struct evp_pkey_asn1_method_st {
 	    X509_ALGOR *a, ASN1_BIT_STRING *sig, EVP_PKEY *pkey);
 	int (*item_sign)(EVP_MD_CTX *ctx, const ASN1_ITEM *it, void *asn,
 	    X509_ALGOR *alg1, X509_ALGOR *alg2, ASN1_BIT_STRING *sig);
-
-	int (*pkey_check)(const EVP_PKEY *pk);
-	int (*pkey_public_check)(const EVP_PKEY *pk);
-	int (*pkey_param_check)(const EVP_PKEY *pk);
 
 	int (*set_priv_key)(EVP_PKEY *pk, const unsigned char *private_key,
 	    size_t len);
@@ -173,12 +172,8 @@ struct evp_pkey_st {
 		struct ec_key_st *ec;	/* ECC */
 		struct ecx_key_st *ecx;	/* ECX */
 #endif
-#ifndef OPENSSL_NO_GOST
-		struct gost_key_st *gost; /* GOST */
-#endif
 	} pkey;
 	int save_parameters;
-	STACK_OF(X509_ATTRIBUTE) *attributes; /* [ 0 ] */
 } /* EVP_PKEY */;
 
 struct evp_md_st {
@@ -286,10 +281,8 @@ struct evp_pkey_method_st {
 	int (*copy)(EVP_PKEY_CTX *dst, EVP_PKEY_CTX *src);
 	void (*cleanup)(EVP_PKEY_CTX *ctx);
 
-	int (*paramgen_init)(EVP_PKEY_CTX *ctx);
 	int (*paramgen)(EVP_PKEY_CTX *ctx, EVP_PKEY *pkey);
 
-	int (*keygen_init)(EVP_PKEY_CTX *ctx);
 	int (*keygen)(EVP_PKEY_CTX *ctx, EVP_PKEY *pkey);
 
 	int (*sign_init)(EVP_PKEY_CTX *ctx);
@@ -301,7 +294,6 @@ struct evp_pkey_method_st {
 	    const unsigned char *sig, size_t siglen,
 	    const unsigned char *tbs, size_t tbslen);
 
-	int (*verify_recover_init)(EVP_PKEY_CTX *ctx);
 	int (*verify_recover)(EVP_PKEY_CTX *ctx,
 	    unsigned char *rout, size_t *routlen,
 	    const unsigned char *sig, size_t siglen);
@@ -310,15 +302,9 @@ struct evp_pkey_method_st {
 	int (*signctx)(EVP_PKEY_CTX *ctx, unsigned char *sig, size_t *siglen,
 	    EVP_MD_CTX *mctx);
 
-	int (*verifyctx_init)(EVP_PKEY_CTX *ctx, EVP_MD_CTX *mctx);
-	int (*verifyctx)(EVP_PKEY_CTX *ctx, const unsigned char *sig,
-	    int siglen, EVP_MD_CTX *mctx);
-
-	int (*encrypt_init)(EVP_PKEY_CTX *ctx);
 	int (*encrypt)(EVP_PKEY_CTX *ctx, unsigned char *out, size_t *outlen,
 	    const unsigned char *in, size_t inlen);
 
-	int (*decrypt_init)(EVP_PKEY_CTX *ctx);
 	int (*decrypt)(EVP_PKEY_CTX *ctx, unsigned char *out, size_t *outlen,
 	    const unsigned char *in, size_t inlen);
 
@@ -332,10 +318,6 @@ struct evp_pkey_method_st {
 	    const unsigned char *tbs, size_t tbslen);
 	int (*digestverify) (EVP_MD_CTX *ctx, const unsigned char *sig,
 	    size_t siglen, const unsigned char *tbs, size_t tbslen);
-
-	int (*check)(EVP_PKEY *pkey);
-	int (*public_check)(EVP_PKEY *pkey);
-	int (*param_check)(EVP_PKEY *pkey);
 } /* EVP_PKEY_METHOD */;
 
 void evp_pkey_set_cb_translate(BN_GENCB *cb, EVP_PKEY_CTX *ctx);

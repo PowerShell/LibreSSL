@@ -1,4 +1,4 @@
-/* $OpenBSD: chacha-merged.c,v 1.11 2023/07/07 19:37:53 beck Exp $ */
+/* $OpenBSD: chacha-merged.c,v 1.13 2024/06/05 19:43:06 tb Exp $ */
 /*
 chacha-merged.c version 20080118
 D. J. Bernstein

@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_bitst.c,v 1.4 2023/04/21 06:11:56 tb Exp $ */
+/* $OpenBSD: x509_bitst.c,v 1.8 2024/08/31 10:23:13 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 1999.
  */
@@ -63,7 +63,9 @@
 #include <openssl/err.h>
 #include <openssl/x509v3.h>
 
-static BIT_STRING_BITNAME ns_cert_type_table[] = {
+#include "x509_local.h"
+
+static const BIT_STRING_BITNAME ns_cert_type_table[] = {
 	{0, "SSL Client", "client"},
 	{1, "SSL Server", "server"},
 	{2, "S/MIME", "email"},
@@ -75,7 +77,7 @@ static BIT_STRING_BITNAME ns_cert_type_table[] = {
 	{-1, NULL, NULL}
 };
 
-static BIT_STRING_BITNAME key_usage_type_table[] = {
+static const BIT_STRING_BITNAME key_usage_type_table[] = {
 	{0, "Digital Signature", "digitalSignature"},
 	{1, "Non Repudiation", "nonRepudiation"},
 	{2, "Key Encipherment", "keyEncipherment"},
@@ -88,7 +90,7 @@ static BIT_STRING_BITNAME key_usage_type_table[] = {
 	{-1, NULL, NULL}
 };
 
-static BIT_STRING_BITNAME crl_reasons[] = {
+static const BIT_STRING_BITNAME crl_reasons[] = {
 	{CRL_REASON_UNSPECIFIED,	 "Unspecified", "unspecified"},
 	{CRL_REASON_KEY_COMPROMISE,	 "Key Compromise", "keyCompromise"},
 	{CRL_REASON_CA_COMPROMISE,	 "CA Compromise", "CACompromise"},
@@ -102,7 +104,7 @@ static BIT_STRING_BITNAME crl_reasons[] = {
 	{-1, NULL, NULL}
 };
 
-const X509V3_EXT_METHOD v3_nscert = {
+static const X509V3_EXT_METHOD x509v3_ext_netscape_cert_type = {
 	.ext_nid = NID_netscape_cert_type,
 	.ext_flags = 0,
 	.it = &ASN1_BIT_STRING_it,
@@ -119,7 +121,13 @@ const X509V3_EXT_METHOD v3_nscert = {
 	.usr_data = ns_cert_type_table,
 };
 
-const X509V3_EXT_METHOD v3_key_usage = {
+const X509V3_EXT_METHOD *
+x509v3_ext_method_netscape_cert_type(void)
+{
+	return &x509v3_ext_netscape_cert_type;
+}
+
+static const X509V3_EXT_METHOD x509v3_ext_key_usage = {
 	.ext_nid = NID_key_usage,
 	.ext_flags = 0,
 	.it = &ASN1_BIT_STRING_it,
@@ -136,7 +144,13 @@ const X509V3_EXT_METHOD v3_key_usage = {
 	.usr_data = key_usage_type_table,
 };
 
-const X509V3_EXT_METHOD v3_crl_reason = {
+const X509V3_EXT_METHOD *
+x509v3_ext_method_key_usage(void)
+{
+	return &x509v3_ext_key_usage;
+}
+
+static const X509V3_EXT_METHOD x509v3_ext_crl_reason = {
 	.ext_nid = NID_crl_reason,
 	.ext_flags = 0,
 	.it = &ASN1_ENUMERATED_it,
@@ -153,11 +167,17 @@ const X509V3_EXT_METHOD v3_crl_reason = {
 	.usr_data = crl_reasons,
 };
 
+const X509V3_EXT_METHOD *
+x509v3_ext_method_crl_reason(void)
+{
+	return &x509v3_ext_crl_reason;
+}
+
 STACK_OF(CONF_VALUE) *
 i2v_ASN1_BIT_STRING(X509V3_EXT_METHOD *method, ASN1_BIT_STRING *bits,
     STACK_OF(CONF_VALUE) *ret)
 {
-	BIT_STRING_BITNAME *bnam;
+	const BIT_STRING_BITNAME *bnam;
 	STACK_OF(CONF_VALUE) *free_ret = NULL;
 
 	if (ret == NULL) {
@@ -188,7 +208,7 @@ v2i_ASN1_BIT_STRING(X509V3_EXT_METHOD *method, X509V3_CTX *ctx,
 	CONF_VALUE *val;
 	ASN1_BIT_STRING *bs;
 	int i;
-	BIT_STRING_BITNAME *bnam;
+	const BIT_STRING_BITNAME *bnam;
 
 	if (!(bs = ASN1_BIT_STRING_new())) {
 		X509V3error(ERR_R_MALLOC_FAILURE);

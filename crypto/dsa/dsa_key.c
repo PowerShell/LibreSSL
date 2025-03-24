@@ -1,4 +1,4 @@
-/* $OpenBSD: dsa_key.c,v 1.35 2023/08/03 18:53:55 tb Exp $ */
+/* $OpenBSD: dsa_key.c,v 1.37 2024/05/11 06:43:50 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -69,19 +69,8 @@
 #include "bn_local.h"
 #include "dsa_local.h"
 
-static int dsa_builtin_keygen(DSA *dsa);
-
 int
 DSA_generate_key(DSA *dsa)
-{
-	if (dsa->meth->dsa_keygen)
-		return dsa->meth->dsa_keygen(dsa);
-	return dsa_builtin_keygen(dsa);
-}
-LCRYPTO_ALIAS(DSA_generate_key);
-
-static int
-dsa_builtin_keygen(DSA *dsa)
 {
 	BIGNUM *pub_key = NULL, *priv_key = NULL;
 	BN_CTX *ctx = NULL;
@@ -117,4 +106,6 @@ dsa_builtin_keygen(DSA *dsa)
 
 	return ok;
 }
+LCRYPTO_ALIAS(DSA_generate_key);
+
 #endif

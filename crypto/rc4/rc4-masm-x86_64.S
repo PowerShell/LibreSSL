@@ -77,14 +77,14 @@ OPTION	DOTNAME
 EXTERN	OPENSSL_ia32cap_P:NEAR
 
 
-PUBLIC	RC4
+PUBLIC	rc4_internal
 
 ALIGN	16
-RC4	PROC PUBLIC
+rc4_internal	PROC PUBLIC
 	mov	QWORD PTR[8+rsp],rdi	;WIN64 prologue
 	mov	QWORD PTR[16+rsp],rsi
 	mov	rax,rsp
-$L$SEH_begin_RC4::
+$L$SEH_begin_rc4_internal::
 	mov	rdi,rcx
 	mov	rsi,rdx
 	mov	rdx,r8
@@ -608,16 +608,16 @@ $L$epilogue::
 	mov	rdi,QWORD PTR[8+rsp]	;WIN64 epilogue
 	mov	rsi,QWORD PTR[16+rsp]
 	DB	0F3h,0C3h		;repret
-$L$SEH_end_RC4::
-RC4	ENDP
-PUBLIC	RC4_set_key
+$L$SEH_end_rc4_internal::
+rc4_internal	ENDP
+PUBLIC	rc4_set_key_internal
 
 ALIGN	16
-RC4_set_key	PROC PUBLIC
+rc4_set_key_internal	PROC PUBLIC
 	mov	QWORD PTR[8+rsp],rdi	;WIN64 prologue
 	mov	QWORD PTR[16+rsp],rsi
 	mov	rax,rsp
-$L$SEH_begin_RC4_set_key::
+$L$SEH_begin_rc4_set_key_internal::
 	mov	rdi,rcx
 	mov	rsi,rdx
 	mov	rdx,r8
@@ -692,8 +692,8 @@ $L$exit_key::
 	mov	rdi,QWORD PTR[8+rsp]	;WIN64 epilogue
 	mov	rsi,QWORD PTR[16+rsp]
 	DB	0F3h,0C3h		;repret
-$L$SEH_end_RC4_set_key::
-RC4_set_key	ENDP
+$L$SEH_end_rc4_set_key_internal::
+rc4_set_key_internal	ENDP
 
 .text$	ENDS
 END

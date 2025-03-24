@@ -1,4 +1,4 @@
-/* $OpenBSD: obj_dat.c,v 1.89 2024/03/02 11:11:11 tb Exp $ */
+/* $OpenBSD: obj_dat.c,v 1.91 2024/07/14 14:32:45 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -71,7 +71,6 @@
 #include <openssl/objects.h>
 
 #include "asn1_local.h"
-#include "lhash_local.h"
 
 /* obj_dat.h is generated from objects.h by obj_dat.pl */
 #include "obj_dat.h"
@@ -167,7 +166,8 @@ cleanup1_doall(ADDED_OBJ *a)
 	    ASN1_OBJECT_FLAG_DYNAMIC_DATA;
 }
 
-static void cleanup2_doall(ADDED_OBJ *a)
+static void
+cleanup2_doall(ADDED_OBJ *a)
 {
 	a->obj->nid++;
 }

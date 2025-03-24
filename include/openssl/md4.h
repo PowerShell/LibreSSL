@@ -1,4 +1,4 @@
-/* $OpenBSD: md4.h,v 1.17 2023/07/08 06:47:26 jsing Exp $ */
+/* $OpenBSD: md4.h,v 1.21 2024/06/01 18:42:49 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -61,6 +61,10 @@
 #ifndef HEADER_MD4_H
 #define HEADER_MD4_H
 
+#if !defined(HAVE_ATTRIBUTE__BOUNDED__) && !defined(__OpenBSD__)
+#define __bounded__(x, y, z)
+#endif
+
 #include <openssl/opensslconf.h>
 
 #ifdef  __cplusplus
@@ -91,9 +95,12 @@ typedef struct MD4state_st {
 } MD4_CTX;
 
 int MD4_Init(MD4_CTX *c);
-int MD4_Update(MD4_CTX *c, const void *data, size_t len);
+int MD4_Update(MD4_CTX *c, const void *data, size_t len)
+    __attribute__ ((__bounded__(__buffer__, 2, 3)));
 int MD4_Final(unsigned char *md, MD4_CTX *c);
-unsigned char *MD4(const unsigned char *d, size_t n, unsigned char *md);
+unsigned char *MD4(const unsigned char *d, size_t n, unsigned char *md)
+    __attribute__ ((__bounded__(__buffer__, 1, 2)))
+    __attribute__ ((__nonnull__(3)));
 void MD4_Transform(MD4_CTX *c, const unsigned char *b);
 #ifdef  __cplusplus
 }

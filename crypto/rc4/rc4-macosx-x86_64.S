@@ -9,10 +9,10 @@
 
 .private_extern	_OPENSSL_ia32cap_P
 
-.globl	_RC4
+.globl	_rc4_internal
 
 .p2align	4
-_RC4:
+_rc4_internal:
 _CET_ENDBR
 	orq	%rsi,%rsi
 	jne	L$entry
@@ -527,10 +527,10 @@ L$exit:
 L$epilogue:
 	retq
 
-.globl	_RC4_set_key
+.globl	_rc4_set_key_internal
 
 .p2align	4
-_RC4_set_key:
+_rc4_set_key_internal:
 _CET_ENDBR
 	leaq	8(%rdi),%rdi
 	leaq	(%rdx,%rsi,1),%rdx

@@ -3,19 +3,15 @@ ASM_X86_64_MACOSX = aes/aes-macosx-x86_64.S
 ASM_X86_64_MACOSX += aes/bsaes-macosx-x86_64.S
 ASM_X86_64_MACOSX += aes/vpaes-macosx-x86_64.S
 ASM_X86_64_MACOSX += aes/aesni-macosx-x86_64.S
-ASM_X86_64_MACOSX += aes/aesni-sha1-macosx-x86_64.S
 ASM_X86_64_MACOSX += bn/modexp512-macosx-x86_64.S
 ASM_X86_64_MACOSX += bn/mont-macosx-x86_64.S
 ASM_X86_64_MACOSX += bn/mont5-macosx-x86_64.S
-ASM_X86_64_MACOSX += camellia/cmll-macosx-x86_64.S
 ASM_X86_64_MACOSX += md5/md5-macosx-x86_64.S
 ASM_X86_64_MACOSX += modes/ghash-macosx-x86_64.S
 ASM_X86_64_MACOSX += rc4/rc4-macosx-x86_64.S
-ASM_X86_64_MACOSX += rc4/rc4-md5-macosx-x86_64.S
 ASM_X86_64_MACOSX += sha/sha1-macosx-x86_64.S
 ASM_X86_64_MACOSX += sha/sha256-macosx-x86_64.S
 ASM_X86_64_MACOSX += sha/sha512-macosx-x86_64.S
-ASM_X86_64_MACOSX += whrlpool/wp-macosx-x86_64.S
 ASM_X86_64_MACOSX += cpuid-macosx-x86_64.S
 
 ASM_X86_64_MACOSX += bn/arch/amd64/bignum_add.S
@@ -34,8 +30,6 @@ ASM_X86_64_MACOSX += bn/arch/amd64/bn_arch.c
 EXTRA_DIST += $(ASM_X86_64_MACOSX)
 
 if HOST_ASM_MACOSX_X86_64
-libcrypto_la_CPPFLAGS += -Dendbr64=
-libcrypto_la_CPPFLAGS += -Dendbr32=
 libcrypto_la_CPPFLAGS += -DAES_ASM
 libcrypto_la_CPPFLAGS += -DBSAES_ASM
 libcrypto_la_CPPFLAGS += -DVPAES_ASM

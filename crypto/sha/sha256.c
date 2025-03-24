@@ -1,4 +1,4 @@
-/* $OpenBSD: sha256.c,v 1.30 2023/08/11 15:27:28 jsing Exp $ */
+/* $OpenBSD: sha256.c,v 1.32 2024/06/01 07:36:16 tb Exp $ */
 /* ====================================================================
  * Copyright (c) 1998-2011 The OpenSSL Project.  All rights reserved.
  *
@@ -131,16 +131,14 @@ Maj(SHA_LONG x, SHA_LONG y, SHA_LONG z)
 }
 
 static inline void
-sha256_msg_schedule_update(SHA_LONG *W0, SHA_LONG W1,
-    SHA_LONG W9, SHA_LONG W14)
+sha256_msg_schedule_update(SHA_LONG *W0, SHA_LONG W1, SHA_LONG W9, SHA_LONG W14)
 {
 	*W0 = sigma1(W14) + W9 + sigma0(W1) + *W0;
 }
 
 static inline void
-sha256_round(SHA_LONG *a, SHA_LONG *b, SHA_LONG *c, SHA_LONG *d,
-    SHA_LONG *e, SHA_LONG *f, SHA_LONG *g, SHA_LONG *h,
-    SHA_LONG Kt, SHA_LONG Wt)
+sha256_round(SHA_LONG *a, SHA_LONG *b, SHA_LONG *c, SHA_LONG *d, SHA_LONG *e,
+    SHA_LONG *f, SHA_LONG *g, SHA_LONG *h, SHA_LONG Kt, SHA_LONG Wt)
 {
 	SHA_LONG T1, T2;
 
@@ -319,10 +317,6 @@ unsigned char *
 SHA224(const unsigned char *d, size_t n, unsigned char *md)
 {
 	SHA256_CTX c;
-	static unsigned char m[SHA224_DIGEST_LENGTH];
-
-	if (md == NULL)
-		md = m;
 
 	SHA224_Init(&c);
 	SHA256_Update(&c, d, n);
@@ -481,10 +475,6 @@ unsigned char *
 SHA256(const unsigned char *d, size_t n, unsigned char *md)
 {
 	SHA256_CTX c;
-	static unsigned char m[SHA256_DIGEST_LENGTH];
-
-	if (md == NULL)
-		md = m;
 
 	SHA256_Init(&c);
 	SHA256_Update(&c, d, n);

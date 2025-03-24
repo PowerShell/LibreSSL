@@ -1,4 +1,4 @@
-/* $OpenBSD: x509.h,v 1.111 2024/03/02 10:59:41 tb Exp $ */
+/* $OpenBSD: x509.h,v 1.119 2024/08/31 10:49:35 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -134,10 +134,7 @@ struct X509_algor_st {
 
 typedef STACK_OF(X509_ALGOR) X509_ALGORS;
 
-typedef struct X509_val_st {
-	ASN1_TIME *notBefore;
-	ASN1_TIME *notAfter;
-} X509_VAL;
+typedef struct X509_val_st X509_VAL;
 
 typedef struct X509_sig_st X509_SIG;
 
@@ -165,11 +162,6 @@ typedef struct x509_cinf_st X509_CINF;
 
 DECLARE_STACK_OF(X509)
 
-/* standard trust ids */
-
-/* OpenSSL changed this to 0 */
-#define X509_TRUST_DEFAULT	-1	/* Only valid in purpose settings */
-
 #define X509_TRUST_COMPAT	1
 #define X509_TRUST_SSL_CLIENT	2
 #define X509_TRUST_SSL_SERVER	3
@@ -182,17 +174,6 @@ DECLARE_STACK_OF(X509)
 /* Keep these up to date! */
 #define X509_TRUST_MIN		1
 #define X509_TRUST_MAX		8
-
-
-/* trust_flags values */
-#define	X509_TRUST_DYNAMIC 	1
-#define	X509_TRUST_DYNAMIC_NAME	2
-
-/* check_trust return codes */
-
-#define X509_TRUST_TRUSTED	1
-#define X509_TRUST_REJECTED	2
-#define X509_TRUST_UNTRUSTED	3
 
 /* Flags for X509_print_ex() */
 
@@ -634,6 +615,12 @@ X509 *		d2i_X509_AUX(X509 **a,const unsigned char **pp,long length);
 
 int i2d_re_X509_tbs(X509 *x, unsigned char **pp);
 
+/* Flags returned by X509_get_signature_info(): valid and suitable for TLS. */
+#define X509_SIG_INFO_VALID	1
+#define X509_SIG_INFO_TLS	2
+int X509_get_signature_info(X509 *x, int *mdnid, int *pknid, int *secbits,
+    uint32_t *flags);
+
 void X509_get0_signature(const ASN1_BIT_STRING **psig,
     const X509_ALGOR **palg, const X509 *x);
 int X509_get_signature_nid(const X509 *x);
@@ -705,8 +692,8 @@ int ASN1_item_sign_ctx(const ASN1_ITEM *it,
 #endif
 
 const STACK_OF(X509_EXTENSION) *X509_get0_extensions(const X509 *x);
-void		X509_get0_uids(const X509 *x, const ASN1_BIT_STRING **piuid,
-		    const ASN1_BIT_STRING **psuid);
+void		X509_get0_uids(const X509 *x, const ASN1_BIT_STRING **issuerUID,
+		    const ASN1_BIT_STRING **subjectUID);
 const X509_ALGOR *X509_get0_tbs_sigalg(const X509 *x);
 int 		X509_set_version(X509 *x, long version);
 long		X509_get_version(const X509 *x);
@@ -744,8 +731,6 @@ EVP_PKEY *	X509_REQ_get_pubkey(X509_REQ *req);
 int		i2d_re_X509_REQ_tbs(X509_REQ *req, unsigned char **pp);
 EVP_PKEY *	X509_REQ_get0_pubkey(X509_REQ *req);
 int		X509_REQ_extension_nid(int nid);
-int *		X509_REQ_get_extension_nids(void);
-void		X509_REQ_set_extension_nids(int *nids);
 STACK_OF(X509_EXTENSION) *X509_REQ_get_extensions(X509_REQ *req);
 int X509_REQ_add_extensions_nid(X509_REQ *req, STACK_OF(X509_EXTENSION) *exts,
 				int nid);
@@ -931,26 +916,6 @@ ASN1_OBJECT *	X509_EXTENSION_get_object(X509_EXTENSION *ex);
 ASN1_OCTET_STRING *X509_EXTENSION_get_data(X509_EXTENSION *ne);
 int		X509_EXTENSION_get_critical(const X509_EXTENSION *ex);
 
-int X509at_get_attr_count(const STACK_OF(X509_ATTRIBUTE) *x);
-int X509at_get_attr_by_NID(const STACK_OF(X509_ATTRIBUTE) *x, int nid,
-			  int lastpos);
-int X509at_get_attr_by_OBJ(const STACK_OF(X509_ATTRIBUTE) *sk,
-    const ASN1_OBJECT *obj, int lastpos);
-X509_ATTRIBUTE *X509at_get_attr(const STACK_OF(X509_ATTRIBUTE) *x, int loc);
-X509_ATTRIBUTE *X509at_delete_attr(STACK_OF(X509_ATTRIBUTE) *x, int loc);
-STACK_OF(X509_ATTRIBUTE) *X509at_add1_attr(STACK_OF(X509_ATTRIBUTE) **x,
-					 X509_ATTRIBUTE *attr);
-STACK_OF(X509_ATTRIBUTE) *X509at_add1_attr_by_OBJ(STACK_OF(X509_ATTRIBUTE) **x,
-			const ASN1_OBJECT *obj, int type,
-			const unsigned char *bytes, int len);
-STACK_OF(X509_ATTRIBUTE) *X509at_add1_attr_by_NID(STACK_OF(X509_ATTRIBUTE) **x,
-			int nid, int type,
-			const unsigned char *bytes, int len);
-STACK_OF(X509_ATTRIBUTE) *X509at_add1_attr_by_txt(STACK_OF(X509_ATTRIBUTE) **x,
-			const char *attrname, int type,
-			const unsigned char *bytes, int len);
-void *X509at_get0_data_by_OBJ(STACK_OF(X509_ATTRIBUTE) *x,
-    const ASN1_OBJECT *obj, int lastpos, int type);
 X509_ATTRIBUTE *X509_ATTRIBUTE_create_by_NID(X509_ATTRIBUTE **attr, int nid,
 	     int atrtype, const void *data, int len);
 X509_ATTRIBUTE *X509_ATTRIBUTE_create_by_OBJ(X509_ATTRIBUTE **attr,
@@ -964,24 +929,6 @@ void *X509_ATTRIBUTE_get0_data(X509_ATTRIBUTE *attr, int idx,
 int X509_ATTRIBUTE_count(const X509_ATTRIBUTE *attr);
 ASN1_OBJECT *X509_ATTRIBUTE_get0_object(X509_ATTRIBUTE *attr);
 ASN1_TYPE *X509_ATTRIBUTE_get0_type(X509_ATTRIBUTE *attr, int idx);
-
-int EVP_PKEY_get_attr_count(const EVP_PKEY *key);
-int EVP_PKEY_get_attr_by_NID(const EVP_PKEY *key, int nid,
-			  int lastpos);
-int EVP_PKEY_get_attr_by_OBJ(const EVP_PKEY *key, const ASN1_OBJECT *obj,
-			  int lastpos);
-X509_ATTRIBUTE *EVP_PKEY_get_attr(const EVP_PKEY *key, int loc);
-X509_ATTRIBUTE *EVP_PKEY_delete_attr(EVP_PKEY *key, int loc);
-int EVP_PKEY_add1_attr(EVP_PKEY *key, X509_ATTRIBUTE *attr);
-int EVP_PKEY_add1_attr_by_OBJ(EVP_PKEY *key,
-			const ASN1_OBJECT *obj, int type,
-			const unsigned char *bytes, int len);
-int EVP_PKEY_add1_attr_by_NID(EVP_PKEY *key,
-			int nid, int type,
-			const unsigned char *bytes, int len);
-int EVP_PKEY_add1_attr_by_txt(EVP_PKEY *key,
-			const char *attrname, int type,
-			const unsigned char *bytes, int len);
 
 int		X509_verify_cert(X509_STORE_CTX *ctx);
 
@@ -1016,8 +963,6 @@ int X509_PUBKEY_set0_param(X509_PUBKEY *pub, ASN1_OBJECT *aobj, int ptype,
     void *pval, unsigned char *penc, int penclen);
 int X509_PUBKEY_get0_param(ASN1_OBJECT **ppkalg, const unsigned char **pk,
     int *ppklen, X509_ALGOR **pa, X509_PUBKEY *pub);
-
-int X509_check_trust(X509 *x, int id, int flags);
 
 int X509_up_ref(X509 *x);
 STACK_OF(X509) *X509_chain_up_ref(STACK_OF(X509) *chain);

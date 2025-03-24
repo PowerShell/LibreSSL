@@ -1,4 +1,4 @@
-/* $OpenBSD: apps.h,v 1.34 2023/06/11 13:02:10 jsg Exp $ */
+/* $OpenBSD: apps.h,v 1.38 2024/08/29 17:01:02 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -127,7 +127,6 @@
 #endif
 
 #include <unistd.h>
-extern int single_execution;
 
 extern CONF *config;
 extern char *default_config_file;
@@ -150,8 +149,6 @@ int ui_read(UI *ui, UI_STRING *uis);
 int ui_write(UI *ui, UI_STRING *uis);
 int ui_close(UI *ui);
 
-int should_retry(int i);
-int args_from_file(char *file, int *argc, char **argv[]);
 int str2fmt(char *s);
 void program_name(char *in, char *out, int size);
 #ifdef HEADER_X509_H
@@ -318,7 +315,4 @@ int options_parse(int argc, char **argv, const struct option *opts,
     char **unnamed, int *argsused);
 
 void show_cipher(const OBJ_NAME *name, void *arg);
-
-int pkey_check(BIO *out, EVP_PKEY *pkey, int (check_fn)(EVP_PKEY_CTX *),
-    const char *desc);
 #endif

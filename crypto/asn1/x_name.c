@@ -1,4 +1,4 @@
-/* $OpenBSD: x_name.c,v 1.41 2023/07/24 06:56:54 tb Exp $ */
+/* $OpenBSD: x_name.c,v 1.44 2024/07/08 14:48:49 beck Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -109,6 +109,7 @@ const ASN1_ITEM X509_NAME_ENTRY_it = {
 	.size = sizeof(X509_NAME_ENTRY),
 	.sname = "X509_NAME_ENTRY",
 };
+LCRYPTO_ALIAS(X509_NAME_ENTRY_it);
 
 
 X509_NAME_ENTRY *
@@ -117,30 +118,35 @@ d2i_X509_NAME_ENTRY(X509_NAME_ENTRY **a, const unsigned char **in, long len)
 	return (X509_NAME_ENTRY *)ASN1_item_d2i((ASN1_VALUE **)a, in, len,
 	    &X509_NAME_ENTRY_it);
 }
+LCRYPTO_ALIAS(d2i_X509_NAME_ENTRY);
 
 int
 i2d_X509_NAME_ENTRY(X509_NAME_ENTRY *a, unsigned char **out)
 {
 	return ASN1_item_i2d((ASN1_VALUE *)a, out, &X509_NAME_ENTRY_it);
 }
+LCRYPTO_ALIAS(i2d_X509_NAME_ENTRY);
 
 X509_NAME_ENTRY *
 X509_NAME_ENTRY_new(void)
 {
 	return (X509_NAME_ENTRY *)ASN1_item_new(&X509_NAME_ENTRY_it);
 }
+LCRYPTO_ALIAS(X509_NAME_ENTRY_new);
 
 void
 X509_NAME_ENTRY_free(X509_NAME_ENTRY *a)
 {
 	ASN1_item_free((ASN1_VALUE *)a, &X509_NAME_ENTRY_it);
 }
+LCRYPTO_ALIAS(X509_NAME_ENTRY_free);
 
 X509_NAME_ENTRY *
 X509_NAME_ENTRY_dup(X509_NAME_ENTRY *x)
 {
 	return ASN1_item_dup(&X509_NAME_ENTRY_it, x);
 }
+LCRYPTO_ALIAS(X509_NAME_ENTRY_dup);
 
 /* For the "Name" type we need a SEQUENCE OF { SET OF X509_NAME_ENTRY }
  * so declare two template wrappers for this
@@ -154,7 +160,7 @@ static const ASN1_TEMPLATE X509_NAME_ENTRIES_item_tt = {
 	.item = &X509_NAME_ENTRY_it,
 };
 
-const ASN1_ITEM X509_NAME_ENTRIES_it = {
+static const ASN1_ITEM X509_NAME_ENTRIES_it = {
 	.itype = ASN1_ITYPE_PRIMITIVE,
 	.utype = -1,
 	.templates = &X509_NAME_ENTRIES_item_tt,
@@ -172,7 +178,7 @@ static const ASN1_TEMPLATE X509_NAME_INTERNAL_item_tt = {
 	.item = &X509_NAME_ENTRIES_it,
 };
 
-const ASN1_ITEM X509_NAME_INTERNAL_it = {
+static const ASN1_ITEM X509_NAME_INTERNAL_it = {
 	.itype = ASN1_ITYPE_PRIMITIVE,
 	.utype = -1,
 	.templates = &X509_NAME_INTERNAL_item_tt,
@@ -207,6 +213,7 @@ const ASN1_ITEM X509_NAME_it = {
 	.size = 0,
 	.sname = "X509_NAME",
 };
+LCRYPTO_ALIAS(X509_NAME_it);
 
 X509_NAME *
 d2i_X509_NAME(X509_NAME **a, const unsigned char **in, long len)
@@ -214,30 +221,35 @@ d2i_X509_NAME(X509_NAME **a, const unsigned char **in, long len)
 	return (X509_NAME *)ASN1_item_d2i((ASN1_VALUE **)a, in, len,
 	    &X509_NAME_it);
 }
+LCRYPTO_ALIAS(d2i_X509_NAME);
 
 int
 i2d_X509_NAME(X509_NAME *a, unsigned char **out)
 {
 	return ASN1_item_i2d((ASN1_VALUE *)a, out, &X509_NAME_it);
 }
+LCRYPTO_ALIAS(i2d_X509_NAME);
 
 X509_NAME *
 X509_NAME_new(void)
 {
 	return (X509_NAME *)ASN1_item_new(&X509_NAME_it);
 }
+LCRYPTO_ALIAS(X509_NAME_new);
 
 void
 X509_NAME_free(X509_NAME *a)
 {
 	ASN1_item_free((ASN1_VALUE *)a, &X509_NAME_it);
 }
+LCRYPTO_ALIAS(X509_NAME_free);
 
 X509_NAME *
 X509_NAME_dup(X509_NAME *x)
 {
 	return ASN1_item_dup(&X509_NAME_it, x);
 }
+LCRYPTO_ALIAS(X509_NAME_dup);
 
 static int
 x509_name_ex_new(ASN1_VALUE **val, const ASN1_ITEM *it)
@@ -635,6 +647,7 @@ X509_NAME_set(X509_NAME **xn, X509_NAME *name)
 	*xn = name;
 	return 1;
 }
+LCRYPTO_ALIAS(X509_NAME_set);
 
 int
 X509_NAME_get0_der(X509_NAME *nm, const unsigned char **pder, size_t *pderlen)
@@ -648,3 +661,4 @@ X509_NAME_get0_der(X509_NAME *nm, const unsigned char **pder, size_t *pderlen)
 		*pderlen = nm->bytes->length;
 	return 1;
 }
+LCRYPTO_ALIAS(X509_NAME_get0_der);

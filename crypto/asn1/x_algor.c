@@ -1,4 +1,4 @@
-/* $OpenBSD: x_algor.c,v 1.39 2024/03/02 10:33:51 tb Exp $ */
+/* $OpenBSD: x_algor.c,v 1.41 2024/07/08 14:48:49 beck Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2000.
  */
@@ -86,6 +86,7 @@ const ASN1_ITEM X509_ALGOR_it = {
 	.size = sizeof(X509_ALGOR),
 	.sname = "X509_ALGOR",
 };
+LCRYPTO_ALIAS(X509_ALGOR_it);
 
 static const ASN1_TEMPLATE X509_ALGORS_item_tt = {
 	.flags = ASN1_TFLG_SEQUENCE_OF,
@@ -104,6 +105,7 @@ const ASN1_ITEM X509_ALGORS_it = {
 	.size = 0,
 	.sname = "X509_ALGORS",
 };
+LCRYPTO_ALIAS(X509_ALGORS_it);
 
 X509_ALGOR *
 d2i_X509_ALGOR(X509_ALGOR **a, const unsigned char **in, long len)
@@ -111,24 +113,28 @@ d2i_X509_ALGOR(X509_ALGOR **a, const unsigned char **in, long len)
 	return (X509_ALGOR *)ASN1_item_d2i((ASN1_VALUE **)a, in, len,
 	    &X509_ALGOR_it);
 }
+LCRYPTO_ALIAS(d2i_X509_ALGOR);
 
 int
 i2d_X509_ALGOR(X509_ALGOR *a, unsigned char **out)
 {
 	return ASN1_item_i2d((ASN1_VALUE *)a, out, &X509_ALGOR_it);
 }
+LCRYPTO_ALIAS(i2d_X509_ALGOR);
 
 X509_ALGOR *
 X509_ALGOR_new(void)
 {
 	return (X509_ALGOR *)ASN1_item_new(&X509_ALGOR_it);
 }
+LCRYPTO_ALIAS(X509_ALGOR_new);
 
 void
 X509_ALGOR_free(X509_ALGOR *a)
 {
 	ASN1_item_free((ASN1_VALUE *)a, &X509_ALGOR_it);
 }
+LCRYPTO_ALIAS(X509_ALGOR_free);
 
 X509_ALGORS *
 d2i_X509_ALGORS(X509_ALGORS **a, const unsigned char **in, long len)
@@ -136,18 +142,21 @@ d2i_X509_ALGORS(X509_ALGORS **a, const unsigned char **in, long len)
 	return (X509_ALGORS *)ASN1_item_d2i((ASN1_VALUE **)a, in, len,
 	    &X509_ALGORS_it);
 }
+LCRYPTO_ALIAS(d2i_X509_ALGORS);
 
 int
 i2d_X509_ALGORS(X509_ALGORS *a, unsigned char **out)
 {
 	return ASN1_item_i2d((ASN1_VALUE *)a, out, &X509_ALGORS_it);
 }
+LCRYPTO_ALIAS(i2d_X509_ALGORS);
 
 X509_ALGOR *
 X509_ALGOR_dup(X509_ALGOR *x)
 {
 	return ASN1_item_dup(&X509_ALGOR_it, x);
 }
+LCRYPTO_ALIAS(X509_ALGOR_dup);
 
 static int
 X509_ALGOR_set0_obj(X509_ALGOR *alg, ASN1_OBJECT *aobj)
@@ -225,6 +234,7 @@ X509_ALGOR_set0(X509_ALGOR *alg, ASN1_OBJECT *aobj, int parameter_type,
 
 	return 1;
 }
+LCRYPTO_ALIAS(X509_ALGOR_set0);
 
 void
 X509_ALGOR_get0(const ASN1_OBJECT **out_aobj, int *out_type,
@@ -252,6 +262,7 @@ X509_ALGOR_get0(const ASN1_OBJECT **out_aobj, int *out_type,
 	if (out_value != NULL)
 		*out_value = value;
 }
+LCRYPTO_ALIAS(X509_ALGOR_get0);
 
 int
 X509_ALGOR_set_evp_md(X509_ALGOR *alg, const EVP_MD *md)
@@ -281,3 +292,4 @@ X509_ALGOR_cmp(const X509_ALGOR *a, const X509_ALGOR *b)
 
 	return ASN1_TYPE_cmp(a->parameter, b->parameter);
 }
+LCRYPTO_ALIAS(X509_ALGOR_cmp);

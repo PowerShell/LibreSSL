@@ -1,4 +1,4 @@
-.\" $OpenBSD: HMAC.3,v 1.20 2022/01/25 17:55:39 tb Exp $
+.\" $OpenBSD: HMAC.3,v 1.23 2024/08/29 20:21:53 tb Exp $
 .\" full merge up to: OpenSSL crypto/hmac a528d4f0 Oct 27 13:40:11 2015 -0400
 .\" selective merge up to: OpenSSL man3/HMAC b3696a55 Sep 2 09:35:50 2017 -0400
 .\"
@@ -52,7 +52,7 @@
 .\" ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 .\" OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.Dd $Mdocdate: January 25 2022 $
+.Dd $Mdocdate: August 29 2024 $
 .Dt HMAC 3
 .Os
 .Sh NAME
@@ -61,7 +61,6 @@
 .Nm HMAC_CTX_reset ,
 .Nm HMAC_CTX_free ,
 .Nm HMAC_Init_ex ,
-.Nm HMAC_Init ,
 .Nm HMAC_Update ,
 .Nm HMAC_Final ,
 .Nm HMAC_CTX_copy ,
@@ -97,14 +96,7 @@
 .Fa "const void *key"
 .Fa "int key_len"
 .Fa "const EVP_MD *md"
-.Fa "ENGINE *impl"
-.Fc
-.Ft int
-.Fo HMAC_Init
-.Fa "HMAC_CTX *ctx"
-.Fa "const void *key"
-.Fa "int key_len"
-.Fa "const EVP_MD *md"
+.Fa "ENGINE *engine"
 .Fc
 .Ft int
 .Fo HMAC_Update
@@ -160,11 +152,6 @@ which must have space for the output of the hash function, which is no
 more than
 .Dv EVP_MAX_MD_SIZE
 bytes.
-If
-.Fa md
-is
-.Dv NULL ,
-the digest is placed in a static array, which is not thread safe.
 The size of the output is placed in
 .Fa md_len ,
 unless it is
@@ -228,12 +215,11 @@ nor the same as the previous digest used by
 .Fa ctx ,
 then an error is returned because reuse of an existing key with a
 different digest is not supported.
-.Pp
-.Fn HMAC_Init
-is a deprecated wrapper around
-.Fn HMAC_Init_ex
-which performs no longer useful extra initialization in
-some circumstances.
+The
+.Fa ENGINE *engine
+argument is always ignored and passing
+.Dv NULL
+is recommended.
 .Pp
 .Fn HMAC_Update
 can be called repeatedly with chunks of the message to be authenticated
@@ -302,7 +288,6 @@ or 0 on error.
 RFC 2104
 .Sh HISTORY
 .Fn HMAC ,
-.Fn HMAC_Init ,
 .Fn HMAC_Update ,
 .Fn HMAC_Final ,
 and
@@ -329,3 +314,11 @@ and
 .Fn HMAC_CTX_get_md
 first appeared in OpenSSL 1.1.0 and have been available since
 .Ox 6.3 .
+.Sh CAVEATS
+Other implementations allow
+.Fa md
+in
+.Fn HMAC
+to be
+.Dv NULL
+and return a static array, which is not thread safe.

@@ -1,4 +1,4 @@
-/* $OpenBSD: conf_mall.c,v 1.11 2024/03/02 09:02:04 tb Exp $ */
+/* $OpenBSD: conf_mall.c,v 1.13 2024/08/31 09:54:31 tb Exp $ */
 /* Written by Stephen Henson (steve@openssl.org) for the OpenSSL
  * project 2001.
  */

@@ -1,4 +1,4 @@
-/* $OpenBSD: hmac.c,v 1.32 2024/02/18 15:45:42 tb Exp $ */
+/* $OpenBSD: hmac.c,v 1.36 2024/08/31 10:42:21 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -137,14 +137,6 @@ err:
 LCRYPTO_ALIAS(HMAC_Init_ex);
 
 int
-HMAC_Init(HMAC_CTX *ctx, const void *key, int len, const EVP_MD *md)
-{
-	if (key && md)
-		HMAC_CTX_init(ctx);
-	return HMAC_Init_ex(ctx, key, len, md, NULL);
-}
-
-int
 HMAC_Update(HMAC_CTX *ctx, const unsigned char *data, size_t len)
 {
 	if (ctx->md == NULL)
@@ -180,14 +172,7 @@ LCRYPTO_ALIAS(HMAC_Final);
 HMAC_CTX *
 HMAC_CTX_new(void)
 {
-	HMAC_CTX *ctx;
-
-	if ((ctx = calloc(1, sizeof(*ctx))) == NULL)
-		return NULL;
-
-	HMAC_CTX_init(ctx);
-
-	return ctx;
+	return calloc(1, sizeof(HMAC_CTX));
 }
 LCRYPTO_ALIAS(HMAC_CTX_new);
 
@@ -210,6 +195,7 @@ HMAC_CTX_reset(HMAC_CTX *ctx)
 	HMAC_CTX_init(ctx);
 	return 1;
 }
+LCRYPTO_ALIAS(HMAC_CTX_reset);
 
 void
 HMAC_CTX_init(HMAC_CTX *ctx)
@@ -268,11 +254,8 @@ HMAC(const EVP_MD *evp_md, const void *key, int key_len, const unsigned char *d,
     size_t n, unsigned char *md, unsigned int *md_len)
 {
 	HMAC_CTX c;
-	static unsigned char m[EVP_MAX_MD_SIZE];
 	const unsigned char dummy_key[1] = { 0 };
 
-	if (md == NULL)
-		md = m;
 	if (key == NULL) {
 		key = dummy_key;
 		key_len = 0;

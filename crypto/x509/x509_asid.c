@@ -1,4 +1,4 @@
-/*	$OpenBSD: x509_asid.c,v 1.43 2024/02/20 14:58:16 tb Exp $ */
+/*	$OpenBSD: x509_asid.c,v 1.45 2024/07/13 15:08:58 tb Exp $ */
 /*
  * Contributed to the OpenSSL Project by the American Registry for
  * Internet Numbers ("ARIN").
@@ -102,6 +102,7 @@ const ASN1_ITEM ASRange_it = {
 	.size = sizeof(ASRange),
 	.sname = "ASRange",
 };
+LCRYPTO_ALIAS(ASRange_it);
 
 static const ASN1_TEMPLATE ASIdOrRange_ch_tt[] = {
 	{
@@ -129,6 +130,7 @@ const ASN1_ITEM ASIdOrRange_it = {
 	.size = sizeof(ASIdOrRange),
 	.sname = "ASIdOrRange",
 };
+LCRYPTO_ALIAS(ASIdOrRange_it);
 
 static const ASN1_TEMPLATE ASIdentifierChoice_ch_tt[] = {
 	{
@@ -156,6 +158,7 @@ const ASN1_ITEM ASIdentifierChoice_it = {
 	.size = sizeof(ASIdentifierChoice),
 	.sname = "ASIdentifierChoice",
 };
+LCRYPTO_ALIAS(ASIdentifierChoice_it);
 
 static const ASN1_TEMPLATE ASIdentifiers_seq_tt[] = {
 	{
@@ -183,6 +186,7 @@ const ASN1_ITEM ASIdentifiers_it = {
 	.size = sizeof(ASIdentifiers),
 	.sname = "ASIdentifiers",
 };
+LCRYPTO_ALIAS(ASIdentifiers_it);
 
 ASRange *
 d2i_ASRange(ASRange **a, const unsigned char **in, long len)
@@ -942,7 +946,7 @@ v2i_ASIdentifiers(const struct v3_ext_method *method, struct v3_ext_ctx *ctx,
 /*
  * OpenSSL dispatch.
  */
-const X509V3_EXT_METHOD v3_asid = {
+static const X509V3_EXT_METHOD x509v3_ext_sbgp_autonomousSysNum = {
 	.ext_nid = NID_sbgp_autonomousSysNum,
 	.ext_flags = 0,
 	.it = &ASIdentifiers_it,
@@ -958,6 +962,12 @@ const X509V3_EXT_METHOD v3_asid = {
 	.r2i = NULL,
 	.usr_data = NULL,
 };
+
+const X509V3_EXT_METHOD *
+x509v3_ext_method_sbgp_autonomousSysNum(void)
+{
+	return &x509v3_ext_sbgp_autonomousSysNum;
+}
 
 /*
  * Figure out whether extension uses inheritance.

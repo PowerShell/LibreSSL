@@ -1,4 +1,4 @@
-/*	$OpenBSD: ecx_methods.c,v 1.11 2024/01/04 17:01:26 tb Exp $ */
+/*	$OpenBSD: ecx_methods.c,v 1.14 2024/08/28 07:15:04 tb Exp $ */
 /*
  * Copyright (c) 2022 Joel Sing <jsing@openbsd.org>
  *
@@ -17,6 +17,7 @@
 
 #include <string.h>
 
+#include <openssl/cms.h>
 #include <openssl/curve25519.h>
 #include <openssl/ec.h>
 #include <openssl/err.h>
@@ -509,6 +510,24 @@ ecx_security_bits(const EVP_PKEY *pkey)
 }
 
 static int
+ecx_signature_info(const X509_ALGOR *algor, int *md_nid, int *pkey_nid,
+    int *security_bits, uint32_t *flags)
+{
+	const ASN1_OBJECT *aobj;
+
+	X509_ALGOR_get0(&aobj, NULL, NULL, algor);
+	if (OBJ_obj2nid(aobj) != EVP_PKEY_ED25519)
+		return 0;
+
+	*md_nid = NID_undef;
+	*pkey_nid = NID_ED25519;
+	*security_bits = ED25519_SECURITY_BITS;
+	*flags = X509_SIG_INFO_TLS | X509_SIG_INFO_VALID;
+
+	return 1;
+}
+
+static int
 ecx_param_cmp(const EVP_PKEY *pkey1, const EVP_PKEY *pkey2)
 {
 	/* No parameters, so always equivalent. */
@@ -530,10 +549,65 @@ ecx_ctrl(EVP_PKEY *pkey, int op, long arg1, void *arg2)
 	return -2;
 }
 
+#ifndef OPENSSL_NO_CMS
+static int
+ecx_cms_sign_or_verify(EVP_PKEY *pkey, long verify, CMS_SignerInfo *si)
+{
+	X509_ALGOR *digestAlgorithm, *signatureAlgorithm;
+
+	if (verify != 0 && verify != 1)
+		return -1;
+
+	/* Check that we have an Ed25519 public key. */
+	if (EVP_PKEY_id(pkey) != NID_ED25519)
+		return -1;
+
+	CMS_SignerInfo_get0_algs(si, NULL, NULL, &digestAlgorithm,
+	    &signatureAlgorithm);
+
+	/* RFC 8419, section 2.3: digestAlgorithm MUST be SHA-512. */
+	if (digestAlgorithm == NULL)
+		return -1;
+	if (OBJ_obj2nid(digestAlgorithm->algorithm) != NID_sha512)
+		return -1;
+
+	/*
+	 * RFC 8419, section 2.4: signatureAlgorithm MUST be Ed25519, and the
+	 * parameters MUST be absent. For verification check that this is the
+	 * case, for signing set the signatureAlgorithm accordingly.
+	 */
+	if (verify) {
+		const ASN1_OBJECT *obj;
+		int param_type;
+
+		if (signatureAlgorithm == NULL)
+			return -1;
+
+		X509_ALGOR_get0(&obj, &param_type, NULL, signatureAlgorithm);
+		if (OBJ_obj2nid(obj) != NID_ED25519)
+			return -1;
+		if (param_type != V_ASN1_UNDEF)
+			return -1;
+
+		return 1;
+	}
+
+	if (!X509_ALGOR_set0_by_nid(signatureAlgorithm, NID_ED25519,
+	    V_ASN1_UNDEF, NULL))
+		return -1;
+
+	return 1;
+}
+#endif
+
 static int
 ecx_sign_ctrl(EVP_PKEY *pkey, int op, long arg1, void *arg2)
 {
 	switch (op) {
+#ifndef OPENSSL_NO_CMS
+	case ASN1_PKEY_CTRL_CMS_SIGN:
+		return ecx_cms_sign_or_verify(pkey, arg1, arg2);
+#endif
 	case ASN1_PKEY_CTRL_DEFAULT_MD_NID:
 		/* PureEdDSA does its own hashing. */
 		*(int *)arg2 = NID_undef;
@@ -806,6 +880,9 @@ pkey_ecx_ed_ctrl(EVP_PKEY_CTX *pkey_ctx, int op, int arg1, void *arg2)
 		}
 		return 1;
 
+#ifndef OPENSSL_NO_CMS
+	case EVP_PKEY_CTRL_CMS_SIGN:
+#endif
 	case EVP_PKEY_CTRL_DIGESTINIT:
 		return 1;
 	}
@@ -869,6 +946,8 @@ const EVP_PKEY_ASN1_METHOD ed25519_asn1_meth = {
 	.pkey_size = ecx_sig_size,
 	.pkey_bits = ecx_bits,
 	.pkey_security_bits = ecx_security_bits,
+
+	.signature_info = ecx_signature_info,
 
 	.param_cmp = ecx_param_cmp,
 

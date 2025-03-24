@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_pku.c,v 1.3 2023/02/16 08:38:17 tb Exp $ */
+/* $OpenBSD: x509_pku.c,v 1.5 2024/07/13 15:08:58 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 1999.
  */
@@ -65,7 +65,7 @@
 static int i2r_PKEY_USAGE_PERIOD(X509V3_EXT_METHOD *method,
     PKEY_USAGE_PERIOD *usage, BIO *out, int indent);
 
-const X509V3_EXT_METHOD v3_pkey_usage_period = {
+static const X509V3_EXT_METHOD x509v3_ext_private_key_usage_period = {
 	.ext_nid = NID_private_key_usage_period,
 	.ext_flags = 0,
 	.it = &PKEY_USAGE_PERIOD_it,
@@ -81,6 +81,12 @@ const X509V3_EXT_METHOD v3_pkey_usage_period = {
 	.r2i = NULL,
 	.usr_data = NULL,
 };
+
+const X509V3_EXT_METHOD *
+x509v3_ext_method_private_key_usage_period(void)
+{
+	return &x509v3_ext_private_key_usage_period;
+}
 
 static const ASN1_TEMPLATE PKEY_USAGE_PERIOD_seq_tt[] = {
 	{
@@ -108,6 +114,7 @@ const ASN1_ITEM PKEY_USAGE_PERIOD_it = {
 	.size = sizeof(PKEY_USAGE_PERIOD),
 	.sname = "PKEY_USAGE_PERIOD",
 };
+LCRYPTO_ALIAS(PKEY_USAGE_PERIOD_it);
 
 
 PKEY_USAGE_PERIOD *

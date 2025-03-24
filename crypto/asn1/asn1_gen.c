@@ -1,4 +1,4 @@
-/* $OpenBSD: asn1_gen.c,v 1.21 2023/07/05 21:23:36 beck Exp $ */
+/* $OpenBSD: asn1_gen.c,v 1.24 2024/08/31 10:03:03 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2002.
  */
@@ -63,6 +63,8 @@
 #include <openssl/x509v3.h>
 
 #include "asn1_local.h"
+#include "conf_local.h"
+#include "x509_local.h"
 
 #define ASN1_GEN_FLAG		0x10000
 #define ASN1_GEN_FLAG_IMP	(ASN1_GEN_FLAG|1)
@@ -533,7 +535,8 @@ static int
 asn1_str2tag(const char *tagstr, int len)
 {
 	unsigned int i;
-	static const struct tag_name_st *tntmp, tnst [] = {
+	const struct tag_name_st *tntmp;
+	static const struct tag_name_st tnst[] = {
 		ASN1_GEN_STR("BOOL", V_ASN1_BOOLEAN),
 		ASN1_GEN_STR("BOOLEAN", V_ASN1_BOOLEAN),
 		ASN1_GEN_STR("NULL", V_ASN1_NULL),

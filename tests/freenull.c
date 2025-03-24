@@ -1,10 +1,9 @@
-/*	$OpenBSD: freenull.c.head,v 1.9 2024/02/29 20:00:53 tb Exp $	*/
+/*	$OpenBSD: freenull.c.head,v 1.10 2024/08/30 05:00:38 tb Exp $	*/
 
 #include <openssl/asn1.h>
 #include <openssl/cmac.h>
 #include <openssl/cms.h>
 #include <openssl/comp.h>
-#include <openssl/conf_api.h>
 #include <openssl/ct.h>
 #include <openssl/engine.h>
 #ifndef OPENSSL_NO_GOST
@@ -67,7 +66,6 @@ main(int argc, char **argv)
 	CMAC_CTX_free(NULL);
 	CMS_ContentInfo_free(NULL);
 	CMS_ReceiptRequest_free(NULL);
-	CONF_free(NULL);
 	CRL_DIST_POINTS_free(NULL);
 	CTLOG_STORE_free(NULL);
 	CTLOG_free(NULL);
@@ -194,13 +192,9 @@ main(int argc, char **argv)
 	X509_free(NULL);
 	lh_free(NULL);
 	sk_free(NULL);
-/*	$OpenBSD: freenull.c.tail,v 1.2 2018/07/10 20:55:57 tb Exp $	*/
+/*	$OpenBSD: freenull.c.tail,v 1.4 2024/08/30 05:00:38 tb Exp $	*/
 
 	BIO_free_all(NULL);
-	NCONF_free_data(NULL);
-	_CONF_free_data(NULL);
-
-	lh_FUNCTION_free(NULL);
 
 	sk_ASN1_OBJECT_pop_free(NULL, NULL);
 	sk_CONF_VALUE_pop_free(NULL, NULL);

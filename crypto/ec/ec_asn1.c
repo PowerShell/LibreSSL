@@ -1,4 +1,4 @@
-/* $OpenBSD: ec_asn1.c,v 1.48 2023/07/07 19:37:53 beck Exp $ */
+/* $OpenBSD: ec_asn1.c,v 1.53 2024/04/17 23:24:18 tb Exp $ */
 /*
  * Written by Nils Larsch for the OpenSSL project.
  */
@@ -74,7 +74,6 @@ EC_GROUP_get_basis_type(const EC_GROUP *group)
 }
 LCRYPTO_ALIAS(EC_GROUP_get_basis_type);
 
-/* some structures needed for the asn1 encoding */
 typedef struct x9_62_pentanomial_st {
 	long k1;
 	long k2;
@@ -125,16 +124,15 @@ typedef struct ec_parameters_st {
 	ASN1_INTEGER *cofactor;
 } ECPARAMETERS;
 
-struct ecpk_parameters_st {
+typedef struct ecpk_parameters_st {
 	int type;
 	union {
 		ASN1_OBJECT *named_curve;
 		ECPARAMETERS *parameters;
 		ASN1_NULL *implicitlyCA;
 	} value;
-} /* ECPKPARAMETERS */ ;
+} ECPKPARAMETERS;
 
-/* SEC1 ECPrivateKey */
 typedef struct ec_privatekey_st {
 	long version;
 	ASN1_OCTET_STRING *privateKey;
@@ -142,7 +140,6 @@ typedef struct ec_privatekey_st {
 	ASN1_BIT_STRING *publicKey;
 } EC_PRIVATEKEY;
 
-/* the OpenSSL ASN.1 definitions */
 static const ASN1_TEMPLATE X9_62_PENTANOMIAL_seq_tt[] = {
 	{
 		.flags = 0,
@@ -167,7 +164,7 @@ static const ASN1_TEMPLATE X9_62_PENTANOMIAL_seq_tt[] = {
 	},
 };
 
-const ASN1_ITEM X9_62_PENTANOMIAL_it = {
+static const ASN1_ITEM X9_62_PENTANOMIAL_it = {
 	.itype = ASN1_ITYPE_SEQUENCE,
 	.utype = V_ASN1_SEQUENCE,
 	.templates = X9_62_PENTANOMIAL_seq_tt,
@@ -176,21 +173,6 @@ const ASN1_ITEM X9_62_PENTANOMIAL_it = {
 	.size = sizeof(X9_62_PENTANOMIAL),
 	.sname = "X9_62_PENTANOMIAL",
 };
-
-X9_62_PENTANOMIAL *X9_62_PENTANOMIAL_new(void);
-void X9_62_PENTANOMIAL_free(X9_62_PENTANOMIAL *a);
-
-X9_62_PENTANOMIAL *
-X9_62_PENTANOMIAL_new(void)
-{
-	return (X9_62_PENTANOMIAL*)ASN1_item_new(&X9_62_PENTANOMIAL_it);
-}
-
-void
-X9_62_PENTANOMIAL_free(X9_62_PENTANOMIAL *a)
-{
-	ASN1_item_free((ASN1_VALUE *)a, &X9_62_PENTANOMIAL_it);
-}
 
 static const ASN1_TEMPLATE char_two_def_tt = {
 	.flags = 0,
@@ -267,7 +249,7 @@ static const ASN1_TEMPLATE X9_62_CHARACTERISTIC_TWO_seq_tt[] = {
 	},
 };
 
-const ASN1_ITEM X9_62_CHARACTERISTIC_TWO_it = {
+static const ASN1_ITEM X9_62_CHARACTERISTIC_TWO_it = {
 	.itype = ASN1_ITYPE_SEQUENCE,
 	.utype = V_ASN1_SEQUENCE,
 	.templates = X9_62_CHARACTERISTIC_TWO_seq_tt,
@@ -276,21 +258,6 @@ const ASN1_ITEM X9_62_CHARACTERISTIC_TWO_it = {
 	.size = sizeof(X9_62_CHARACTERISTIC_TWO),
 	.sname = "X9_62_CHARACTERISTIC_TWO",
 };
-
-X9_62_CHARACTERISTIC_TWO *X9_62_CHARACTERISTIC_TWO_new(void);
-void X9_62_CHARACTERISTIC_TWO_free(X9_62_CHARACTERISTIC_TWO *a);
-
-X9_62_CHARACTERISTIC_TWO *
-X9_62_CHARACTERISTIC_TWO_new(void)
-{
-	return (X9_62_CHARACTERISTIC_TWO*)ASN1_item_new(&X9_62_CHARACTERISTIC_TWO_it);
-}
-
-void
-X9_62_CHARACTERISTIC_TWO_free(X9_62_CHARACTERISTIC_TWO *a)
-{
-	ASN1_item_free((ASN1_VALUE *)a, &X9_62_CHARACTERISTIC_TWO_it);
-}
 
 static const ASN1_TEMPLATE fieldID_def_tt = {
 	.flags = 0,
@@ -349,7 +316,7 @@ static const ASN1_TEMPLATE X9_62_FIELDID_seq_tt[] = {
 	},
 };
 
-const ASN1_ITEM X9_62_FIELDID_it = {
+static const ASN1_ITEM X9_62_FIELDID_it = {
 	.itype = ASN1_ITYPE_SEQUENCE,
 	.utype = V_ASN1_SEQUENCE,
 	.templates = X9_62_FIELDID_seq_tt,
@@ -383,7 +350,7 @@ static const ASN1_TEMPLATE X9_62_CURVE_seq_tt[] = {
 	},
 };
 
-const ASN1_ITEM X9_62_CURVE_it = {
+static const ASN1_ITEM X9_62_CURVE_it = {
 	.itype = ASN1_ITYPE_SEQUENCE,
 	.utype = V_ASN1_SEQUENCE,
 	.templates = X9_62_CURVE_seq_tt,
@@ -448,16 +415,13 @@ const ASN1_ITEM ECPARAMETERS_it = {
 	.sname = "ECPARAMETERS",
 };
 
-ECPARAMETERS *ECPARAMETERS_new(void);
-void ECPARAMETERS_free(ECPARAMETERS *a);
-
-ECPARAMETERS *
+static ECPARAMETERS *
 ECPARAMETERS_new(void)
 {
 	return (ECPARAMETERS*)ASN1_item_new(&ECPARAMETERS_it);
 }
 
-void
+static void
 ECPARAMETERS_free(ECPARAMETERS *a)
 {
 	ASN1_item_free((ASN1_VALUE *)a, &ECPARAMETERS_it);
@@ -497,31 +461,26 @@ const ASN1_ITEM ECPKPARAMETERS_it = {
 	.sname = "ECPKPARAMETERS",
 };
 
-ECPKPARAMETERS *ECPKPARAMETERS_new(void);
-void ECPKPARAMETERS_free(ECPKPARAMETERS *a);
-ECPKPARAMETERS *d2i_ECPKPARAMETERS(ECPKPARAMETERS **a, const unsigned char **in, long len);
-int i2d_ECPKPARAMETERS(const ECPKPARAMETERS *a, unsigned char **out);
-
-ECPKPARAMETERS *
+static ECPKPARAMETERS *
 d2i_ECPKPARAMETERS(ECPKPARAMETERS **a, const unsigned char **in, long len)
 {
 	return (ECPKPARAMETERS *)ASN1_item_d2i((ASN1_VALUE **)a, in, len,
 	    &ECPKPARAMETERS_it);
 }
 
-int
+static int
 i2d_ECPKPARAMETERS(const ECPKPARAMETERS *a, unsigned char **out)
 {
 	return ASN1_item_i2d((ASN1_VALUE *)a, out, &ECPKPARAMETERS_it);
 }
 
-ECPKPARAMETERS *
+static ECPKPARAMETERS *
 ECPKPARAMETERS_new(void)
 {
 	return (ECPKPARAMETERS *)ASN1_item_new(&ECPKPARAMETERS_it);
 }
 
-void
+static void
 ECPKPARAMETERS_free(ECPKPARAMETERS *a)
 {
 	ASN1_item_free((ASN1_VALUE *)a, &ECPKPARAMETERS_it);
@@ -558,7 +517,7 @@ static const ASN1_TEMPLATE EC_PRIVATEKEY_seq_tt[] = {
 	},
 };
 
-const ASN1_ITEM EC_PRIVATEKEY_it = {
+static const ASN1_ITEM EC_PRIVATEKEY_it = {
 	.itype = ASN1_ITYPE_SEQUENCE,
 	.utype = V_ASN1_SEQUENCE,
 	.templates = EC_PRIVATEKEY_seq_tt,
@@ -568,57 +527,30 @@ const ASN1_ITEM EC_PRIVATEKEY_it = {
 	.sname = "EC_PRIVATEKEY",
 };
 
-EC_PRIVATEKEY *EC_PRIVATEKEY_new(void);
-void EC_PRIVATEKEY_free(EC_PRIVATEKEY *a);
-EC_PRIVATEKEY *d2i_EC_PRIVATEKEY(EC_PRIVATEKEY **a, const unsigned char **in, long len);
-int i2d_EC_PRIVATEKEY(const EC_PRIVATEKEY *a, unsigned char **out);
-
-EC_PRIVATEKEY *
+static EC_PRIVATEKEY *
 d2i_EC_PRIVATEKEY(EC_PRIVATEKEY **a, const unsigned char **in, long len)
 {
 	return (EC_PRIVATEKEY *)ASN1_item_d2i((ASN1_VALUE **)a, in, len,
 	    &EC_PRIVATEKEY_it);
 }
 
-int
+static int
 i2d_EC_PRIVATEKEY(const EC_PRIVATEKEY *a, unsigned char **out)
 {
 	return ASN1_item_i2d((ASN1_VALUE *)a, out, &EC_PRIVATEKEY_it);
 }
 
-EC_PRIVATEKEY *
+static EC_PRIVATEKEY *
 EC_PRIVATEKEY_new(void)
 {
 	return (EC_PRIVATEKEY *)ASN1_item_new(&EC_PRIVATEKEY_it);
 }
 
-void
+static void
 EC_PRIVATEKEY_free(EC_PRIVATEKEY *a)
 {
 	ASN1_item_free((ASN1_VALUE *)a, &EC_PRIVATEKEY_it);
 }
-
-/* some declarations of internal function */
-
-/* ec_asn1_group2fieldid() sets the values in a X9_62_FIELDID object */
-static int ec_asn1_group2fieldid(const EC_GROUP *, X9_62_FIELDID *);
-/* ec_asn1_group2curve() sets the values in a X9_62_CURVE object */
-static int ec_asn1_group2curve(const EC_GROUP *, X9_62_CURVE *);
-/* ec_asn1_parameters2group() creates a EC_GROUP object from a
- * ECPARAMETERS object */
-static EC_GROUP *ec_asn1_parameters2group(const ECPARAMETERS *);
-/* ec_asn1_group2parameters() creates a ECPARAMETERS object from a
- * EC_GROUP object */
-static ECPARAMETERS *ec_asn1_group2parameters(const EC_GROUP *, ECPARAMETERS *);
-/* ec_asn1_pkparameters2group() creates a EC_GROUP object from a
- * ECPKPARAMETERS object */
-static EC_GROUP *ec_asn1_pkparameters2group(const ECPKPARAMETERS *);
-/* ec_asn1_group2pkparameters() creates a ECPKPARAMETERS object from a
- * EC_GROUP object */
-static ECPKPARAMETERS *ec_asn1_group2pkparameters(const EC_GROUP *,
-    ECPKPARAMETERS *);
-
-/* the function definitions */
 
 static int
 ec_asn1_group2fieldid(const EC_GROUP *group, X9_62_FIELDID *field)
@@ -1076,8 +1008,6 @@ ec_asn1_pkparameters2group(const ECPKPARAMETERS *params)
 	return ret;
 }
 
-/* EC_GROUP <-> DER encoding of ECPKPARAMETERS */
-
 EC_GROUP *
 d2i_ECPKParameters(EC_GROUP **a, const unsigned char **in, long len)
 {
@@ -1122,8 +1052,6 @@ i2d_ECPKParameters(const EC_GROUP *a, unsigned char **out)
 	return (ret);
 }
 LCRYPTO_ALIAS(i2d_ECPKParameters);
-
-/* some EC_KEY functions */
 
 EC_KEY *
 d2i_ECPrivateKey(EC_KEY **a, const unsigned char **in, long len)

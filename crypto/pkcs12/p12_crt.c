@@ -1,4 +1,4 @@
-/* $OpenBSD: p12_crt.c,v 1.23 2023/02/16 08:38:17 tb Exp $ */
+/* $OpenBSD: p12_crt.c,v 1.26 2024/08/22 12:22:42 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project.
  */
@@ -60,26 +60,14 @@
 
 #include <openssl/err.h>
 #include <openssl/pkcs12.h>
+#include <openssl/x509.h>
 
+#include "evp_local.h"
 #include "pkcs12_local.h"
+#include "x509_local.h"
 
 static int pkcs12_add_bag(STACK_OF(PKCS12_SAFEBAG) **pbags,
     PKCS12_SAFEBAG *bag);
-
-static int
-copy_bag_attr(PKCS12_SAFEBAG *bag, EVP_PKEY *pkey, int nid)
-{
-	int idx;
-	X509_ATTRIBUTE *attr;
-
-	idx = EVP_PKEY_get_attr_by_NID(pkey, nid, -1);
-	if (idx < 0)
-		return 1;
-	attr = EVP_PKEY_get_attr(pkey, idx);
-	if (!X509at_add1_attr(&bag->attrib, attr))
-		return 0;
-	return 1;
-}
 
 PKCS12 *
 PKCS12_create(const char *pass, const char *name, EVP_PKEY *pkey, X509 *cert,
@@ -141,11 +129,6 @@ PKCS12_create(const char *pass, const char *name, EVP_PKEY *pkey, X509 *cert,
 		bag = PKCS12_add_key(&bags, pkey, keytype, iter, nid_key, pass);
 
 		if (!bag)
-			goto err;
-
-		if (!copy_bag_attr(bag, pkey, NID_ms_csp_name))
-			goto err;
-		if (!copy_bag_attr(bag, pkey, NID_LocalKeySet))
 			goto err;
 
 		if (name && !PKCS12_add_friendlyname(bag, name, -1))
@@ -222,7 +205,6 @@ err:
 
 	return NULL;
 }
-LCRYPTO_ALIAS(PKCS12_add_cert);
 
 PKCS12_SAFEBAG *
 PKCS12_add_key(STACK_OF(PKCS12_SAFEBAG) **pbags, EVP_PKEY *key, int key_usage,
@@ -263,7 +245,6 @@ err:
 
 	return NULL;
 }
-LCRYPTO_ALIAS(PKCS12_add_key);
 
 int
 PKCS12_add_safe(STACK_OF(PKCS7) **psafes, STACK_OF(PKCS12_SAFEBAG) *bags,
@@ -307,7 +288,6 @@ err:
 
 	return 0;
 }
-LCRYPTO_ALIAS(PKCS12_add_safe);
 
 static int
 pkcs12_add_bag(STACK_OF(PKCS12_SAFEBAG) **pbags, PKCS12_SAFEBAG *bag)
@@ -354,4 +334,3 @@ PKCS12_add_safes(STACK_OF(PKCS7) *safes, int nid_p7)
 
 	return p12;
 }
-LCRYPTO_ALIAS(PKCS12_add_safes);

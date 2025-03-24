@@ -1,4 +1,4 @@
-/* $OpenBSD: a_time_tm.c,v 1.33 2024/03/02 09:10:42 tb Exp $ */
+/* $OpenBSD: a_time_tm.c,v 1.42 2024/05/03 18:33:27 tb Exp $ */
 /*
  * Copyright (c) 2015 Bob Beck <beck@openbsd.org>
  *
@@ -35,29 +35,29 @@ int
 ASN1_time_tm_cmp(struct tm *tm1, struct tm *tm2)
 {
 	if (tm1->tm_year < tm2->tm_year)
-		return (-1);
+		return -1;
 	if (tm1->tm_year > tm2->tm_year)
-		return (1);
+		return 1;
 	if (tm1->tm_mon < tm2->tm_mon)
-		return (-1);
+		return -1;
 	if (tm1->tm_mon > tm2->tm_mon)
-		return (1);
+		return 1;
 	if (tm1->tm_mday < tm2->tm_mday)
-		return (-1);
+		return -1;
 	if (tm1->tm_mday > tm2->tm_mday)
-		return (1);
+		return 1;
 	if (tm1->tm_hour < tm2->tm_hour)
-		return (-1);
+		return -1;
 	if (tm1->tm_hour > tm2->tm_hour)
-		return (1);
+		return 1;
 	if (tm1->tm_min < tm2->tm_min)
-		return (-1);
+		return -1;
 	if (tm1->tm_min > tm2->tm_min)
-		return (1);
+		return 1;
 	if (tm1->tm_sec < tm2->tm_sec)
-		return (-1);
+		return -1;
 	if (tm1->tm_sec > tm2->tm_sec)
-		return (1);
+		return 1;
 	return 0;
 }
 
@@ -78,31 +78,21 @@ ASN1_time_tm_clamp_notafter(struct tm *tm)
 }
 
 /* Convert time to GeneralizedTime, X.690, 11.7. */
-ASN1_TIME *
+static int
 tm_to_gentime(struct tm *tm, ASN1_TIME *atime)
 {
 	char *time_str = NULL;
-	int year;
 
-	year = tm->tm_year + 1900;
-	if (year < 0 || year > 9999) {
+	if (tm->tm_year < -1900 || tm->tm_year > 9999 - 1900) {
 		ASN1error(ASN1_R_ILLEGAL_TIME_VALUE);
-		goto err;
+		return 0;
 	}
 
-	if (asprintf(&time_str, "%04u%02u%02u%02u%02u%02uZ", year,
+	if (asprintf(&time_str, "%04u%02u%02u%02u%02u%02uZ", tm->tm_year + 1900,
 	    tm->tm_mon + 1, tm->tm_mday, tm->tm_hour, tm->tm_min,
 	    tm->tm_sec) == -1) {
-		time_str = NULL;
 		ASN1error(ERR_R_MALLOC_FAILURE);
-		goto err;
-	}
-
-	if (atime == NULL)
-		atime = ASN1_TIME_new();
-	if (atime == NULL) {
-		ASN1error(ERR_R_MALLOC_FAILURE);
-		goto err;
+		return 0;
 	}
 
 	free(atime->data);
@@ -110,38 +100,25 @@ tm_to_gentime(struct tm *tm, ASN1_TIME *atime)
 	atime->length = GENTIME_LENGTH;
 	atime->type = V_ASN1_GENERALIZEDTIME;
 
-	return (atime);
-
- err:
-	free(time_str);
-
-	return (NULL);
+	return 1;
 }
 
 /* Convert time to UTCTime, X.690, 11.8. */
-ASN1_TIME *
+static int
 tm_to_utctime(struct tm *tm, ASN1_TIME *atime)
 {
 	char *time_str = NULL;
 
 	if (tm->tm_year >= 150 || tm->tm_year < 50) {
 		ASN1error(ASN1_R_ILLEGAL_TIME_VALUE);
-		goto err;
+		return 0;
 	}
 
 	if (asprintf(&time_str, "%02u%02u%02u%02u%02u%02uZ",
 	    tm->tm_year % 100,  tm->tm_mon + 1, tm->tm_mday,
 	    tm->tm_hour, tm->tm_min, tm->tm_sec) == -1) {
-		time_str = NULL;
 		ASN1error(ERR_R_MALLOC_FAILURE);
-		goto err;
-	}
-
-	if (atime == NULL)
-		atime = ASN1_TIME_new();
-	if (atime == NULL) {
-		ASN1error(ERR_R_MALLOC_FAILURE);
-		goto err;
+		return 0;
 	}
 
 	free(atime->data);
@@ -149,29 +126,16 @@ tm_to_utctime(struct tm *tm, ASN1_TIME *atime)
 	atime->length = UTCTIME_LENGTH;
 	atime->type = V_ASN1_UTCTIME;
 
-	return (atime);
-
- err:
-	free(time_str);
-
-	return (NULL);
+	return 1;
 }
 
-ASN1_TIME *
+static int
 tm_to_rfc5280_time(struct tm *tm, ASN1_TIME *atime)
 {
-	int year;
+	if (tm->tm_year >= 50 && tm->tm_year < 150)
+		return tm_to_utctime(tm, atime);
 
-	year = tm->tm_year + 1900;
-	if (year < 1950 || year > 9999) {
-		ASN1error(ASN1_R_ILLEGAL_TIME_VALUE);
-		return (NULL);
-	}
-
-	if (year < 2050)
-		return (tm_to_utctime(tm, atime));
-
-	return (tm_to_gentime(tm, atime));
+	return tm_to_gentime(tm, atime);
 }
 
 
@@ -323,12 +287,11 @@ asn1_time_parse_cbs(const CBS *cbs, int is_gentime, struct tm *out_tm)
 int
 ASN1_time_parse(const char *bytes, size_t len, struct tm *tm, int mode)
 {
-	struct tm tml, *tmp = tm ? tm : &tml;
 	int type = 0;
 	CBS cbs;
 
 	if (bytes == NULL)
-		return (-1);
+		return -1;
 
 	CBS_init(&cbs, bytes, len);
 
@@ -336,7 +299,7 @@ ASN1_time_parse(const char *bytes, size_t len, struct tm *tm, int mode)
 		type = V_ASN1_UTCTIME;
 	if (CBS_len(&cbs) == GENTIME_LENGTH)
 		type = V_ASN1_GENERALIZEDTIME;
-	if (asn1_time_parse_cbs(&cbs, type == V_ASN1_GENERALIZEDTIME, tmp)) {
+	if (asn1_time_parse_cbs(&cbs, type == V_ASN1_GENERALIZEDTIME, tm)) {
 		if (mode != 0 && mode != type)
 			return -1;
 		return type;
@@ -352,64 +315,84 @@ ASN1_time_parse(const char *bytes, size_t len, struct tm *tm, int mode)
 static int
 ASN1_TIME_set_string_internal(ASN1_TIME *s, const char *str, int mode)
 {
-	int type;
-	char *tmp;
+	struct tm tm;
 
-	if ((type = ASN1_time_parse(str, strlen(str), NULL, mode)) == -1)
-		return (0);
-	if (mode != 0 && mode != type)
-		return (0);
+	if (ASN1_time_parse(str, strlen(str), &tm, mode) == -1)
+		return 0;
 
+	/* Only check str's format, as documented. */
 	if (s == NULL)
-		return (1);
+		return 1;
 
-	if ((tmp = strdup(str)) == NULL)
-		return (0);
-	free(s->data);
-	s->data = tmp;
-	s->length = strlen(tmp);
-	s->type = type;
-
-	return (1);
+	switch (mode) {
+	case V_ASN1_UTCTIME:
+		return tm_to_utctime(&tm, s);
+	case V_ASN1_GENERALIZEDTIME:
+		return tm_to_gentime(&tm, s);
+	case RFC5280:
+		return tm_to_rfc5280_time(&tm, s);
+	default:
+		return 0;
+	}
 }
 
 static ASN1_TIME *
 ASN1_TIME_adj_internal(ASN1_TIME *s, time_t t, int offset_day, long offset_sec,
     int mode)
 {
+	ASN1_TIME *atime = s;
 	struct tm tm;
 
 	if (!asn1_time_time_t_to_tm(&t, &tm))
-		return (NULL);
+		goto err;
 
 	if (offset_day != 0 || offset_sec != 0) {
 		if (!OPENSSL_gmtime_adj(&tm, offset_day, offset_sec))
-			return (NULL);
+			goto err;
 	}
+
+	if (atime == NULL)
+		atime = ASN1_TIME_new();
+	if (atime == NULL)
+		goto err;
 
 	switch (mode) {
 	case V_ASN1_UTCTIME:
-		return (tm_to_utctime(&tm, s));
+		if (!tm_to_utctime(&tm, atime))
+			goto err;
+		break;
 	case V_ASN1_GENERALIZEDTIME:
-		return (tm_to_gentime(&tm, s));
+		if (!tm_to_gentime(&tm, atime))
+			goto err;
+		break;
 	case RFC5280:
-		return (tm_to_rfc5280_time(&tm, s));
+		if (!tm_to_rfc5280_time(&tm, atime))
+			goto err;
+		break;
 	default:
-		return (NULL);
+		goto err;
 	}
+
+	return atime;
+
+ err:
+	if (atime != s)
+		ASN1_TIME_free(atime);
+
+	return NULL;
 }
 
 ASN1_TIME *
 ASN1_TIME_set(ASN1_TIME *s, time_t t)
 {
-	return (ASN1_TIME_adj(s, t, 0, 0));
+	return ASN1_TIME_adj(s, t, 0, 0);
 }
 LCRYPTO_ALIAS(ASN1_TIME_set);
 
 ASN1_TIME *
 ASN1_TIME_adj(ASN1_TIME *s, time_t t, int offset_day, long offset_sec)
 {
-	return (ASN1_TIME_adj_internal(s, t, offset_day, offset_sec, RFC5280));
+	return ASN1_TIME_adj_internal(s, t, offset_day, offset_sec, RFC5280);
 }
 LCRYPTO_ALIAS(ASN1_TIME_adj);
 
@@ -417,8 +400,8 @@ int
 ASN1_TIME_check(const ASN1_TIME *t)
 {
 	if (t->type != V_ASN1_GENERALIZEDTIME && t->type != V_ASN1_UTCTIME)
-		return (0);
-	return (t->type == ASN1_time_parse(t->data, t->length, NULL, t->type));
+		return 0;
+	return t->type == ASN1_time_parse(t->data, t->length, NULL, t->type);
 }
 LCRYPTO_ALIAS(ASN1_TIME_check);
 
@@ -429,26 +412,36 @@ ASN1_TIME_to_generalizedtime(const ASN1_TIME *t, ASN1_GENERALIZEDTIME **out)
 	struct tm tm;
 
 	if (t->type != V_ASN1_GENERALIZEDTIME && t->type != V_ASN1_UTCTIME)
-		return (NULL);
+		goto err;
 
 	if (t->type != ASN1_time_parse(t->data, t->length, &tm, t->type))
-		return (NULL);
+		goto err;
 
-	if (out != NULL)
-		agt = *out;
-	if ((agt = tm_to_gentime(&tm, agt)) == NULL)
-		return (NULL);
+	if (out == NULL || (agt = *out) == NULL)
+		agt = ASN1_TIME_new();
+	if (agt == NULL)
+		goto err;
+
+	if (!tm_to_gentime(&tm, agt))
+		goto err;
+
 	if (out != NULL)
 		*out = agt;
 
-	return (agt);
+	return agt;
+
+ err:
+	if (out == NULL || *out != agt)
+		ASN1_TIME_free(agt);
+
+	return NULL;
 }
 LCRYPTO_ALIAS(ASN1_TIME_to_generalizedtime);
 
 int
 ASN1_TIME_set_string(ASN1_TIME *s, const char *str)
 {
-	return (ASN1_TIME_set_string_internal(s, str, 0));
+	return ASN1_TIME_set_string_internal(s, str, RFC5280);
 }
 LCRYPTO_ALIAS(ASN1_TIME_set_string);
 
@@ -517,8 +510,8 @@ int
 ASN1_UTCTIME_check(const ASN1_UTCTIME *d)
 {
 	if (d->type != V_ASN1_UTCTIME)
-		return (0);
-	return (d->type == ASN1_time_parse(d->data, d->length, NULL, d->type));
+		return 0;
+	return d->type == ASN1_time_parse(d->data, d->length, NULL, d->type);
 }
 LCRYPTO_ALIAS(ASN1_UTCTIME_check);
 
@@ -526,23 +519,23 @@ int
 ASN1_UTCTIME_set_string(ASN1_UTCTIME *s, const char *str)
 {
 	if (s != NULL && s->type != V_ASN1_UTCTIME)
-		return (0);
-	return (ASN1_TIME_set_string_internal(s, str, V_ASN1_UTCTIME));
+		return 0;
+	return ASN1_TIME_set_string_internal(s, str, V_ASN1_UTCTIME);
 }
 LCRYPTO_ALIAS(ASN1_UTCTIME_set_string);
 
 ASN1_UTCTIME *
 ASN1_UTCTIME_set(ASN1_UTCTIME *s, time_t t)
 {
-	return (ASN1_UTCTIME_adj(s, t, 0, 0));
+	return ASN1_UTCTIME_adj(s, t, 0, 0);
 }
 LCRYPTO_ALIAS(ASN1_UTCTIME_set);
 
 ASN1_UTCTIME *
 ASN1_UTCTIME_adj(ASN1_UTCTIME *s, time_t t, int offset_day, long offset_sec)
 {
-	return (ASN1_TIME_adj_internal(s, t, offset_day, offset_sec,
-	    V_ASN1_UTCTIME));
+	return ASN1_TIME_adj_internal(s, t, offset_day, offset_sec,
+	    V_ASN1_UTCTIME);
 }
 LCRYPTO_ALIAS(ASN1_UTCTIME_adj);
 
@@ -553,6 +546,7 @@ ASN1_UTCTIME_cmp_time_t(const ASN1_UTCTIME *s, time_t t)
 		return ASN1_TIME_cmp_time_t_internal(s, t, V_ASN1_UTCTIME);
 	return -2;
 }
+LCRYPTO_ALIAS(ASN1_UTCTIME_cmp_time_t);
 
 /*
  * ASN1_GENERALIZEDTIME wrappers
@@ -562,8 +556,8 @@ int
 ASN1_GENERALIZEDTIME_check(const ASN1_GENERALIZEDTIME *d)
 {
 	if (d->type != V_ASN1_GENERALIZEDTIME)
-		return (0);
-	return (d->type == ASN1_time_parse(d->data, d->length, NULL, d->type));
+		return 0;
+	return d->type == ASN1_time_parse(d->data, d->length, NULL, d->type);
 }
 LCRYPTO_ALIAS(ASN1_GENERALIZEDTIME_check);
 
@@ -571,15 +565,15 @@ int
 ASN1_GENERALIZEDTIME_set_string(ASN1_GENERALIZEDTIME *s, const char *str)
 {
 	if (s != NULL && s->type != V_ASN1_GENERALIZEDTIME)
-		return (0);
-	return (ASN1_TIME_set_string_internal(s, str, V_ASN1_GENERALIZEDTIME));
+		return 0;
+	return ASN1_TIME_set_string_internal(s, str, V_ASN1_GENERALIZEDTIME);
 }
 LCRYPTO_ALIAS(ASN1_GENERALIZEDTIME_set_string);
 
 ASN1_GENERALIZEDTIME *
 ASN1_GENERALIZEDTIME_set(ASN1_GENERALIZEDTIME *s, time_t t)
 {
-	return (ASN1_GENERALIZEDTIME_adj(s, t, 0, 0));
+	return ASN1_GENERALIZEDTIME_adj(s, t, 0, 0);
 }
 LCRYPTO_ALIAS(ASN1_GENERALIZEDTIME_set);
 
@@ -587,8 +581,8 @@ ASN1_GENERALIZEDTIME *
 ASN1_GENERALIZEDTIME_adj(ASN1_GENERALIZEDTIME *s, time_t t, int offset_day,
     long offset_sec)
 {
-	return (ASN1_TIME_adj_internal(s, t, offset_day, offset_sec,
-	    V_ASN1_GENERALIZEDTIME));
+	return ASN1_TIME_adj_internal(s, t, offset_day, offset_sec,
+	    V_ASN1_GENERALIZEDTIME);
 }
 LCRYPTO_ALIAS(ASN1_GENERALIZEDTIME_adj);
 
@@ -601,7 +595,7 @@ ASN1_TIME_normalize(ASN1_TIME *t)
 		return 0;
 	if (!ASN1_TIME_to_tm(t, &tm))
 		return 0;
-	return tm_to_rfc5280_time(&tm, t) != NULL;
+	return tm_to_rfc5280_time(&tm, t);
 }
 LCRYPTO_ALIAS(ASN1_TIME_normalize);
 

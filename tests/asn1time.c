@@ -1,4 +1,4 @@
-/* $OpenBSD: asn1time.c,v 1.25 2024/02/18 22:17:01 tb Exp $ */
+/* $OpenBSD: asn1time.c,v 1.30 2024/07/21 13:25:11 tb Exp $ */
 /*
  * Copyright (c) 2015 Joel Sing <jsing@openbsd.org>
  * Copyright (c) 2024 Google Inc.
@@ -120,6 +120,18 @@ static const struct asn1_time_test asn1_gentime_tests[] = {
 			0x32, 0x33, 0x30, 0x33, 0x32, 0x37, 0x30, 0x30,
 			0x5a,
 		},
+	},
+	{
+		/* 1 second after the 32-bit epoch wraps. */
+		.str = "20380119031408Z",
+		.data = "20380119031408Z",
+		.time = 2147483648LL,
+		.der = {
+			0x18, 0x0f, 0x32, 0x30, 0x33, 0x38, 0x30, 0x31,
+			0x31, 0x39, 0x30, 0x33, 0x31, 0x34, 0x30, 0x38,
+			0x5a,
+		},
+
 	},
 };
 
@@ -280,6 +292,7 @@ asn1_gentime_test(int test_no, const struct asn1_time_test *att)
 	const unsigned char *der;
 	unsigned char *p = NULL;
 	ASN1_GENERALIZEDTIME *gt = NULL;
+	time_t t;
 	int failure = 1;
 	int len;
 	struct tm tm;
@@ -307,11 +320,18 @@ asn1_gentime_test(int test_no, const struct asn1_time_test *att)
 		goto done;
 	}
 
-	if (timegm(&tm) != att->time) {
+	if (!OPENSSL_timegm(&tm, &t)) {
 		/* things with crappy time_t should die in fire */
-		int64_t a = timegm(&tm);
-		int64_t b = att->time;
-		fprintf(stderr, "FAIL: test %d - times don't match, expected %lld got %lld\n",
+		fprintf(stderr, "FAIL: test %d - OPENSSL_timegm failed\n",
+		    test_no);
+	}
+
+	if (t != att->time) {
+		/* things with crappy time_t should die in fire */
+		int64_t a = t, b = att->time;
+
+		fprintf(stderr, "FAIL: test %d - times don't match, "
+		    "expected %lld got %lld\n",
 		    test_no, (long long)b, (long long)a);
 		goto done;
 	}
@@ -420,6 +440,7 @@ static int
 asn1_time_test(int test_no, const struct asn1_time_test *att, int type)
 {
 	ASN1_TIME *t = NULL, *tx509 = NULL;
+	char *parsed_time = NULL;
 	int failure = 1;
 
 	if (ASN1_TIME_set_string(NULL, att->str) != 1) {
@@ -434,9 +455,27 @@ asn1_time_test(int test_no, const struct asn1_time_test *att, int type)
 	if ((tx509 = ASN1_TIME_new()) == NULL)
 		goto done;
 
-	if (ASN1_TIME_set_string(t, att->str) != 1) {
-		fprintf(stderr, "FAIL: test %d - failed to set string '%s'\n",
-		    test_no, att->str);
+	switch (strlen(att->str)) {
+	case 13:
+		t->type = V_ASN1_UTCTIME;
+		if (ASN1_UTCTIME_set_string(t, att->str) != 1) {
+			fprintf(stderr, "FAIL: test %d - failed to set utc "
+			    "string '%s'\n",
+			    test_no, att->str);
+			goto done;
+		}
+		break;
+	case 15:
+		t->type = V_ASN1_GENERALIZEDTIME;
+		if (ASN1_GENERALIZEDTIME_set_string(t, att->str) != 1) {
+			fprintf(stderr, "FAIL: test %d - failed to set gen "
+			    "string '%s'\n",
+			    test_no, att->str);
+			goto done;
+		}
+		break;
+	default:
+		fprintf(stderr, "FAIL: unknown type\n");
 		goto done;
 	}
 
@@ -446,13 +485,33 @@ asn1_time_test(int test_no, const struct asn1_time_test *att, int type)
 		goto done;
 	}
 
+	if ((parsed_time = strdup(t->data)) == NULL)
+		goto done;
+
 	if (ASN1_TIME_normalize(t) != 1) {
 		fprintf(stderr, "FAIL: test %d - failed to set normalize '%s'\n",
 		    test_no, att->str);
 		goto done;
 	}
 
-	if (ASN1_TIME_set_string_X509(tx509, t->data) != 1) {
+	if (ASN1_TIME_set_string_X509(tx509, parsed_time) != 1) {
+		fprintf(stderr, "FAIL: test %d - failed to set string X509 '%s'\n",
+		    test_no, t->data);
+		goto done;
+	}
+
+	if (t->type != tx509->type) {
+		fprintf(stderr, "FAIL: test %d - type %d, different from %d\n",
+		    test_no, t->type, tx509->type);
+		goto done;
+	}
+
+	if (ASN1_TIME_compare(t, tx509) != 0) {
+		fprintf(stderr, "FAIL: ASN1_TIME values differ!\n");
+		goto done;
+	}
+
+	if (ASN1_TIME_set_string(tx509, parsed_time) != 1) {
 		fprintf(stderr, "FAIL: test %d - failed to set string X509 '%s'\n",
 		    test_no, t->data);
 		goto done;
@@ -476,6 +535,7 @@ asn1_time_test(int test_no, const struct asn1_time_test *att, int type)
 
 	ASN1_TIME_free(t);
 	ASN1_TIME_free(tx509);
+	free(parsed_time);
 
 	return (failure);
 }
@@ -521,14 +581,16 @@ asn1_time_compare_families(const struct asn1_time_test *fam1, size_t fam1_size,
 			asn1_cmp = ASN1_TIME_compare(t1, t2);
 
 			if (time_cmp != asn1_cmp) {
-				fprintf(stderr, "%s vs. %s: want %d, got %d\n",
+				fprintf(stderr, "ASN1_TIME_compare - %s vs. %s: "
+				    "want %d, got %d\n",
 				    att1->str, att2->str, time_cmp, asn1_cmp);
 				comparison_failure |= 1;
 			}
 
 			time_cmp = ASN1_TIME_cmp_time_t(t1, att2->time);
 			if (time_cmp != asn1_cmp) {
-				fprintf(stderr, "%s vs. %lld: want %d, got %d\n",
+				fprintf(stderr, "ASN1_TIME_cmp_time_t - %s vs. %lld: "
+				    "want %d, got %d\n",
 				    att1->str, (long long)att2->time,
 				    asn1_cmp, time_cmp);
 				comparison_failure |= 1;
@@ -538,7 +600,8 @@ asn1_time_compare_families(const struct asn1_time_test *fam1, size_t fam1_size,
 			if (t1->type != V_ASN1_UTCTIME)
 				asn1_cmp = -2;
 			if (time_cmp != asn1_cmp) {
-				fprintf(stderr, "%s vs. %lld: want %d, got %d\n",
+				fprintf(stderr, "ASN1_UTCTIME_cmp_time_t - %s vs. %lld: "
+				    "want %d, got %d\n",
 				    att1->str, (long long)att2->time,
 				    asn1_cmp, time_cmp);
 				comparison_failure |= 1;

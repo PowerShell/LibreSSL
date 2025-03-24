@@ -1,4 +1,4 @@
-/* $OpenBSD: conf_sap.c,v 1.15 2023/11/19 15:46:09 tb Exp $ */
+/* $OpenBSD: conf_sap.c,v 1.17 2024/08/31 09:54:31 tb Exp $ */
 /* Written by Stephen Henson (steve@openssl.org) for the OpenSSL
  * project 2001.
  */
@@ -67,6 +67,8 @@
 #include <openssl/err.h>
 #include <openssl/x509.h>
 
+#include "conf_local.h"
+
 /* This is the automatic configuration loader: it is called automatically by
  * OpenSSL when any of a number of standard initialisation functions are called,
  * unless this is overridden by calling OPENSSL_no_config()
@@ -124,6 +126,7 @@ OPENSSL_config(const char *config_name)
 {
 	(void) OpenSSL_config(config_name);
 }
+LCRYPTO_ALIAS(OPENSSL_config);
 
 static void
 OPENSSL_no_config_internal(void)
@@ -144,3 +147,4 @@ OPENSSL_no_config(void)
 {
 	(void) OpenSSL_no_config();
 }
+LCRYPTO_ALIAS(OPENSSL_no_config);

@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_lib.c,v 1.321 2024/03/02 11:48:55 tb Exp $ */
+/* $OpenBSD: ssl_lib.c,v 1.330 2024/09/22 14:59:48 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -160,8 +160,6 @@
 #include "ssl_sigalgs.h"
 #include "ssl_tlsext.h"
 #include "tls12_internal.h"
-
-const char *SSL_version_str = OPENSSL_VERSION_TEXT;
 
 int
 SSL_clear(SSL *s)
@@ -605,8 +603,7 @@ LSSL_ALIAS(SSL_free);
 int
 SSL_up_ref(SSL *s)
 {
-	int refs = CRYPTO_add(&s->references, 1, CRYPTO_LOCK_SSL);
-	return (refs > 1) ? 1 : 0;
+	return CRYPTO_add(&s->references, 1, CRYPTO_LOCK_SSL) > 1;
 }
 LSSL_ALIAS(SSL_up_ref);
 
@@ -1375,10 +1372,8 @@ SSL_ctrl(SSL *s, int cmd, long larg, void *parg)
 		s->max_cert_list = larg;
 		return (l);
 	case SSL_CTRL_SET_MTU:
-#ifndef OPENSSL_NO_DTLS1
 		if (larg < (long)dtls1_min_mtu())
 			return (0);
-#endif
 		if (SSL_is_dtls(s)) {
 			s->d1->mtu = larg;
 			return (larg);
@@ -1531,9 +1526,9 @@ LSSL_ALIAS(SSL_get_ciphers);
 STACK_OF(SSL_CIPHER) *
 SSL_get_client_ciphers(const SSL *s)
 {
-	if (s == NULL || s->session == NULL || !s->server)
+	if (s == NULL || !s->server)
 		return NULL;
-	return s->session->ciphers;
+	return s->s3->hs.client_ciphers;
 }
 LSSL_ALIAS(SSL_get_client_ciphers);
 
@@ -1716,10 +1711,10 @@ SSL_get_shared_ciphers(const SSL *s, char *buf, int len)
 	char *end;
 	int i;
 
-	if (!s->server || s->session == NULL || len < 2)
+	if (!s->server || len < 2)
 		return NULL;
 
-	if ((client_ciphers = s->session->ciphers) == NULL)
+	if ((client_ciphers = s->s3->hs.client_ciphers) == NULL)
 		return NULL;
 	if ((server_ciphers = SSL_get_ciphers(s)) == NULL)
 		return NULL;
@@ -1788,45 +1783,72 @@ LSSL_ALIAS(SSL_get_servername_type);
  * It returns either:
  * OPENSSL_NPN_NEGOTIATED if a common protocol was found, or
  * OPENSSL_NPN_NO_OVERLAP if the fallback case was reached.
+ *
+ * XXX - the out argument points into server_list or client_list and should
+ * therefore really be const. We can't fix that without breaking the callers.
  */
 int
 SSL_select_next_proto(unsigned char **out, unsigned char *outlen,
-    const unsigned char *server, unsigned int server_len,
-    const unsigned char *client, unsigned int client_len)
+    const unsigned char *peer_list, unsigned int peer_list_len,
+    const unsigned char *supported_list, unsigned int supported_list_len)
 {
-	unsigned int		 i, j;
-	const unsigned char	*result;
-	int			 status = OPENSSL_NPN_UNSUPPORTED;
+	CBS peer, peer_proto, supported, supported_proto;
+
+	*out = NULL;
+	*outlen = 0;
+
+	/* First check that the supported list is well-formed. */
+	CBS_init(&supported, supported_list, supported_list_len);
+	if (!tlsext_alpn_check_format(&supported))
+		goto err;
 
 	/*
-	 * For each protocol in server preference order,
-	 * see if we support it.
+	 * Use first supported protocol as fallback. This is one way of doing
+	 * NPN's "opportunistic" protocol selection (see security considerations
+	 * in draft-agl-tls-nextprotoneg-04), and it is the documented behavior
+	 * of this API. For ALPN it's the callback's responsibility to fail on
+	 * OPENSSL_NPN_NO_OVERLAP.
 	 */
-	for (i = 0; i < server_len; ) {
-		for (j = 0; j < client_len; ) {
-			if (server[i] == client[j] &&
-			    memcmp(&server[i + 1],
-			    &client[j + 1], server[i]) == 0) {
-				/* We found a match */
-				result = &server[i];
-				status = OPENSSL_NPN_NEGOTIATED;
-				goto found;
+
+	if (!CBS_get_u8_length_prefixed(&supported, &supported_proto))
+		goto err;
+
+	*out = (unsigned char *)CBS_data(&supported_proto);
+	*outlen = CBS_len(&supported_proto);
+
+	/* Now check that the peer list is well-formed. */
+	CBS_init(&peer, peer_list, peer_list_len);
+	if (!tlsext_alpn_check_format(&peer))
+		goto err;
+
+	/*
+	 * Walk the peer list and select the first protocol that appears in
+	 * the supported list. Thus we honor peer preference rather than local
+	 * preference contrary to a SHOULD in RFC 7301, section 3.2.
+	 */
+	while (CBS_len(&peer) > 0) {
+		if (!CBS_get_u8_length_prefixed(&peer, &peer_proto))
+			goto err;
+
+		CBS_init(&supported, supported_list, supported_list_len);
+
+		while (CBS_len(&supported) > 0) {
+			if (!CBS_get_u8_length_prefixed(&supported,
+			    &supported_proto))
+				goto err;
+
+			if (CBS_mem_equal(&supported_proto,
+			    CBS_data(&peer_proto), CBS_len(&peer_proto))) {
+				*out = (unsigned char *)CBS_data(&peer_proto);
+				*outlen = CBS_len(&peer_proto);
+
+				return OPENSSL_NPN_NEGOTIATED;
 			}
-			j += client[j];
-			j++;
 		}
-		i += server[i];
-		i++;
 	}
 
-	/* There's no overlap between our protocols and the server's list. */
-	result = client;
-	status = OPENSSL_NPN_NO_OVERLAP;
-
- found:
-	*out = (unsigned char *) result + 1;
-	*outlen = result[0];
-	return (status);
+ err:
+	return OPENSSL_NPN_NO_OVERLAP;
 }
 LSSL_ALIAS(SSL_select_next_proto);
 
@@ -2217,8 +2239,7 @@ LSSL_ALIAS(SSL_CTX_free);
 int
 SSL_CTX_up_ref(SSL_CTX *ctx)
 {
-	int refs = CRYPTO_add(&ctx->references, 1, CRYPTO_LOCK_SSL_CTX);
-	return ((refs > 1) ? 1 : 0);
+	return CRYPTO_add(&ctx->references, 1, CRYPTO_LOCK_SSL_CTX) > 1;
 }
 LSSL_ALIAS(SSL_CTX_up_ref);
 
@@ -3050,11 +3071,10 @@ LSSL_ALIAS(SSL_get_privatekey);
 const SSL_CIPHER *
 SSL_get_current_cipher(const SSL *s)
 {
-	if ((s->session != NULL) && (s->session->cipher != NULL))
-		return (s->session->cipher);
-	return (NULL);
+	return s->s3->hs.cipher;
 }
 LSSL_ALIAS(SSL_get_current_cipher);
+
 const void *
 SSL_get_current_compression(SSL *s)
 {
@@ -3380,6 +3400,16 @@ SSL_CTX_set_cert_store(SSL_CTX *ctx, X509_STORE *store)
 	ctx->cert_store = store;
 }
 LSSL_ALIAS(SSL_CTX_set_cert_store);
+
+void
+SSL_CTX_set1_cert_store(SSL_CTX *ctx, X509_STORE *store)
+{
+	if (store != NULL)
+		X509_STORE_up_ref(store);
+
+	SSL_CTX_set_cert_store(ctx, store);
+}
+LSSL_ALIAS(SSL_CTX_set1_cert_store);
 
 X509 *
 SSL_CTX_get0_certificate(const SSL_CTX *ctx)

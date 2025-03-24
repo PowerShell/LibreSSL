@@ -9,6 +9,8 @@
 
 #define NO_REDEF_POSIX_FUNCTIONS
 
+#include <sys/time.h>
+
 #include <ws2tcpip.h>
 #include <windows.h>
 
@@ -164,9 +166,10 @@ static void noop_handler(const wchar_t *expression,	const wchar_t *function,
 }
 
 #define BEGIN_SUPPRESS_IPH \
-	int old_report_mode = _CrtSetReportMode(_CRT_ASSERT, 0); \
-	_invalid_parameter_handler old_handler = _set_thread_local_invalid_parameter_handler(noop_handler)
+	const int old_report_mode = _CrtSetReportMode(_CRT_ASSERT, 0); \
+	const _invalid_parameter_handler old_handler = _set_thread_local_invalid_parameter_handler(noop_handler)
 #define END_SUPPRESS_IPH \
+	(void)old_report_mode; /* Silence warning in release mode when _CrtSetReportMode compiles to void. */ \
 	_CrtSetReportMode(_CRT_ASSERT, old_report_mode); \
 	_set_thread_local_invalid_parameter_handler(old_handler)
 
@@ -305,7 +308,7 @@ int gettimeofday(struct timeval * tp, struct timezone * tzp)
 	time = ((uint64_t)file_time.dwLowDateTime);
 	time += ((uint64_t)file_time.dwHighDateTime) << 32;
 
-	tp->tv_sec = (long)((time - EPOCH) / 10000000L);
+	tp->tv_sec = (long long)((time - EPOCH) / 10000000L);
 	tp->tv_usec = (long)(system_time.wMilliseconds * 1000);
 	return 0;
 }

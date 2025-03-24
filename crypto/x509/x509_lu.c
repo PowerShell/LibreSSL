@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_lu.c,v 1.64 2024/03/02 10:57:03 tb Exp $ */
+/* $OpenBSD: x509_lu.c,v 1.66 2024/08/31 10:19:17 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -63,10 +63,11 @@
 #include <openssl/lhash.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
+
 #include "x509_local.h"
 
 static X509_LOOKUP *
-X509_LOOKUP_new(X509_LOOKUP_METHOD *method)
+X509_LOOKUP_new(const X509_LOOKUP_METHOD *method)
 {
 	X509_LOOKUP *lu;
 
@@ -221,22 +222,13 @@ x509_object_dup(const X509_OBJECT *obj)
 void
 X509_STORE_free(X509_STORE *store)
 {
-	STACK_OF(X509_LOOKUP) *sk;
-	X509_LOOKUP *lu;
-	int i;
-
 	if (store == NULL)
 		return;
 
 	if (CRYPTO_add(&store->references, -1, CRYPTO_LOCK_X509_STORE) > 0)
 		return;
 
-	sk = store->get_cert_methods;
-	for (i = 0; i < sk_X509_LOOKUP_num(sk); i++) {
-		lu = sk_X509_LOOKUP_value(sk, i);
-		X509_LOOKUP_free(lu);
-	}
-	sk_X509_LOOKUP_free(sk);
+	sk_X509_LOOKUP_pop_free(store->get_cert_methods, X509_LOOKUP_free);
 	sk_X509_OBJECT_pop_free(store->objs, X509_OBJECT_free);
 
 	CRYPTO_free_ex_data(CRYPTO_EX_INDEX_X509_STORE, store, &store->ex_data);
@@ -253,7 +245,7 @@ X509_STORE_up_ref(X509_STORE *store)
 LCRYPTO_ALIAS(X509_STORE_up_ref);
 
 X509_LOOKUP *
-X509_STORE_add_lookup(X509_STORE *store, X509_LOOKUP_METHOD *method)
+X509_STORE_add_lookup(X509_STORE *store, const X509_LOOKUP_METHOD *method)
 {
 	STACK_OF(X509_LOOKUP) *sk;
 	X509_LOOKUP *lu;

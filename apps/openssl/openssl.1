@@ -1,4 +1,4 @@
-.\" $OpenBSD: openssl.1,v 1.155 2024/01/26 11:58:37 job Exp $
+.\" $OpenBSD: openssl.1,v 1.161 2024/08/30 06:05:10 jmc Exp $
 .\" ====================================================================
 .\" Copyright (c) 1998-2002 The OpenSSL Project.  All rights reserved.
 .\"
@@ -110,7 +110,7 @@
 .\" copied and put under another distribution licence
 .\" [including the GNU Public Licence.]
 .\"
-.Dd $Mdocdate: January 26 2024 $
+.Dd $Mdocdate: August 30 2024 $
 .Dt OPENSSL 1
 .Os
 .Sh NAME
@@ -136,7 +136,7 @@
 .Nm OpenSSL
 is a cryptography toolkit implementing the
 Transport Layer Security
-.Pq TLS v1
+.Pq TLS
 network protocol,
 as well as related cryptography standards.
 .Pp
@@ -338,7 +338,6 @@ into a nested structure.
 .Op Fl revoke Ar file
 .Op Fl selfsign
 .Op Fl sigopt Ar nm:v
-.Op Fl spkac Ar file
 .Op Fl ss_cert Ar file
 .Op Fl startdate Ar date
 .Op Fl status Ar serial
@@ -469,9 +468,7 @@ Don't output the text form of a certificate to the output file.
 The output file to output certificates to.
 The default is standard output.
 The certificate details will also be printed out to this file in
-PEM format, except that
-.Fl spkac
-outputs DER format.
+PEM format.
 .It Fl outdir Ar directory
 The
 .Ar directory
@@ -514,8 +511,7 @@ certificate requests were signed with, given with
 .Fl keyfile .
 Certificate requests signed with a different key are ignored.
 If
-.Fl gencrl ,
-.Fl spkac ,
+.Fl gencrl
 or
 .Fl ss_cert
 are given,
@@ -532,20 +528,6 @@ signed with the self-signed certificate.
 .It Fl sigopt Ar nm:v
 Pass options to the signature algorithm during sign or certify operations.
 The names and values of these options are algorithm-specific.
-.It Fl spkac Ar file
-A file containing a single Netscape signed public key and challenge,
-and additional field values to be signed by the CA.
-This will usually come from the
-KEYGEN tag in an HTML form to create a new private key.
-It is, however, possible to create SPKACs using the
-.Nm spkac
-utility.
-.Pp
-The file should contain the variable SPKAC set to the value of
-the SPKAC and also the required DN components as name value pairs.
-If it's necessary to include the same component twice,
-then it can be preceded by a number and a
-.Sq \&. .
 .It Fl ss_cert Ar file
 A single self-signed certificate to be signed by the CA.
 .It Fl startdate Ar date
@@ -961,6 +943,7 @@ but without cipher suite codes.
 .Oc
 .Op Fl CAfile Ar file
 .Op Fl CApath Ar directory
+.Op Fl CRLfile Ar file
 .Op Fl binary
 .Op Fl certfile Ar file
 .Op Fl certsout Ar file
@@ -1151,6 +1134,9 @@ This directory must be a standard certificate directory: that is a hash
 of each subject name (using
 .Nm x509 Fl hash )
 should be linked to each certificate.
+.It Fl CRLfile Ar file
+Allows additional certificate revocation lists to be specified for verification.
+The CRLs should be in PEM format.
 .It Ar cert.pem ...
 One or more certificates of message recipients: used when encrypting a message.
 .It Fl certfile Ar file
@@ -3098,7 +3084,6 @@ It is recommended that des3 is used.
 .Op Fl certpbe Ar alg
 .Op Fl chain
 .Op Fl clcerts
-.Op Fl CSP Ar name
 .Op Fl descert
 .Op Fl export
 .Op Fl in Ar file
@@ -3107,7 +3092,6 @@ It is recommended that des3 is used.
 .Op Fl keyex
 .Op Fl keypbe Ar alg
 .Op Fl keysig
-.Op Fl LMK
 .Op Fl macalg Ar alg
 .Op Fl maciter
 .Op Fl name Ar name
@@ -3216,10 +3200,6 @@ For interoperability reasons it is advisable to only use PKCS#12 algorithms.
 Include the entire certificate chain of the user certificate.
 The standard CA store is used for this search.
 If the search fails, it is considered a fatal error.
-.It Fl CSP Ar name
-Write
-.Ar name
-as a Microsoft CSP name.
 .It Fl descert
 Encrypt the certificate using triple DES; this may render the PKCS#12
 file unreadable by some
@@ -3251,8 +3231,6 @@ option marks the key for signing only.
 Signing only keys can be used for S/MIME signing, authenticode
 (ActiveX control signing)
 and SSL client authentication.
-.It Fl LMK
-Add local machine keyset attribute to private key.
 .It Fl macalg Ar alg
 Specify the MAC digest algorithm.
 The default is SHA1.
@@ -3304,7 +3282,6 @@ is equivalent to
 .Bl -hang -width "openssl pkey"
 .It Nm openssl pkey
 .Bk -words
-.Op Fl check
 .Op Ar cipher
 .Op Fl in Ar file
 .Op Fl inform Cm der | pem
@@ -3313,7 +3290,6 @@ is equivalent to
 .Op Fl outform Cm der | pem
 .Op Fl passin Ar arg
 .Op Fl passout Ar arg
-.Op Fl pubcheck
 .Op Fl pubin
 .Op Fl pubout
 .Op Fl text
@@ -3329,8 +3305,6 @@ and their components printed out.
 .Pp
 The options are as follows:
 .Bl -tag -width Ds
-.It Fl check
-Check the validity of a key pair.
 .It Ar cipher
 Encrypt the private key with the specified cipher.
 Any algorithm name accepted by
@@ -3356,9 +3330,6 @@ The output format.
 The key password source.
 .It Fl passout Ar arg
 The output file password source.
-.It Fl pubcheck
-Check the validity of a public key
-or the public component of a key pair.
 .It Fl pubin
 Read in a public key, not a private key.
 .It Fl pubout
@@ -3373,7 +3344,6 @@ even if a private key is being processed.
 .Tg pkeyparam
 .Sh PKEYPARAM
 .Cm openssl pkeyparam
-.Op Fl check
 .Op Fl in Ar file
 .Op Fl noout
 .Op Fl out Ar file
@@ -3386,8 +3356,6 @@ The key type is determined by the PEM headers.
 .Pp
 The options are as follows:
 .Bl -tag -width Ds
-.It Fl check
-check the correctness of parameters.
 .It Fl in Ar file
 The input file to read from,
 or standard input if not specified.
@@ -5402,68 +5370,6 @@ bytes from the alignment provided by
 .Xr malloc 3 .
 .Ar number
 should be between 0 and 16.
-.El
-.Tg spkac
-.Sh SPKAC
-.Bl -hang -width "openssl spkac"
-.It Nm openssl spkac
-.Bk -words
-.Op Fl challenge Ar string
-.Op Fl in Ar file
-.Op Fl key Ar keyfile
-.Op Fl noout
-.Op Fl out Ar file
-.Op Fl passin Ar arg
-.Op Fl pubkey
-.Op Fl spkac Ar spkacname
-.Op Fl spksect Ar section
-.Op Fl verify
-.Ek
-.El
-.Pp
-The
-.Nm spkac
-command processes signed public key and challenge (SPKAC) files.
-It can print out their contents, verify the signature,
-and produce its own SPKACs from a supplied private key.
-.Pp
-The options are as follows:
-.Bl -tag -width Ds
-.It Fl challenge Ar string
-The challenge string, if an SPKAC is being created.
-.It Fl in Ar file
-The input file to read from,
-or standard input if not specified.
-Ignored if the
-.Fl key
-option is used.
-.It Fl key Ar keyfile
-Create an SPKAC file using the private key in
-.Ar keyfile .
-The
-.Fl in , noout , spksect ,
-and
-.Fl verify
-options are ignored, if present.
-.It Fl noout
-Do not output the text version of the SPKAC.
-.It Fl out Ar file
-The output file to write to,
-or standard output if not specified.
-.It Fl passin Ar arg
-The key password source.
-.It Fl pubkey
-Output the public key of an SPKAC.
-.It Fl spkac Ar spkacname
-An alternative name for the variable containing the SPKAC.
-The default is "SPKAC".
-This option affects both generated and input SPKAC files.
-.It Fl spksect Ar section
-An alternative name for the
-.Ar section
-containing the SPKAC.
-.It Fl verify
-Verify the digital signature on the supplied SPKAC.
 .El
 .Tg ts
 .Sh TS

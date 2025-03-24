@@ -1,4 +1,4 @@
-/* $OpenBSD: md4.c,v 1.7 2023/08/10 13:41:56 jsing Exp $ */
+/* $OpenBSD: md4.c,v 1.18 2024/06/01 07:36:16 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -57,203 +57,286 @@
  */
 
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include <openssl/opensslconf.h>
+
 #include <openssl/md4.h>
 
-__BEGIN_HIDDEN_DECLS
+#include "crypto_internal.h"
 
-void md4_block_data_order (MD4_CTX *c, const void *p, size_t num);
+/* Ensure that MD4_LONG and uint32_t are equivalent size. */
+CTASSERT(sizeof(MD4_LONG) == sizeof(uint32_t));
 
-__END_HIDDEN_DECLS
+static inline uint32_t
+md4_f(uint32_t x, uint32_t y, uint32_t z)
+{
+	return (x & y) | (~x & z);
+}
 
-#define DATA_ORDER_IS_LITTLE_ENDIAN
+static inline uint32_t
+md4_g(uint32_t x, uint32_t y, uint32_t z)
+{
+	return (x & y) | (x & z) | (y & z);
+}
 
-#define HASH_LONG		MD4_LONG
-#define HASH_CTX		MD4_CTX
-#define HASH_CBLOCK		MD4_CBLOCK
-#define HASH_UPDATE		MD4_Update
-#define HASH_TRANSFORM		MD4_Transform
-#define HASH_FINAL		MD4_Final
-#define	HASH_MAKE_STRING(c,s)	do {	\
-	unsigned long ll;		\
-	ll=(c)->A; HOST_l2c(ll,(s));	\
-	ll=(c)->B; HOST_l2c(ll,(s));	\
-	ll=(c)->C; HOST_l2c(ll,(s));	\
-	ll=(c)->D; HOST_l2c(ll,(s));	\
-	} while (0)
-#define	HASH_BLOCK_DATA_ORDER	md4_block_data_order
+static inline uint32_t
+md4_h(uint32_t x, uint32_t y, uint32_t z)
+{
+	return x ^ y ^ z;
+}
 
-#include "md32_common.h"
-LCRYPTO_ALIAS(MD4_Update);
-LCRYPTO_ALIAS(MD4_Final);
-LCRYPTO_ALIAS(MD4_Transform);
+static inline void
+md4_round1(uint32_t *a, uint32_t b, uint32_t c, uint32_t d, uint32_t x,
+    uint32_t s)
+{
+	*a = crypto_rol_u32(*a + md4_f(b, c, d) + x, s);
+}
 
-/*
-#define	F(x,y,z)	(((x) & (y))  |  ((~(x)) & (z)))
-#define	G(x,y,z)	(((x) & (y))  |  ((x) & ((z))) | ((y) & ((z))))
-*/
+static inline void
+md4_round2(uint32_t *a, uint32_t b, uint32_t c, uint32_t d, uint32_t x,
+    uint32_t s)
+{
+	*a = crypto_rol_u32(*a + md4_g(b, c, d) + x + 0x5a827999UL, s);
+}
 
-/* As pointed out by Wei Dai <weidai@eskimo.com>, the above can be
- * simplified to the code below.  Wei attributes these optimizations
- * to Peter Gutmann's SHS code, and he attributes it to Rich Schroeppel.
- */
-#define	F(b,c,d)	((((c) ^ (d)) & (b)) ^ (d))
-#define G(b,c,d)	(((b) & (c)) | ((b) & (d)) | ((c) & (d)))
-#define	H(b,c,d)	((b) ^ (c) ^ (d))
+static inline void
+md4_round3(uint32_t *a, uint32_t b, uint32_t c, uint32_t d, uint32_t x,
+    uint32_t s)
+{
+	*a = crypto_rol_u32(*a + md4_h(b, c, d) + x + 0x6ed9eba1UL, s);
+}
 
-#define R0(a,b,c,d,k,s,t) { \
-	a+=((k)+(t)+F((b),(c),(d))); \
-	a=ROTATE(a,s); };
+static void
+md4_block_data_order(MD4_CTX *c, const void *_in, size_t num)
+{
+	const uint8_t *in = _in;
+	const MD4_LONG *in32;
+	unsigned int A, B, C, D;
+	unsigned int X0, X1, X2, X3, X4, X5, X6, X7,
+	    X8, X9, X10, X11, X12, X13, X14, X15;
 
-#define R1(a,b,c,d,k,s,t) { \
-	a+=((k)+(t)+G((b),(c),(d))); \
-	a=ROTATE(a,s); };\
+	while (num-- > 0) {
+		A = c->A;
+		B = c->B;
+		C = c->C;
+		D = c->D;
 
-#define R2(a,b,c,d,k,s,t) { \
-	a+=((k)+(t)+H((b),(c),(d))); \
-	a=ROTATE(a,s); };
+		if ((uintptr_t)in % 4 == 0) {
+			/* Input is 32 bit aligned. */
+			in32 = (const MD4_LONG *)in;
+			X0 = le32toh(in32[0]);
+			X1 = le32toh(in32[1]);
+			X2 = le32toh(in32[2]);
+			X3 = le32toh(in32[3]);
+			X4 = le32toh(in32[4]);
+			X5 = le32toh(in32[5]);
+			X6 = le32toh(in32[6]);
+			X7 = le32toh(in32[7]);
+			X8 = le32toh(in32[8]);
+			X9 = le32toh(in32[9]);
+			X10 = le32toh(in32[10]);
+			X11 = le32toh(in32[11]);
+			X12 = le32toh(in32[12]);
+			X13 = le32toh(in32[13]);
+			X14 = le32toh(in32[14]);
+			X15 = le32toh(in32[15]);
+		} else {
+			/* Input is not 32 bit aligned. */
+			X0 = crypto_load_le32toh(&in[0 * 4]);
+			X1 = crypto_load_le32toh(&in[1 * 4]);
+			X2 = crypto_load_le32toh(&in[2 * 4]);
+			X3 = crypto_load_le32toh(&in[3 * 4]);
+			X4 = crypto_load_le32toh(&in[4 * 4]);
+			X5 = crypto_load_le32toh(&in[5 * 4]);
+			X6 = crypto_load_le32toh(&in[6 * 4]);
+			X7 = crypto_load_le32toh(&in[7 * 4]);
+			X8 = crypto_load_le32toh(&in[8 * 4]);
+			X9 = crypto_load_le32toh(&in[9 * 4]);
+			X10 = crypto_load_le32toh(&in[10 * 4]);
+			X11 = crypto_load_le32toh(&in[11 * 4]);
+			X12 = crypto_load_le32toh(&in[12 * 4]);
+			X13 = crypto_load_le32toh(&in[13 * 4]);
+			X14 = crypto_load_le32toh(&in[14 * 4]);
+			X15 = crypto_load_le32toh(&in[15 * 4]);
+		}
+		in += MD4_CBLOCK;
 
-/* Implemented from RFC1186 The MD4 Message-Digest Algorithm
- */
+		md4_round1(&A, B, C, D, X0, 3);
+		md4_round1(&D, A, B, C, X1, 7);
+		md4_round1(&C, D, A, B, X2, 11);
+		md4_round1(&B, C, D, A, X3, 19);
+		md4_round1(&A, B, C, D, X4, 3);
+		md4_round1(&D, A, B, C, X5, 7);
+		md4_round1(&C, D, A, B, X6, 11);
+		md4_round1(&B, C, D, A, X7, 19);
+		md4_round1(&A, B, C, D, X8, 3);
+		md4_round1(&D, A, B, C, X9, 7);
+		md4_round1(&C, D, A, B, X10, 11);
+		md4_round1(&B, C, D, A, X11, 19);
+		md4_round1(&A, B, C, D, X12, 3);
+		md4_round1(&D, A, B, C, X13, 7);
+		md4_round1(&C, D, A, B, X14, 11);
+		md4_round1(&B, C, D, A, X15, 19);
 
-#define INIT_DATA_A (unsigned long)0x67452301L
-#define INIT_DATA_B (unsigned long)0xefcdab89L
-#define INIT_DATA_C (unsigned long)0x98badcfeL
-#define INIT_DATA_D (unsigned long)0x10325476L
+		/* Round 1 */
+		md4_round2(&A, B, C, D, X0, 3);
+		md4_round2(&D, A, B, C, X4, 5);
+		md4_round2(&C, D, A, B, X8, 9);
+		md4_round2(&B, C, D, A, X12, 13);
+		md4_round2(&A, B, C, D, X1, 3);
+		md4_round2(&D, A, B, C, X5, 5);
+		md4_round2(&C, D, A, B, X9, 9);
+		md4_round2(&B, C, D, A, X13, 13);
+		md4_round2(&A, B, C, D, X2, 3);
+		md4_round2(&D, A, B, C, X6, 5);
+		md4_round2(&C, D, A, B, X10, 9);
+		md4_round2(&B, C, D, A, X14, 13);
+		md4_round2(&A, B, C, D, X3, 3);
+		md4_round2(&D, A, B, C, X7, 5);
+		md4_round2(&C, D, A, B, X11, 9);
+		md4_round2(&B, C, D, A, X15, 13);
+
+		/* Round 2 */
+		md4_round3(&A, B, C, D, X0, 3);
+		md4_round3(&D, A, B, C, X8, 9);
+		md4_round3(&C, D, A, B, X4, 11);
+		md4_round3(&B, C, D, A, X12, 15);
+		md4_round3(&A, B, C, D, X2, 3);
+		md4_round3(&D, A, B, C, X10, 9);
+		md4_round3(&C, D, A, B, X6, 11);
+		md4_round3(&B, C, D, A, X14, 15);
+		md4_round3(&A, B, C, D, X1, 3);
+		md4_round3(&D, A, B, C, X9, 9);
+		md4_round3(&C, D, A, B, X5, 11);
+		md4_round3(&B, C, D, A, X13, 15);
+		md4_round3(&A, B, C, D, X3, 3);
+		md4_round3(&D, A, B, C, X11, 9);
+		md4_round3(&C, D, A, B, X7, 11);
+		md4_round3(&B, C, D, A, X15, 15);
+
+		c->A += A;
+		c->B += B;
+		c->C += C;
+		c->D += D;
+	}
+}
 
 int
 MD4_Init(MD4_CTX *c)
 {
-	memset (c, 0, sizeof(*c));
-	c->A = INIT_DATA_A;
-	c->B = INIT_DATA_B;
-	c->C = INIT_DATA_C;
-	c->D = INIT_DATA_D;
+	memset(c, 0, sizeof(*c));
+
+	c->A = 0x67452301UL;
+	c->B = 0xefcdab89UL;
+	c->C = 0x98badcfeUL;
+	c->D = 0x10325476UL;
+
 	return 1;
 }
 LCRYPTO_ALIAS(MD4_Init);
 
-#ifndef md4_block_data_order
-#ifdef X
-#undef X
-#endif
-void
-md4_block_data_order(MD4_CTX *c, const void *data_, size_t num)
+int
+MD4_Update(MD4_CTX *c, const void *data_, size_t len)
 {
 	const unsigned char *data = data_;
-	unsigned int A, B, C, D, l;
-	unsigned int X0, X1, X2, X3, X4, X5, X6, X7,
-	    X8, X9, X10, X11, X12, X13, X14, X15;
+	unsigned char *p;
+	MD4_LONG l;
+	size_t n;
 
-	A = c->A;
-	B = c->B;
-	C = c->C;
-	D = c->D;
+	if (len == 0)
+		return 1;
 
-	for (; num--; ) {
-		HOST_c2l(data, l);
-		X0 = l;
-		HOST_c2l(data, l);
-		X1 = l;
-		/* Round 0 */
-		R0(A, B, C, D, X0, 3, 0);
-		HOST_c2l(data, l);
-		X2 = l;
-		R0(D, A, B, C, X1, 7, 0);
-		HOST_c2l(data, l);
-		X3 = l;
-		R0(C, D, A, B, X2, 11, 0);
-		HOST_c2l(data, l);
-		X4 = l;
-		R0(B, C, D, A, X3, 19, 0);
-		HOST_c2l(data, l);
-		X5 = l;
-		R0(A, B, C, D, X4, 3, 0);
-		HOST_c2l(data, l);
-		X6 = l;
-		R0(D, A, B, C, X5, 7, 0);
-		HOST_c2l(data, l);
-		X7 = l;
-		R0(C, D, A, B, X6, 11, 0);
-		HOST_c2l(data, l);
-		X8 = l;
-		R0(B, C, D, A, X7, 19, 0);
-		HOST_c2l(data, l);
-		X9 = l;
-		R0(A, B, C, D, X8, 3, 0);
-		HOST_c2l(data, l);
-		X10 = l;
-		R0(D, A,B, C,X9, 7, 0);
-		HOST_c2l(data, l);
-		X11 = l;
-		R0(C, D,A, B,X10, 11, 0);
-		HOST_c2l(data, l);
-		X12 = l;
-		R0(B, C,D, A,X11, 19, 0);
-		HOST_c2l(data, l);
-		X13 = l;
-		R0(A, B,C, D,X12, 3, 0);
-		HOST_c2l(data, l);
-		X14 = l;
-		R0(D, A,B, C,X13, 7, 0);
-		HOST_c2l(data, l);
-		X15 = l;
-		R0(C, D,A, B,X14, 11, 0);
-		R0(B, C,D, A,X15, 19, 0);
-		/* Round 1 */
-		R1(A, B, C, D, X0, 3, 0x5A827999L);
-		R1(D, A, B, C, X4, 5, 0x5A827999L);
-		R1(C, D, A, B, X8, 9, 0x5A827999L);
-		R1(B, C, D, A, X12, 13, 0x5A827999L);
-		R1(A, B, C, D, X1, 3, 0x5A827999L);
-		R1(D, A, B, C, X5, 5, 0x5A827999L);
-		R1(C, D, A, B, X9, 9, 0x5A827999L);
-		R1(B, C, D, A, X13, 13, 0x5A827999L);
-		R1(A, B, C, D, X2, 3, 0x5A827999L);
-		R1(D, A, B, C, X6, 5, 0x5A827999L);
-		R1(C, D, A, B, X10, 9, 0x5A827999L);
-		R1(B, C, D, A, X14, 13, 0x5A827999L);
-		R1(A, B, C, D, X3, 3, 0x5A827999L);
-		R1(D, A, B, C, X7, 5, 0x5A827999L);
-		R1(C, D, A, B, X11, 9, 0x5A827999L);
-		R1(B, C, D, A, X15, 13, 0x5A827999L);
-		/* Round 2 */
-		R2(A, B, C, D, X0, 3, 0x6ED9EBA1L);
-		R2(D, A, B, C, X8, 9, 0x6ED9EBA1L);
-		R2(C, D, A, B, X4, 11, 0x6ED9EBA1L);
-		R2(B, C, D, A, X12, 15, 0x6ED9EBA1L);
-		R2(A, B, C, D, X2, 3, 0x6ED9EBA1L);
-		R2(D, A, B, C, X10, 9, 0x6ED9EBA1L);
-		R2(C, D, A, B, X6, 11, 0x6ED9EBA1L);
-		R2(B, C, D, A, X14, 15, 0x6ED9EBA1L);
-		R2(A, B, C, D, X1, 3, 0x6ED9EBA1L);
-		R2(D, A, B, C, X9, 9, 0x6ED9EBA1L);
-		R2(C, D, A, B, X5, 11, 0x6ED9EBA1L);
-		R2(B, C, D, A, X13, 15, 0x6ED9EBA1L);
-		R2(A, B, C, D, X3, 3, 0x6ED9EBA1L);
-		R2(D, A, B, C, X11, 9, 0x6ED9EBA1L);
-		R2(C, D, A, B, X7, 11, 0x6ED9EBA1L);
-		R2(B, C, D, A, X15, 15, 0x6ED9EBA1L);
+	l = (c->Nl + (((MD4_LONG)len) << 3))&0xffffffffUL;
+	/* 95-05-24 eay Fixed a bug with the overflow handling, thanks to
+	 * Wei Dai <weidai@eskimo.com> for pointing it out. */
+	if (l < c->Nl) /* overflow */
+		c->Nh++;
+	c->Nh+=(MD4_LONG)(len>>29);	/* might cause compiler warning on 16-bit */
+	c->Nl = l;
 
-		A = c->A += A;
-		B = c->B += B;
-		C = c->C += C;
-		D = c->D += D;
+	n = c->num;
+	if (n != 0) {
+		p = (unsigned char *)c->data;
+
+		if (len >= MD4_CBLOCK || len + n >= MD4_CBLOCK) {
+			memcpy (p + n, data, MD4_CBLOCK - n);
+			md4_block_data_order (c, p, 1);
+			n = MD4_CBLOCK - n;
+			data += n;
+			len -= n;
+			c->num = 0;
+			memset(p, 0, MD4_CBLOCK);	/* keep it zeroed */
+		} else {
+			memcpy(p + n, data, len);
+			c->num += (unsigned int)len;
+			return 1;
+		}
 	}
+
+	n = len / MD4_CBLOCK;
+	if (n > 0) {
+		md4_block_data_order(c, data, n);
+		n    *= MD4_CBLOCK;
+		data += n;
+		len -= n;
+	}
+
+	if (len != 0) {
+		p = (unsigned char *)c->data;
+		c->num = (unsigned int)len;
+		memcpy(p, data, len);
+	}
+	return 1;
 }
-#endif
+LCRYPTO_ALIAS(MD4_Update);
+
+void
+MD4_Transform(MD4_CTX *c, const unsigned char *data)
+{
+	md4_block_data_order(c, data, 1);
+}
+LCRYPTO_ALIAS(MD4_Transform);
+
+int
+MD4_Final(unsigned char *md, MD4_CTX *c)
+{
+	unsigned char *p = (unsigned char *)c->data;
+	size_t n = c->num;
+
+	p[n] = 0x80; /* there is always room for one */
+	n++;
+
+	if (n > (MD4_CBLOCK - 8)) {
+		memset(p + n, 0, MD4_CBLOCK - n);
+		n = 0;
+		md4_block_data_order(c, p, 1);
+	}
+
+	memset(p + n, 0, MD4_CBLOCK - 8 - n);
+	c->data[MD4_LBLOCK - 2] = htole32(c->Nl);
+	c->data[MD4_LBLOCK - 1] = htole32(c->Nh);
+
+	md4_block_data_order(c, p, 1);
+	c->num = 0;
+	memset(p, 0, MD4_CBLOCK);
+
+	crypto_store_htole32(&md[0 * 4], c->A);
+	crypto_store_htole32(&md[1 * 4], c->B);
+	crypto_store_htole32(&md[2 * 4], c->C);
+	crypto_store_htole32(&md[3 * 4], c->D);
+
+	return 1;
+}
+LCRYPTO_ALIAS(MD4_Final);
 
 unsigned char *
 MD4(const unsigned char *d, size_t n, unsigned char *md)
 {
 	MD4_CTX c;
-	static unsigned char m[MD4_DIGEST_LENGTH];
 
-	if (md == NULL)
-		md = m;
 	if (!MD4_Init(&c))
 		return NULL;
 	MD4_Update(&c, d, n);
